@@ -1305,6 +1305,12 @@ Panel {
       }
       installerProcess.command = Model.installProcessArgs()
       installerProcess.startDetached()
+      // The installer runs in Omarchy's presented terminal, where sudo asks
+      // for the user's password. While the panel is open its full-screen
+      // overlay holds the shell's keyboard focus, so the panel must close
+      // before that terminal can receive any typing. The install poll keeps
+      // running with the panel closed and settles the state for reopening.
+      root.close()
       installPoll.restart()
       installTimeout.restart()
     }

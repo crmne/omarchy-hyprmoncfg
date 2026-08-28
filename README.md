@@ -87,7 +87,7 @@ systemctl --user restart hyprmoncfgd.service
 setsid -f gtk-launch hyprmoncfg-omarchy >/dev/null 2>&1
 ```
 
-The installer uses Omarchy's install helper when the package is missing and upgrades an existing package directly through `yay`. Both commands run in Omarchy's presented terminal, never invisibly inside `omarchy-shell`. After a successful install or upgrade it explicitly restarts the daemon, so an already-running service immediately uses the new binary, then opens hyprmoncfg through its hidden Omarchy desktop launcher. That launcher ships with the main package and carries Omarchy's standard `TUI.float` window identity, so the editor opens centered at the normal floating size without putting Omarchy-specific window logic in the panel. Saving a profile updates the panel immediately over IPC.
+The installer uses Omarchy's install helper when the package is missing and upgrades an existing package directly through `yay`. Both commands run in Omarchy's presented terminal, never invisibly inside `omarchy-shell`. The panel closes itself as that terminal opens: while open it is a full-screen overlay that holds the shell's keyboard focus, and `sudo`'s password prompt in the terminal would never receive what you type. After a successful install or upgrade it explicitly restarts the daemon, so an already-running service immediately uses the new binary, then opens hyprmoncfg through its hidden Omarchy desktop launcher. That launcher ships with the main package and carries Omarchy's standard `TUI.float` window identity, so the editor opens centered at the normal floating size without putting Omarchy-specific window logic in the panel. Saving a profile updates the panel immediately over IPC.
 
 ## Requirements
 
