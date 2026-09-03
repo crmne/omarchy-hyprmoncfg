@@ -866,14 +866,22 @@ function shellRestartCommand() {
   return ["sh", "-c", "setsid -f omarchy-restart-shell >/dev/null 2>&1"]
 }
 
-// pluginUpdated reports whether `omarchy plugin update` actually pulled
-// something, so an already-current plugin does not restart the shell for nothing.
-function pluginUpdated(output) {
-  return /^Updated /m.test(String(output || ""))
-}
-
+// Keep updater output out of the long-lived shell: even a broken or compromised
+// updater cannot grow its memory by writing forever. Exit 10 reports a changed
+// checkout without collecting subprocess text; zero means it was already current.
 function pluginUpdateCommand(pluginId) {
-  return ["omarchy", "plugin", "update", String(pluginId || ""), "--yes"]
+  return [
+    "sh",
+    "-c",
+    'dir="$HOME/.config/omarchy/plugins/$1"; ' +
+      '[ -d "$dir/.git" ] || exit 3; ' +
+      'before=$(git -C "$dir" rev-parse HEAD 2>/dev/null) || exit 4; ' +
+      'omarchy plugin update "$1" --yes >/dev/null 2>&1 || exit 5; ' +
+      'after=$(git -C "$dir" rev-parse HEAD 2>/dev/null) || exit 4; ' +
+      '[ "$before" = "$after" ] || exit 10',
+    "sh",
+    String(pluginId || "")
+  ]
 }
 
 // releaseVersion pulls the plain version out of `hyprmoncfg version` output,
@@ -972,7 +980,6 @@ if (typeof module !== "undefined") {
     pluginUpdateCheckCommand: pluginUpdateCheckCommand,
     pluginUpdateCommand: pluginUpdateCommand,
     shellRestartCommand: shellRestartCommand,
-    pluginUpdated: pluginUpdated,
     releaseVersion: releaseVersion,
     daemonNeedsRestart: daemonNeedsRestart,
     versionAtLeast: versionAtLeast

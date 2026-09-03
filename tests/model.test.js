@@ -803,9 +803,14 @@ test("the panel notices its own updates, since Omarchy never pulls plugins on it
   assert.doesNotMatch(check[2], /: > "\$stamp"/)
   assert.doesNotMatch(check[2], /\/tmp/)
 
-  assert.deepEqual(Model.pluginUpdateCommand("crmne.hyprmoncfg"), [
-    "omarchy", "plugin", "update", "crmne.hyprmoncfg", "--yes"
-  ])
+  const update = Model.pluginUpdateCommand("crmne.hyprmoncfg")
+  assert.equal(update[0], "sh")
+  assert.deepEqual(update.slice(3), ["sh", "crmne.hyprmoncfg"])
+  assert.doesNotMatch(update[2], /crmne\.hyprmoncfg/)
+  assert.match(update[2], /omarchy plugin update "\$1" --yes >\/dev\/null 2>&1/)
+  assert.match(update[2], /before=\$\(git -C "\$dir" rev-parse HEAD/)
+  assert.match(update[2], /after=\$\(git -C "\$dir" rev-parse HEAD/)
+  assert.match(update[2], /exit 10/)
 
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
   assert.match(qml, /root\.pluginUpdateAvailable = exitCode === 10/)
@@ -858,17 +863,12 @@ test("updating the panel finishes the job by reloading the shell", () => {
   // setsid matters: the restart must outlive the shell it is about to kill.
   assert.match(Model.shellRestartCommand()[2], /setsid/)
 
-  // Only a real update is worth a restart.
-  assert.equal(Model.pluginUpdated("Updated crmne.hyprmoncfg."), true)
-  assert.equal(Model.pluginUpdated("crmne.hyprmoncfg is up to date."), false)
-  assert.equal(Model.pluginUpdated(""), false)
-
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
-  assert.match(qml, /if \(Model\.pluginUpdated\(pluginUpdateOutput\.text\)\)/)
+  assert.match(qml, /if \(exitCode === 10\)/)
   assert.match(qml, /shellRestartProcess\.startDetached\(\)/)
 })
 
-test("updating touches only this plugin, and asks nothing", () => {
+test("updating touches only this plugin, asks nothing, and never buffers updater output", () => {
   const command = Model.pluginUpdateCommand("crmne.hyprmoncfg")
 
   // Naming the plugin is what keeps omarchy-plugin-update from walking every
@@ -876,5 +876,55 @@ test("updating touches only this plugin, and asks nothing", () => {
   assert.ok(command.includes("crmne.hyprmoncfg"), "the plugin id must be passed")
   // --yes skips the diff and the gum confirm, which a panel has no terminal to
   // answer anyway.
-  assert.ok(command.includes("--yes"), "the update must not wait on a prompt")
+  assert.match(command[2], /--yes/, "the update must not wait on a prompt")
+
+  // The updater may be verbose or compromised. Its stdout and stderr go to the
+  // null device, and the bounded exit status tells QML whether HEAD changed.
+  assert.match(command[2], />\/dev\/null 2>&1/)
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  assert.doesNotMatch(qml, /pluginUpdateOutput/)
+  assert.doesNotMatch(qml, /id: pluginUpdateRunProcess\s+stdout: StdioCollector/)
+})
+
+test("the panel updater discards subprocess output and reports a changed checkout by exit status", () => {
+  const temporaryHome = fs.mkdtempSync(path.join(os.tmpdir(), "hyprmoncfg-panel-update-"))
+  const pluginDir = path.join(temporaryHome, ".config", "omarchy", "plugins", "crmne.hyprmoncfg")
+  const fakeBin = path.join(temporaryHome, "bin")
+  const fakeOmarchy = path.join(fakeBin, "omarchy")
+  const fakeGit = path.join(fakeBin, "git")
+
+  fs.mkdirSync(path.join(pluginDir, ".git"), { recursive: true })
+  fs.mkdirSync(fakeBin)
+  fs.writeFileSync(fakeOmarchy, [
+    "#!/bin/sh",
+    "head -c 131072 /dev/zero",
+    "head -c 131072 /dev/zero >&2",
+    'touch "$HOME/panel-update-finished"'
+  ].join("\n"), { mode: 0o755 })
+  fs.writeFileSync(fakeGit, [
+    "#!/bin/sh",
+    'if [ -e "$HOME/panel-update-finished" ]; then',
+    "  printf '%s\\n' after",
+    "else",
+    "  printf '%s\\n' before",
+    "fi"
+  ].join("\n"), { mode: 0o755 })
+
+  try {
+    const command = Model.pluginUpdateCommand("crmne.hyprmoncfg")
+    const result = childProcess.spawnSync(command[0], command.slice(1), {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        HOME: temporaryHome,
+        PATH: fakeBin + path.delimiter + process.env.PATH
+      }
+    })
+
+    assert.equal(result.status, 10)
+    assert.equal(result.stdout, "")
+    assert.equal(result.stderr, "")
+  } finally {
+    fs.rmSync(temporaryHome, { recursive: true, force: true })
+  }
 })
