@@ -60,6 +60,15 @@ test("Preview & save requires a manually entered name and stays disabled while b
   assert.match(root.lastError, /profile name/)
 })
 
+test("the installed backend requirement matches the manifest and upgrade message", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const required = require("../manifest.json").hyprmoncfg.minimumVersion
+  assert.equal(qml.match(/Model.versionAtLeast\(versionOutput.text, "([^"]+)"\)/)[1], required)
+  assert.ok(qml.includes("hyprmoncfg " + required + " or newer is still required."))
+  assert.equal(Model.versionAtLeast("hyprmoncfg 1.18.2", required), false)
+  assert.equal(Model.versionAtLeast("hyprmoncfg " + required, required), true)
+})
+
 test("installer and TUI launches release panel focus before starting the terminal", () => {
   const trace = []
   const deferred = []
