@@ -13,6 +13,21 @@ function panelFunction(name, root, globals = {}) {
   return vm.runInNewContext("(" + source + ")", { root, Model, ...globals })
 }
 
+test("unnamed layouts explain saving and focus the profile name without applying", () => {
+  let focused = false
+  const root = {
+    managedChecked: true,
+    draftName() { return "" },
+    send() { throw new Error("must not apply an unnamed layout") },
+  }
+  panelFunction("previewDraft", root, {
+    Qt: { callLater(fn) { fn() } },
+    profileNameInput: { forceActiveFocus() { focused = true } },
+  })()
+  assert.equal(focused, true)
+  assert.match(root.lastError, /profile name.*Enter/)
+})
+
 test("installer and TUI launches release panel focus before starting the terminal", () => {
   const trace = []
   const deferred = []

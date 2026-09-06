@@ -858,7 +858,8 @@ Panel {
     if (!root.managedChecked) return
     var name = root.draftName()
     if (name === "") {
-      root.lastError = "Give this layout a profile name before previewing it."
+      root.lastError = "Enter a profile name, then press Enter to preview and save."
+      Qt.callLater(function() { profileNameInput.forceActiveFocus() })
       return
     }
     root.lastError = ""
@@ -3702,7 +3703,9 @@ Panel {
                     ? (root.profileAutomatic
                       ? "Turn off automatic selection to activate a profile."
                       : "Activation uses a safe 10-second preview.")
-                    : "Changes are previewed safely before they can be saved."))
+                    : (root.sourceProfile === "" && String(root.saveName || "").trim() === ""
+                      ? "Enter a profile name to save this custom layout."
+                      : "Changes are previewed safely before they can be saved.")))
                 color: root.dim
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
@@ -3807,11 +3810,11 @@ Panel {
               id: saveDraftButton
               anchors.verticalCenter: parent.verticalCenter
               visible: root.draftDirty || root.creatingProfile
-              text: "Preview & save"
+              text: root.sourceProfile === "" && String(root.saveName || "").trim() === ""
+                ? "Name & save" : "Preview & save"
               selected: true
               bordered: true
               enabled: root.managedChecked && !root.editPending && !root.previewPending
-                && (root.sourceProfile !== "" || String(root.saveName || "").trim() !== "")
               foreground: root.foreground
               fontFamily: root.fontFamily
               onClicked: root.previewDraft()
