@@ -7,6 +7,7 @@ Before committing a change, run:
 ```sh
 node --test tests/model.test.js
 qmllint *.qml
+QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -platform offscreen -input tests/qml
 omarchy plugin validate .
 git diff --check
 ```

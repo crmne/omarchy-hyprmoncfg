@@ -2524,524 +2524,539 @@ Panel {
                   }
                 }
 
-                Column {
-                  visible: root.inspectorPage === "display"
+                InspectorViewport {
+                  id: inspectorViewport
                   anchors.left: parent.left
                   anchors.right: parent.right
                   anchors.top: inspectorTabs.bottom
+                  anchors.bottom: parent.bottom
                   anchors.topMargin: Style.space(9)
-                  spacing: Style.space(9)
-
-                  BrightnessControl {
-                    visible: root.brightnessConnector !== ""
-                    width: parent.width
-                    bar: root.bar
-                    connector: root.brightnessConnector
-                    displayLabel: root.brightnessDisplayLabel
-                    value: root.brightnessPercent
-                    available: root.brightnessAvailable
-                    loading: root.brightnessLoading
-                    foreground: root.foreground
-                    dim: root.dim
-                    accent: Color.accent
-                    fontFamily: root.fontFamily
-                    onPreviewed: function(value) { root.previewBrightness(value) }
-                    onCommitted: function(value) {
-                      brightnessSetDebounce.stop()
-                      root.setBrightness(value)
-                    }
-                  }
-
-                  PanelSeparator {
-                    visible: root.brightnessConnector !== ""
-                    width: parent.width
-                    foreground: root.foreground
-                  }
-
-                  Item {
-                    width: parent.width
-                    height: displayEnabledToggle.height
-
-                    Toggle {
-                      id: displayEnabledToggle
-                      anchors.left: parent.left
-                      anchors.right: enabledResetAction.visible ? enabledResetAction.left : parent.right
-                      anchors.rightMargin: enabledResetAction.visible ? Style.spacing.xxs : 0
-                      label: "Enabled"
-                      description: checked ? "This display participates in the layout" : "Saved as off"
-                      checked: root.selectedOutput ? root.selectedOutput.enabled !== false : false
-                      enabled: root.managedChecked && !!root.selectedOutput && !root.editPending
-                        && (checked ? Model.enabledOutputCount(root.draftProfile) > 1 : true)
-                      opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
-                      hasCursor: root.inspectorHasCursor(0)
-                      foreground: root.foreground
-                      fontFamily: root.fontFamily
-                      onClicked: root.editOutput({ enabled: !checked })
-                    }
-
-                    PanelActionButton {
-                      id: enabledResetAction
-                      anchors.right: parent.right
-                      anchors.verticalCenter: parent.verticalCenter
-                      visible: root.outputFieldChanged("enabled")
-                      enabled: displayEnabledToggle.enabled
-                      iconText: "󰑐"
-                      tooltipText: root.outputFieldResetTooltip("enabled state")
-                      foreground: root.foreground
-                      fontFamily: root.fontFamily
-                      focusable: true
-                      onClicked: root.resetOutputField("enabled")
-                    }
-                  }
-
-                  Grid {
-                    width: parent.width
-                    columns: 2
-                    spacing: Style.space(8)
-                    enabled: root.managedChecked
-                    opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
-                    readonly property real cellWidth: (width - spacing) / 2
-
-                    PanelDropdown {
-                      id: modeDropdown
-                      popupParent: keyCatcher
-                      ownerOpen: root.opened && root.expanded
-                      width: parent.cellWidth
-                      label: "MODE"
-                      options: Model.modeOptions(root.editorDocument.displays, root.selectedOutputKey)
-                      value: root.selectedOutput ? Model.outputMode(root.selectedOutput) : ""
-                      enabled: !!root.selectedOutput && !root.editPending
-                      hasCursor: root.inspectorHasCursor(1)
-                      foreground: root.foreground
-                      fontFamily: root.fontFamily
-                      resetVisible: root.outputFieldChanged("mode")
-                      resetTooltip: root.outputFieldResetTooltip("display mode")
-                      onChanged: function(value) { root.editOutput({ mode: value }) }
-                      onResetRequested: root.resetOutputField("mode")
-                    }
-
-                    PanelDropdown {
-                      id: scaleDropdown
-                      popupParent: keyCatcher
-                      ownerOpen: root.opened && root.expanded
-                      width: parent.cellWidth
-                      label: "SCALE"
-                      options: Model.scaleOptions(root.editorDocument.displays, root.selectedOutputKey,
-                        root.selectedOutput ? root.selectedOutput.scale : 1)
-                      value: root.selectedOutput ? Model.formatScale(root.selectedOutput.scale) : "1"
-                      enabled: !!root.selectedOutput && !root.editPending
-                      hasCursor: root.inspectorHasCursor(2)
-                      foreground: root.foreground
-                      fontFamily: root.fontFamily
-                      resetVisible: root.outputFieldChanged("scale")
-                      resetTooltip: root.outputFieldResetTooltip("display scale")
-                      onChanged: function(value) { root.editOutput({ scale: Number(value) }) }
-                      onResetRequested: root.resetOutputField("scale")
-                    }
-
-                    PanelDropdown {
-                      id: vrrDropdown
-                      popupParent: keyCatcher
-                      ownerOpen: root.opened && root.expanded
-                      width: parent.cellWidth
-                      label: "VRR"
-                      options: root.vrrOptions
-                      value: root.selectedOutput ? String(root.selectedOutput.vrr || 0) : "0"
-                      enabled: !!root.selectedOutput && !root.editPending
-                      hasCursor: root.inspectorHasCursor(5)
-                      foreground: root.foreground
-                      fontFamily: root.fontFamily
-                      resetVisible: root.outputFieldChanged("vrr")
-                      resetTooltip: root.outputFieldResetTooltip("VRR mode")
-                      onChanged: function(value) { root.editOutput({ vrr: Number(value) }) }
-                      onResetRequested: root.resetOutputField("vrr")
-                    }
-
-                    PanelDropdown {
-                      id: rotationDropdown
-                      popupParent: keyCatcher
-                      ownerOpen: root.opened && root.expanded
-                      width: parent.cellWidth
-                      label: "ROTATION"
-                      options: root.transformOptions
-                      value: root.selectedOutput ? String(root.selectedOutput.transform || 0) : "0"
-                      enabled: !!root.selectedOutput && !root.editPending
-                      hasCursor: root.inspectorHasCursor(6)
-                      foreground: root.foreground
-                      fontFamily: root.fontFamily
-                      resetVisible: root.outputFieldChanged("transform")
-                      resetTooltip: root.outputFieldResetTooltip("rotation")
-                      onChanged: function(value) { root.editOutput({ transform: Number(value) }) }
-                      onResetRequested: root.resetOutputField("transform")
-                    }
-
-                    Item {
-                      width: parent.cellWidth
-                      height: positionXField.height
-
-                      NumberField {
-                        id: positionXField
-                        anchors.left: parent.left
-                        anchors.right: positionXResetAction.visible ? positionXResetAction.left : parent.right
-                        anchors.rightMargin: positionXResetAction.visible ? Style.spacing.xxs : 0
-                        fieldWidth: width
-                        label: "POSITION X"
-                        from: -20000
-                        to: 20000
-                        value: root.selectedOutput ? Number(root.selectedOutput.x || 0) : 0
-                        enabled: !!root.selectedOutput && !root.editPending
-                        hasCursor: root.inspectorHasCursor(7)
-                        foreground: root.foreground
-                        fontFamily: root.fontFamily
-                        onModified: function(value) {
-                          root.editOutput({ x: value })
-                          Qt.callLater(function() { keyCatcher.forceActiveFocus() })
-                        }
-                      }
-
-                      PanelActionButton {
-                        id: positionXResetAction
-                        anchors.right: parent.right
-                        anchors.bottom: parent.bottom
-                        visible: root.outputFieldChanged("x")
-                        enabled: !!root.selectedOutput && !root.editPending
-                        iconText: "󰑐"
-                        tooltipText: root.outputFieldResetTooltip("horizontal position")
-                        foreground: root.foreground
-                        fontFamily: root.fontFamily
-                        focusable: true
-                        onClicked: root.resetOutputField("x")
-                      }
-                    }
-
-                    Item {
-                      width: parent.cellWidth
-                      height: positionYField.height
-
-                      NumberField {
-                        id: positionYField
-                        anchors.left: parent.left
-                        anchors.right: positionYResetAction.visible ? positionYResetAction.left : parent.right
-                        anchors.rightMargin: positionYResetAction.visible ? Style.spacing.xxs : 0
-                        fieldWidth: width
-                        label: "POSITION Y"
-                        from: -20000
-                        to: 20000
-                        value: root.selectedOutput ? Number(root.selectedOutput.y || 0) : 0
-                        enabled: !!root.selectedOutput && !root.editPending
-                        hasCursor: root.inspectorHasCursor(8)
-                        foreground: root.foreground
-                        fontFamily: root.fontFamily
-                        onModified: function(value) {
-                          root.editOutput({ y: value })
-                          Qt.callLater(function() { keyCatcher.forceActiveFocus() })
-                        }
-                      }
-
-                      PanelActionButton {
-                        id: positionYResetAction
-                        anchors.right: parent.right
-                        anchors.bottom: parent.bottom
-                        visible: root.outputFieldChanged("y")
-                        enabled: !!root.selectedOutput && !root.editPending
-                        iconText: "󰑐"
-                        tooltipText: root.outputFieldResetTooltip("vertical position")
-                        foreground: root.foreground
-                        fontFamily: root.fontFamily
-                        focusable: true
-                        onClicked: root.resetOutputField("y")
-                      }
-                    }
-                  }
-
-                  PanelDropdown {
-                    id: mirrorDropdown
-                    popupParent: keyCatcher
-                    ownerOpen: root.opened && root.expanded
-                    width: parent.width
-                    label: "MIRROR"
-                    options: Model.mirrorOptions(root.draftProfile, root.selectedOutputKey)
-                    value: root.selectedOutput ? String(root.selectedOutput.mirror_of || "") : ""
-                    enabled: root.managedChecked && !!root.selectedOutput && !root.editPending
-                    hasCursor: root.inspectorHasCursor(9)
-                    opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
-                    foreground: root.foreground
-                    fontFamily: root.fontFamily
-                    resetVisible: root.outputFieldChanged("mirror_of")
-                    resetTooltip: root.outputFieldResetTooltip("mirror target")
-                    onChanged: function(value) { root.editOutput({ mirror_of: value }) }
-                    onResetRequested: root.resetOutputField("mirror_of")
-                  }
-                }
-
-                Column {
-                  visible: root.inspectorPage === "color"
-                  anchors.left: parent.left
-                  anchors.right: parent.right
-                  anchors.top: inspectorTabs.bottom
-                  anchors.topMargin: Style.space(9)
-                  spacing: Style.space(8)
-                  enabled: root.managedChecked
-                  opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
-
-                  Text {
-                    textFormat: Text.PlainText
-                    width: parent.width
-                    text: "bpc = bits per color component · EOTF = electro-optical transfer function · PQ = Perceptual Quantizer · WCG = wide color gamut · luminance is cd/m² (nits). All-zero display luminance overrides keep EDID detection. A reset button appears beside a value changed from the loaded profile."
-                    color: root.dim
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                    wrapMode: Text.WordWrap
-                  }
-
-                  Grid {
-                    width: parent.width
-                    columns: 2
-                    spacing: Style.space(7)
-                    readonly property real cellWidth: (width - spacing) / 2
-
-                    PanelDropdown {
-                      id: bitdepthDropdown
-                      popupParent: keyCatcher
-                      ownerOpen: root.opened && root.expanded
-                      width: parent.cellWidth
-                      label: "COLOR DEPTH (BPC)"
-                      options: root.bitdepthOptions
-                      value: root.selectedOutput ? String(root.selectedOutput.bitdepth || 8) : "8"
-                      enabled: !!root.selectedOutput && !root.editPending
-                      hasCursor: root.inspectorHasCursor(3)
-                      foreground: root.foreground
-                      fontFamily: root.fontFamily
-                      resetVisible: root.outputFieldChanged("bitdepth")
-                      resetTooltip: root.outputFieldResetTooltip("color depth")
-                      onChanged: function(value) { root.editOutput({ bitdepth: Number(value) }) }
-                      onResetRequested: root.resetOutputField("bitdepth")
-                    }
-
-                    PanelDropdown {
-                      id: colorManagementDropdown
-                      popupParent: keyCatcher
-                      ownerOpen: root.opened && root.expanded
-                      width: parent.cellWidth
-                      label: "COLOR SPACE / EOTF"
-                      options: root.colorManagementOptions
-                      value: root.selectedOutput && String(root.selectedOutput.cm || "") !== ""
-                        ? String(root.selectedOutput.cm) : "srgb"
-                      enabled: !!root.selectedOutput && !root.editPending
-                      hasCursor: root.inspectorHasCursor(4)
-                      foreground: root.foreground
-                      fontFamily: root.fontFamily
-                      resetVisible: root.outputFieldChanged("cm")
-                      resetTooltip: root.outputFieldResetTooltip("color space and EOTF")
-                      onChanged: function(value) { root.editOutput({ cm: value }) }
-                      onResetRequested: root.resetOutputField("cm")
-                    }
-
-                    DecimalField {
-                      id: sdrBrightnessField
-                      width: parent.cellWidth
-                      label: "SDR LUMINANCE SCALE"
-                      value: root.selectedOutput ? Number(root.selectedOutput.sdr_brightness || 1) : 1
-                      decimals: 2
-                      enabled: !!root.selectedOutput && !root.editPending
-                      hasCursor: root.inspectorHasCursor(10)
-                      resetVisible: root.outputFieldChanged("sdr_brightness")
-                      resetTooltip: root.outputFieldResetTooltip("SDR luminance scale")
-                      onModified: function(value) { root.editOutput({ sdr_brightness: value }) }
-                      onResetRequested: root.resetOutputField("sdr_brightness")
-                    }
-
-                    DecimalField {
-                      id: sdrSaturationField
-                      width: parent.cellWidth
-                      label: "SDR SATURATION SCALE"
-                      value: root.selectedOutput ? Number(root.selectedOutput.sdr_saturation || 1) : 1
-                      decimals: 2
-                      enabled: !!root.selectedOutput && !root.editPending
-                      hasCursor: root.inspectorHasCursor(11)
-                      resetVisible: root.outputFieldChanged("sdr_saturation")
-                      resetTooltip: root.outputFieldResetTooltip("SDR saturation scale")
-                      onModified: function(value) { root.editOutput({ sdr_saturation: value }) }
-                      onResetRequested: root.resetOutputField("sdr_saturation")
-                    }
-
-                    DecimalField {
-                      id: sdrMinLuminanceField
-                      width: parent.cellWidth
-                      label: "SDR BLACK LEVEL (cd/m²)"
-                      value: root.selectedOutput ? Number(root.selectedOutput.sdr_min_luminance || 0) : 0
-                      decimals: 3
-                      enabled: !!root.selectedOutput && !root.editPending
-                      hasCursor: root.inspectorHasCursor(12)
-                      resetVisible: root.outputFieldChanged("sdr_min_luminance")
-                      resetTooltip: root.outputFieldResetTooltip("SDR black level")
-                      onModified: function(value) { root.editOutput({ sdr_min_luminance: value }) }
-                      onResetRequested: root.resetOutputField("sdr_min_luminance")
-                    }
-
-                    DecimalField {
-                      id: sdrMaxLuminanceField
-                      width: parent.cellWidth
-                      label: "SDR WHITE LEVEL (cd/m²)"
-                      value: root.selectedOutput ? Number(root.selectedOutput.sdr_max_luminance || 0) : 0
-                      decimals: 0
-                      enabled: !!root.selectedOutput && !root.editPending
-                      hasCursor: root.inspectorHasCursor(13)
-                      resetVisible: root.outputFieldChanged("sdr_max_luminance")
-                      resetTooltip: root.outputFieldResetTooltip("SDR white level")
-                      onModified: function(value) { root.editOutput({ sdr_max_luminance: Math.round(value) }) }
-                      onResetRequested: root.resetOutputField("sdr_max_luminance")
-                    }
-
-                    PanelDropdown {
-                      id: sdrCurveDropdown
-                      popupParent: keyCatcher
-                      ownerOpen: root.opened && root.expanded
-                      width: parent.cellWidth
-                      label: "SDR EOTF"
-                      options: [
-                        { value: "default", label: "Default" },
-                        { value: "gamma22", label: "Gamma 2.2" },
-                        { value: "srgb", label: "sRGB" }
-                      ]
-                      value: root.selectedOutput && String(root.selectedOutput.sdr_eotf || "") !== ""
-                        ? String(root.selectedOutput.sdr_eotf) : "default"
-                      enabled: !!root.selectedOutput && !root.editPending
-                      hasCursor: root.inspectorHasCursor(14)
-                      foreground: root.foreground
-                      fontFamily: root.fontFamily
-                      resetVisible: root.outputFieldChanged("sdr_eotf")
-                      resetTooltip: root.outputFieldResetTooltip("SDR EOTF")
-                      onChanged: function(value) { root.editOutput({ sdr_eotf: value }) }
-                      onResetRequested: root.resetOutputField("sdr_eotf")
-                    }
-
-                    DecimalField {
-                      id: minLuminanceField
-                      width: parent.cellWidth
-                      label: "DISPLAY BLACK (cd/m²)"
-                      value: root.selectedOutput ? Number(root.selectedOutput.min_luminance || 0) : 0
-                      decimals: 3
-                      enabled: !!root.selectedOutput && !root.editPending
-                      hasCursor: root.inspectorHasCursor(15)
-                      resetVisible: root.outputFieldChanged("min_luminance")
-                      resetTooltip: root.outputFieldResetTooltip("display black level")
-                      onModified: function(value) { root.editOutput({ min_luminance: value }) }
-                      onResetRequested: root.resetOutputField("min_luminance")
-                    }
-
-                    DecimalField {
-                      id: maxLuminanceField
-                      width: parent.cellWidth
-                      label: "DISPLAY PEAK (cd/m²)"
-                      value: root.selectedOutput ? Number(root.selectedOutput.max_luminance || 0) : 0
-                      decimals: 0
-                      enabled: !!root.selectedOutput && !root.editPending
-                      hasCursor: root.inspectorHasCursor(16)
-                      resetVisible: root.outputFieldChanged("max_luminance")
-                      resetTooltip: root.outputFieldResetTooltip("display peak luminance")
-                      onModified: function(value) { root.editOutput({ max_luminance: Math.round(value) }) }
-                      onResetRequested: root.resetOutputField("max_luminance")
-                    }
-
-                    DecimalField {
-                      id: maxAvgLuminanceField
-                      width: parent.cellWidth
-                      label: "MAX FRAME-AVERAGE (cd/m²)"
-                      value: root.selectedOutput ? Number(root.selectedOutput.max_avg_luminance || 0) : 0
-                      decimals: 0
-                      enabled: !!root.selectedOutput && !root.editPending
-                      hasCursor: root.inspectorHasCursor(17)
-                      resetVisible: root.outputFieldChanged("max_avg_luminance")
-                      resetTooltip: root.outputFieldResetTooltip("maximum frame-average luminance")
-                      onModified: function(value) { root.editOutput({ max_avg_luminance: Math.round(value) }) }
-                      onResetRequested: root.resetOutputField("max_avg_luminance")
-                    }
-
-                    PanelDropdown {
-                      id: forceWideDropdown
-                      popupParent: keyCatcher
-                      ownerOpen: root.opened && root.expanded
-                      width: parent.cellWidth
-                      label: "WCG CAPABILITY"
-                      options: root.triStateOptions
-                      value: root.selectedOutput ? String(root.selectedOutput.supports_wide_color || 0) : "0"
-                      enabled: !!root.selectedOutput && !root.editPending
-                      hasCursor: root.inspectorHasCursor(18)
-                      foreground: root.foreground
-                      fontFamily: root.fontFamily
-                      resetVisible: root.outputFieldChanged("supports_wide_color")
-                      resetTooltip: root.outputFieldResetTooltip("wide-color-gamut capability")
-                      onChanged: function(value) { root.editOutput({ supports_wide_color: Number(value) }) }
-                      onResetRequested: root.resetOutputField("supports_wide_color")
-                    }
-
-                    PanelDropdown {
-                      id: forceHdrDropdown
-                      popupParent: keyCatcher
-                      ownerOpen: root.opened && root.expanded
-                      width: parent.cellWidth
-                      label: "HDR CAPABILITY"
-                      options: root.triStateOptions
-                      value: root.selectedOutput ? String(root.selectedOutput.supports_hdr || 0) : "0"
-                      enabled: !!root.selectedOutput && !root.editPending
-                      hasCursor: root.inspectorHasCursor(19)
-                      foreground: root.foreground
-                      fontFamily: root.fontFamily
-                      resetVisible: root.outputFieldChanged("supports_hdr")
-                      resetTooltip: root.outputFieldResetTooltip("HDR capability")
-                      onChanged: function(value) { root.editOutput({ supports_hdr: Number(value) }) }
-                      onResetRequested: root.resetOutputField("supports_hdr")
-                    }
-                  }
+                  scrollBarGap: Style.space(4)
+                  formHeight: root.inspectorPage === "display"
+                    ? displayControls.implicitHeight : colorControls.implicitHeight
+                  property string page: root.inspectorPage
+                  onPageChanged: contentY = 0
+                  currentField: root.keyboardLayoutPane === root.inspectorPage
+                    ? [displayEnabledToggle, modeDropdown, scaleDropdown, bitdepthDropdown,
+                       colorManagementDropdown, vrrDropdown, rotationDropdown, positionXField,
+                       positionYField, mirrorDropdown, sdrBrightnessField, sdrSaturationField,
+                       sdrMinLuminanceField, sdrMaxLuminanceField, sdrCurveDropdown,
+                       minLuminanceField, maxLuminanceField, maxAvgLuminanceField,
+                       forceWideDropdown, forceHdrDropdown, iccProfileInput][root.keyboardInspectorField]
+                    : null
 
                   Column {
+                    id: displayControls
+                    visible: root.inspectorPage === "display"
                     width: parent.width
-                    spacing: Style.space(4)
+                    spacing: Style.space(9)
 
-                    PanelSectionHeader {
-                      text: "ICC DEVICE PROFILE"
+                    BrightnessControl {
+                      visible: root.brightnessConnector !== ""
+                      width: parent.width
+                      bar: root.bar
+                      connector: root.brightnessConnector
+                      displayLabel: root.brightnessDisplayLabel
+                      value: root.brightnessPercent
+                      available: root.brightnessAvailable
+                      loading: root.brightnessLoading
                       foreground: root.foreground
+                      dim: root.dim
+                      accent: Color.accent
                       fontFamily: root.fontFamily
+                      onPreviewed: function(value) { root.previewBrightness(value) }
+                      onCommitted: function(value) {
+                        brightnessSetDebounce.stop()
+                        root.setBrightness(value)
+                      }
+                    }
+
+                    PanelSeparator {
+                      visible: root.brightnessConnector !== ""
+                      width: parent.width
+                      foreground: root.foreground
                     }
 
                     Item {
                       width: parent.width
-                      height: iccProfileInput.height
+                      height: displayEnabledToggle.height
 
-                      TextField {
-                        id: iccProfileInput
+                      Toggle {
+                        id: displayEnabledToggle
                         anchors.left: parent.left
-                        anchors.right: iccResetAction.visible ? iccResetAction.left : parent.right
-                        anchors.rightMargin: iccResetAction.visible ? Style.spacing.xxs : 0
-                        text: root.selectedOutput ? String(root.selectedOutput.icc || "") : ""
-                        placeholderText: "None — enter an absolute ICC profile path"
-                        enabled: !!root.selectedOutput && !root.editPending
-                        hasCursor: root.inspectorHasCursor(20)
+                        anchors.right: enabledResetAction.visible ? enabledResetAction.left : parent.right
+                        anchors.rightMargin: enabledResetAction.visible ? Style.spacing.xxs : 0
+                        label: "Enabled"
+                        description: checked ? "This display participates in the layout" : "Saved as off"
+                        checked: root.selectedOutput ? root.selectedOutput.enabled !== false : false
+                        enabled: root.managedChecked && !!root.selectedOutput && !root.editPending
+                          && (checked ? Model.enabledOutputCount(root.draftProfile) > 1 : true)
+                        opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
+                        hasCursor: root.inspectorHasCursor(0)
                         foreground: root.foreground
-                        onEditingFinished: {
-                          var returnToKeyboard = activeFocus
-                          if (text !== String((root.selectedOutput || {}).icc || ""))
-                            root.editOutput({ icc: text })
-                          if (returnToKeyboard)
-                            Qt.callLater(function() { keyCatcher.forceActiveFocus() })
-                        }
+                        fontFamily: root.fontFamily
+                        onClicked: root.editOutput({ enabled: !checked })
                       }
 
                       PanelActionButton {
-                        id: iccResetAction
+                        id: enabledResetAction
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
-                        visible: root.outputFieldChanged("icc")
-                        enabled: !!root.selectedOutput && !root.editPending
+                        visible: root.outputFieldChanged("enabled")
+                        enabled: displayEnabledToggle.enabled
                         iconText: "󰑐"
-                        tooltipText: root.outputFieldResetTooltip("ICC device profile")
+                        tooltipText: root.outputFieldResetTooltip("enabled state")
                         foreground: root.foreground
                         fontFamily: root.fontFamily
-                        fontSize: Style.font.body
-                        size: Math.min(iccProfileInput.height, Style.space(24))
                         focusable: true
-                        onClicked: root.resetOutputField("icc")
+                        onClicked: root.resetOutputField("enabled")
+                      }
+                    }
+
+                    Grid {
+                      width: parent.width
+                      columns: 2
+                      spacing: Style.space(8)
+                      enabled: root.managedChecked
+                      opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
+                      readonly property real cellWidth: (width - spacing) / 2
+
+                      PanelDropdown {
+                        id: modeDropdown
+                        popupParent: keyCatcher
+                        ownerOpen: root.opened && root.expanded && !inspectorViewport.moving
+                        width: parent.cellWidth
+                        label: "MODE"
+                        options: Model.modeOptions(root.editorDocument.displays, root.selectedOutputKey)
+                        value: root.selectedOutput ? Model.outputMode(root.selectedOutput) : ""
+                        enabled: !!root.selectedOutput && !root.editPending
+                        hasCursor: root.inspectorHasCursor(1)
+                        foreground: root.foreground
+                        fontFamily: root.fontFamily
+                        resetVisible: root.outputFieldChanged("mode")
+                        resetTooltip: root.outputFieldResetTooltip("display mode")
+                        onChanged: function(value) { root.editOutput({ mode: value }) }
+                        onResetRequested: root.resetOutputField("mode")
+                      }
+
+                      PanelDropdown {
+                        id: scaleDropdown
+                        popupParent: keyCatcher
+                        ownerOpen: root.opened && root.expanded && !inspectorViewport.moving
+                        width: parent.cellWidth
+                        label: "SCALE"
+                        options: Model.scaleOptions(root.editorDocument.displays, root.selectedOutputKey,
+                          root.selectedOutput ? root.selectedOutput.scale : 1)
+                        value: root.selectedOutput ? Model.formatScale(root.selectedOutput.scale) : "1"
+                        enabled: !!root.selectedOutput && !root.editPending
+                        hasCursor: root.inspectorHasCursor(2)
+                        foreground: root.foreground
+                        fontFamily: root.fontFamily
+                        resetVisible: root.outputFieldChanged("scale")
+                        resetTooltip: root.outputFieldResetTooltip("display scale")
+                        onChanged: function(value) { root.editOutput({ scale: Number(value) }) }
+                        onResetRequested: root.resetOutputField("scale")
+                      }
+
+                      PanelDropdown {
+                        id: vrrDropdown
+                        popupParent: keyCatcher
+                        ownerOpen: root.opened && root.expanded && !inspectorViewport.moving
+                        width: parent.cellWidth
+                        label: "VRR"
+                        options: root.vrrOptions
+                        value: root.selectedOutput ? String(root.selectedOutput.vrr || 0) : "0"
+                        enabled: !!root.selectedOutput && !root.editPending
+                        hasCursor: root.inspectorHasCursor(5)
+                        foreground: root.foreground
+                        fontFamily: root.fontFamily
+                        resetVisible: root.outputFieldChanged("vrr")
+                        resetTooltip: root.outputFieldResetTooltip("VRR mode")
+                        onChanged: function(value) { root.editOutput({ vrr: Number(value) }) }
+                        onResetRequested: root.resetOutputField("vrr")
+                      }
+
+                      PanelDropdown {
+                        id: rotationDropdown
+                        popupParent: keyCatcher
+                        ownerOpen: root.opened && root.expanded && !inspectorViewport.moving
+                        width: parent.cellWidth
+                        label: "ROTATION"
+                        options: root.transformOptions
+                        value: root.selectedOutput ? String(root.selectedOutput.transform || 0) : "0"
+                        enabled: !!root.selectedOutput && !root.editPending
+                        hasCursor: root.inspectorHasCursor(6)
+                        foreground: root.foreground
+                        fontFamily: root.fontFamily
+                        resetVisible: root.outputFieldChanged("transform")
+                        resetTooltip: root.outputFieldResetTooltip("rotation")
+                        onChanged: function(value) { root.editOutput({ transform: Number(value) }) }
+                        onResetRequested: root.resetOutputField("transform")
+                      }
+
+                      Item {
+                        width: parent.cellWidth
+                        height: positionXField.height
+
+                        NumberField {
+                          id: positionXField
+                          anchors.left: parent.left
+                          anchors.right: positionXResetAction.visible ? positionXResetAction.left : parent.right
+                          anchors.rightMargin: positionXResetAction.visible ? Style.spacing.xxs : 0
+                          fieldWidth: width
+                          label: "POSITION X"
+                          from: -20000
+                          to: 20000
+                          value: root.selectedOutput ? Number(root.selectedOutput.x || 0) : 0
+                          enabled: !!root.selectedOutput && !root.editPending
+                          hasCursor: root.inspectorHasCursor(7)
+                          foreground: root.foreground
+                          fontFamily: root.fontFamily
+                          onModified: function(value) {
+                            root.editOutput({ x: value })
+                            Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+                          }
+                        }
+
+                        PanelActionButton {
+                          id: positionXResetAction
+                          anchors.right: parent.right
+                          anchors.bottom: parent.bottom
+                          visible: root.outputFieldChanged("x")
+                          enabled: !!root.selectedOutput && !root.editPending
+                          iconText: "󰑐"
+                          tooltipText: root.outputFieldResetTooltip("horizontal position")
+                          foreground: root.foreground
+                          fontFamily: root.fontFamily
+                          focusable: true
+                          onClicked: root.resetOutputField("x")
+                        }
+                      }
+
+                      Item {
+                        width: parent.cellWidth
+                        height: positionYField.height
+
+                        NumberField {
+                          id: positionYField
+                          anchors.left: parent.left
+                          anchors.right: positionYResetAction.visible ? positionYResetAction.left : parent.right
+                          anchors.rightMargin: positionYResetAction.visible ? Style.spacing.xxs : 0
+                          fieldWidth: width
+                          label: "POSITION Y"
+                          from: -20000
+                          to: 20000
+                          value: root.selectedOutput ? Number(root.selectedOutput.y || 0) : 0
+                          enabled: !!root.selectedOutput && !root.editPending
+                          hasCursor: root.inspectorHasCursor(8)
+                          foreground: root.foreground
+                          fontFamily: root.fontFamily
+                          onModified: function(value) {
+                            root.editOutput({ y: value })
+                            Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+                          }
+                        }
+
+                        PanelActionButton {
+                          id: positionYResetAction
+                          anchors.right: parent.right
+                          anchors.bottom: parent.bottom
+                          visible: root.outputFieldChanged("y")
+                          enabled: !!root.selectedOutput && !root.editPending
+                          iconText: "󰑐"
+                          tooltipText: root.outputFieldResetTooltip("vertical position")
+                          foreground: root.foreground
+                          fontFamily: root.fontFamily
+                          focusable: true
+                          onClicked: root.resetOutputField("y")
+                        }
+                      }
+                    }
+
+                    PanelDropdown {
+                      id: mirrorDropdown
+                      popupParent: keyCatcher
+                      ownerOpen: root.opened && root.expanded && !inspectorViewport.moving
+                      width: parent.width
+                      label: "MIRROR"
+                      options: Model.mirrorOptions(root.draftProfile, root.selectedOutputKey)
+                      value: root.selectedOutput ? String(root.selectedOutput.mirror_of || "") : ""
+                      enabled: root.managedChecked && !!root.selectedOutput && !root.editPending
+                      hasCursor: root.inspectorHasCursor(9)
+                      opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
+                      foreground: root.foreground
+                      fontFamily: root.fontFamily
+                      resetVisible: root.outputFieldChanged("mirror_of")
+                      resetTooltip: root.outputFieldResetTooltip("mirror target")
+                      onChanged: function(value) { root.editOutput({ mirror_of: value }) }
+                      onResetRequested: root.resetOutputField("mirror_of")
+                    }
+                  }
+
+                  Column {
+                    id: colorControls
+                    visible: root.inspectorPage === "color"
+                    width: parent.width
+                    spacing: Style.space(8)
+                    enabled: root.managedChecked
+                    opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
+
+                    Grid {
+                      width: parent.width
+                      columns: 2
+                      spacing: Style.space(7)
+                      readonly property real cellWidth: (width - spacing) / 2
+
+                      PanelDropdown {
+                        id: bitdepthDropdown
+                        popupParent: keyCatcher
+                        ownerOpen: root.opened && root.expanded && !inspectorViewport.moving
+                        width: parent.cellWidth
+                        label: "COLOR DEPTH (BPC)"
+                        tooltipText: "Bits per color component."
+                        options: root.bitdepthOptions
+                        value: root.selectedOutput ? String(root.selectedOutput.bitdepth || 8) : "8"
+                        enabled: !!root.selectedOutput && !root.editPending
+                        hasCursor: root.inspectorHasCursor(3)
+                        foreground: root.foreground
+                        fontFamily: root.fontFamily
+                        resetVisible: root.outputFieldChanged("bitdepth")
+                        resetTooltip: root.outputFieldResetTooltip("color depth")
+                        onChanged: function(value) { root.editOutput({ bitdepth: Number(value) }) }
+                        onResetRequested: root.resetOutputField("bitdepth")
+                      }
+
+                      PanelDropdown {
+                        id: colorManagementDropdown
+                        popupParent: keyCatcher
+                        ownerOpen: root.opened && root.expanded && !inspectorViewport.moving
+                        width: parent.cellWidth
+                        label: "COLOR SPACE / EOTF"
+                        tooltipText: "Color space and electro-optical transfer function."
+                        options: root.colorManagementOptions
+                        value: root.selectedOutput && String(root.selectedOutput.cm || "") !== ""
+                          ? String(root.selectedOutput.cm) : "srgb"
+                        enabled: !!root.selectedOutput && !root.editPending
+                        hasCursor: root.inspectorHasCursor(4)
+                        foreground: root.foreground
+                        fontFamily: root.fontFamily
+                        resetVisible: root.outputFieldChanged("cm")
+                        resetTooltip: root.outputFieldResetTooltip("color space and EOTF")
+                        onChanged: function(value) { root.editOutput({ cm: value }) }
+                        onResetRequested: root.resetOutputField("cm")
+                      }
+
+                      DecimalField {
+                        id: sdrBrightnessField
+                        width: parent.cellWidth
+                        label: "SDR LUMINANCE SCALE"
+                        value: root.selectedOutput ? Number(root.selectedOutput.sdr_brightness || 1) : 1
+                        decimals: 2
+                        enabled: !!root.selectedOutput && !root.editPending
+                        hasCursor: root.inspectorHasCursor(10)
+                        resetVisible: root.outputFieldChanged("sdr_brightness")
+                        resetTooltip: root.outputFieldResetTooltip("SDR luminance scale")
+                        onModified: function(value) { root.editOutput({ sdr_brightness: value }) }
+                        onResetRequested: root.resetOutputField("sdr_brightness")
+                      }
+
+                      DecimalField {
+                        id: sdrSaturationField
+                        width: parent.cellWidth
+                        label: "SDR SATURATION SCALE"
+                        value: root.selectedOutput ? Number(root.selectedOutput.sdr_saturation || 1) : 1
+                        decimals: 2
+                        enabled: !!root.selectedOutput && !root.editPending
+                        hasCursor: root.inspectorHasCursor(11)
+                        resetVisible: root.outputFieldChanged("sdr_saturation")
+                        resetTooltip: root.outputFieldResetTooltip("SDR saturation scale")
+                        onModified: function(value) { root.editOutput({ sdr_saturation: value }) }
+                        onResetRequested: root.resetOutputField("sdr_saturation")
+                      }
+
+                      DecimalField {
+                        id: sdrMinLuminanceField
+                        width: parent.cellWidth
+                        label: "SDR BLACK LEVEL (cd/m²)"
+                        value: root.selectedOutput ? Number(root.selectedOutput.sdr_min_luminance || 0) : 0
+                        decimals: 3
+                        enabled: !!root.selectedOutput && !root.editPending
+                        hasCursor: root.inspectorHasCursor(12)
+                        resetVisible: root.outputFieldChanged("sdr_min_luminance")
+                        resetTooltip: root.outputFieldResetTooltip("SDR black level")
+                        onModified: function(value) { root.editOutput({ sdr_min_luminance: value }) }
+                        onResetRequested: root.resetOutputField("sdr_min_luminance")
+                      }
+
+                      DecimalField {
+                        id: sdrMaxLuminanceField
+                        width: parent.cellWidth
+                        label: "SDR WHITE LEVEL (cd/m²)"
+                        value: root.selectedOutput ? Number(root.selectedOutput.sdr_max_luminance || 0) : 0
+                        decimals: 0
+                        enabled: !!root.selectedOutput && !root.editPending
+                        hasCursor: root.inspectorHasCursor(13)
+                        resetVisible: root.outputFieldChanged("sdr_max_luminance")
+                        resetTooltip: root.outputFieldResetTooltip("SDR white level")
+                        onModified: function(value) { root.editOutput({ sdr_max_luminance: Math.round(value) }) }
+                        onResetRequested: root.resetOutputField("sdr_max_luminance")
+                      }
+
+                      PanelDropdown {
+                        id: sdrCurveDropdown
+                        popupParent: keyCatcher
+                        ownerOpen: root.opened && root.expanded && !inspectorViewport.moving
+                        width: parent.cellWidth
+                        label: "SDR EOTF"
+                        tooltipText: "SDR electro-optical transfer function."
+                        options: [
+                          { value: "default", label: "Default" },
+                          { value: "gamma22", label: "Gamma 2.2" },
+                          { value: "srgb", label: "sRGB" }
+                        ]
+                        value: root.selectedOutput && String(root.selectedOutput.sdr_eotf || "") !== ""
+                          ? String(root.selectedOutput.sdr_eotf) : "default"
+                        enabled: !!root.selectedOutput && !root.editPending
+                        hasCursor: root.inspectorHasCursor(14)
+                        foreground: root.foreground
+                        fontFamily: root.fontFamily
+                        resetVisible: root.outputFieldChanged("sdr_eotf")
+                        resetTooltip: root.outputFieldResetTooltip("SDR EOTF")
+                        onChanged: function(value) { root.editOutput({ sdr_eotf: value }) }
+                        onResetRequested: root.resetOutputField("sdr_eotf")
+                      }
+
+                      DecimalField {
+                        id: minLuminanceField
+                        width: parent.cellWidth
+                        label: "DISPLAY BLACK (cd/m²)"
+                        tooltipText: "All display luminance values at 0: use EDID."
+                        value: root.selectedOutput ? Number(root.selectedOutput.min_luminance || 0) : 0
+                        decimals: 3
+                        enabled: !!root.selectedOutput && !root.editPending
+                        hasCursor: root.inspectorHasCursor(15)
+                        resetVisible: root.outputFieldChanged("min_luminance")
+                        resetTooltip: root.outputFieldResetTooltip("display black level")
+                        onModified: function(value) { root.editOutput({ min_luminance: value }) }
+                        onResetRequested: root.resetOutputField("min_luminance")
+                      }
+
+                      DecimalField {
+                        id: maxLuminanceField
+                        width: parent.cellWidth
+                        label: "DISPLAY PEAK (cd/m²)"
+                        tooltipText: "All display luminance values at 0: use EDID."
+                        value: root.selectedOutput ? Number(root.selectedOutput.max_luminance || 0) : 0
+                        decimals: 0
+                        enabled: !!root.selectedOutput && !root.editPending
+                        hasCursor: root.inspectorHasCursor(16)
+                        resetVisible: root.outputFieldChanged("max_luminance")
+                        resetTooltip: root.outputFieldResetTooltip("display peak luminance")
+                        onModified: function(value) { root.editOutput({ max_luminance: Math.round(value) }) }
+                        onResetRequested: root.resetOutputField("max_luminance")
+                      }
+
+                      DecimalField {
+                        id: maxAvgLuminanceField
+                        width: parent.cellWidth
+                        label: "MAX FRAME-AVERAGE (cd/m²)"
+                        tooltipText: "All display luminance values at 0: use EDID."
+                        value: root.selectedOutput ? Number(root.selectedOutput.max_avg_luminance || 0) : 0
+                        decimals: 0
+                        enabled: !!root.selectedOutput && !root.editPending
+                        hasCursor: root.inspectorHasCursor(17)
+                        resetVisible: root.outputFieldChanged("max_avg_luminance")
+                        resetTooltip: root.outputFieldResetTooltip("maximum frame-average luminance")
+                        onModified: function(value) { root.editOutput({ max_avg_luminance: Math.round(value) }) }
+                        onResetRequested: root.resetOutputField("max_avg_luminance")
+                      }
+
+                      PanelDropdown {
+                        id: forceWideDropdown
+                        popupParent: keyCatcher
+                        ownerOpen: root.opened && root.expanded && !inspectorViewport.moving
+                        width: parent.cellWidth
+                        label: "WCG CAPABILITY"
+                        tooltipText: "Override wide color gamut support."
+                        options: root.triStateOptions
+                        value: root.selectedOutput ? String(root.selectedOutput.supports_wide_color || 0) : "0"
+                        enabled: !!root.selectedOutput && !root.editPending
+                        hasCursor: root.inspectorHasCursor(18)
+                        foreground: root.foreground
+                        fontFamily: root.fontFamily
+                        resetVisible: root.outputFieldChanged("supports_wide_color")
+                        resetTooltip: root.outputFieldResetTooltip("wide-color-gamut capability")
+                        onChanged: function(value) { root.editOutput({ supports_wide_color: Number(value) }) }
+                        onResetRequested: root.resetOutputField("supports_wide_color")
+                      }
+
+                      PanelDropdown {
+                        id: forceHdrDropdown
+                        popupParent: keyCatcher
+                        ownerOpen: root.opened && root.expanded && !inspectorViewport.moving
+                        width: parent.cellWidth
+                        label: "HDR CAPABILITY"
+                        options: root.triStateOptions
+                        value: root.selectedOutput ? String(root.selectedOutput.supports_hdr || 0) : "0"
+                        enabled: !!root.selectedOutput && !root.editPending
+                        hasCursor: root.inspectorHasCursor(19)
+                        foreground: root.foreground
+                        fontFamily: root.fontFamily
+                        resetVisible: root.outputFieldChanged("supports_hdr")
+                        resetTooltip: root.outputFieldResetTooltip("HDR capability")
+                        onChanged: function(value) { root.editOutput({ supports_hdr: Number(value) }) }
+                        onResetRequested: root.resetOutputField("supports_hdr")
+                      }
+                    }
+
+                    Column {
+                      width: parent.width
+                      spacing: Style.space(4)
+
+                      PanelSectionHeader {
+                        text: "ICC DEVICE PROFILE"
+                        foreground: root.foreground
+                        fontFamily: root.fontFamily
+                      }
+
+                      Item {
+                        width: parent.width
+                        height: iccProfileInput.height
+
+                        TextField {
+                          id: iccProfileInput
+                          anchors.left: parent.left
+                          anchors.right: iccResetAction.visible ? iccResetAction.left : parent.right
+                          anchors.rightMargin: iccResetAction.visible ? Style.spacing.xxs : 0
+                          text: root.selectedOutput ? String(root.selectedOutput.icc || "") : ""
+                          placeholderText: "None — enter an absolute ICC profile path"
+                          enabled: !!root.selectedOutput && !root.editPending
+                          hasCursor: root.inspectorHasCursor(20)
+                          foreground: root.foreground
+                          onEditingFinished: {
+                            var returnToKeyboard = activeFocus
+                            if (text !== String((root.selectedOutput || {}).icc || ""))
+                              root.editOutput({ icc: text })
+                            if (returnToKeyboard)
+                              Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+                          }
+                        }
+
+                        PanelActionButton {
+                          id: iccResetAction
+                          anchors.right: parent.right
+                          anchors.verticalCenter: parent.verticalCenter
+                          visible: root.outputFieldChanged("icc")
+                          enabled: !!root.selectedOutput && !root.editPending
+                          iconText: "󰑐"
+                          tooltipText: root.outputFieldResetTooltip("ICC device profile")
+                          foreground: root.foreground
+                          fontFamily: root.fontFamily
+                          fontSize: Style.font.body
+                          size: Math.min(iccProfileInput.height, Style.space(24))
+                          focusable: true
+                          onClicked: root.resetOutputField("icc")
+                        }
                       }
                     }
                   }
@@ -3944,6 +3959,7 @@ Panel {
   component DecimalField: Column {
     id: decimalField
     property string label: ""
+    property string tooltipText: ""
     property real value: 0
     property int decimals: 2
     property bool hasCursor: false
@@ -3968,6 +3984,13 @@ Panel {
       text: decimalField.label
       foreground: root.foreground
       fontFamily: root.fontFamily
+
+      HoverHandler { id: labelHover }
+      PanelToolTip {
+        visible: decimalField.tooltipText !== "" && labelHover.hovered
+        text: decimalField.tooltipText
+        fontFamily: root.fontFamily
+      }
     }
 
     Item {

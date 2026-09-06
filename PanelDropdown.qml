@@ -12,6 +12,7 @@ Item {
   id: root
 
   property string label: ""
+  property string tooltipText: ""
   property string value: ""
   property var options: []
   property Item popupParent: null
@@ -76,6 +77,14 @@ Item {
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
       font.bold: true
+      topPadding: Math.ceil(font.pixelSize * 0.15)
+
+      HoverHandler { id: labelHover }
+      PanelToolTip {
+        visible: root.tooltipText !== "" && labelHover.hovered
+        text: root.tooltipText
+        fontFamily: root.fontFamily
+      }
     }
 
     BorderSurface {

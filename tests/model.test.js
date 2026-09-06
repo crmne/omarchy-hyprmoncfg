@@ -752,10 +752,11 @@ test("the inspectors use standards-based colour terms and per-field profile rese
     "ICC DEVICE PROFILE"
   ]) assert.match(qml, new RegExp(label.replace(/[()²/]/g, "\\$&")))
 
-  assert.match(qml, /bpc = bits per color component/)
-  assert.match(qml, /EOTF = electro-optical transfer function/)
-  assert.match(qml, /PQ = Perceptual Quantizer/)
-  assert.match(qml, /WCG = wide color gamut/)
+  assert.doesNotMatch(qml, /bpc =|EOTF =|PQ =|WCG =|A reset button appears/)
+  assert.match(qml, /tooltipText: "Bits per color component\."/)
+  assert.match(qml, /tooltipText: "Color space and electro-optical transfer function\."/)
+  assert.match(qml, /tooltipText: "Override wide color gamut support\."/)
+  assert.match(qml, /tooltipText: "All display luminance values at 0: use EDID\."/)
   assert.match(qml, /BT\.2020 \+ PQ \(HDR\)/)
   assert.match(qml, /EDID primaries \+ PQ/)
   assert.match(qml, /function resetOutputField\(field\)/)
@@ -767,6 +768,27 @@ test("the inspectors use standards-based colour terms and per-field profile rese
   assert.match(qml, /onClicked: root\.resetOutputField\("icc"\)/)
   assert.match(dropdown, /signal resetRequested\(\)/)
   assert.match(dropdown, /tooltipText: root\.resetTooltip/)
+})
+
+test("both inspector forms stay inside a scrollable viewport below the tabs", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const viewport = fs.readFileSync(path.join(__dirname, "..", "InspectorViewport.qml"), "utf8")
+  const start = qml.indexOf("                InspectorViewport {")
+  const end = qml.indexOf("\n                }", start)
+  const inspector = qml.slice(start, end)
+  assert.match(inspector, /anchors.top: inspectorTabs.bottom/)
+  assert.match(inspector, /anchors.bottom: parent.bottom/)
+  assert.match(inspector, /id: displayControls/)
+  assert.match(inspector, /id: colorControls/)
+  assert.match(inspector, /id: iccProfileInput/)
+  assert.match(inspector, /formHeight: root.inspectorPage === "display"/)
+  assert.match(inspector, /currentField: root.keyboardLayoutPane === root.inspectorPage/)
+  assert.match(inspector, /onPageChanged: contentY = 0/)
+  assert.match(inspector, /!inspectorViewport.moving/)
+  assert.match(viewport, /clip: true/)
+  assert.match(viewport, /ScrollBar.vertical: ScrollBar/)
+  assert.match(viewport, /onCurrentFieldChanged:/)
+  assert.match(viewport, /onFocusedFieldChanged:/)
 })
 
 test("the workspace form hides irrelevant group size and adapts keyboard navigation", () => {

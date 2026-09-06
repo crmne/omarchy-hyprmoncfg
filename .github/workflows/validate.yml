@@ -16,3 +16,13 @@ jobs:
         with:
           node-version: 22
       - run: node --test tests/model.test.js
+      - name: Install Qt 6 rendering test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qt6-declarative-dev-tools qt6-qpa-plugins \
+            qml6-module-qtquick qml6-module-qtquick-window qml6-module-qtquick-controls \
+            qml6-module-qtquick-templates qml6-module-qtqml-workerscript qml6-module-qttest
+      - name: Test inspector rendering and interaction
+        env:
+          QT_QUICK_BACKEND: software
+        run: /usr/lib/qt6/bin/qmltestrunner -platform offscreen -input tests/qml
