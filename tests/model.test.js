@@ -847,6 +847,29 @@ test("both inspector forms stay inside a scrollable viewport below the tabs", ()
   assert.match(viewport, /onFocusedFieldChanged:/)
 })
 
+test("the default inspector leaves room for the complete color form", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const pane = fs.readFileSync(path.join(__dirname, "..", "EditorPane.qml"), "utf8")
+  const viewport = qml.slice(qml.indexOf("id: inspectorViewport"))
+  const tabGap = Number(viewport.match(/anchors.topMargin: Style.space\((\d+)\)/)[1])
+  const panelHeight = Number(qml.match(/panel.fittedContentHeight\(Style.space\((\d+)\)\)/)[1])
+  const navHeight = Number(qml.slice(qml.indexOf("id: editorNav")).match(/height: Style.space\((\d+)\)/)[1])
+  const footerHeight = Number(qml.slice(qml.indexOf("id: editorFooter")).match(/height: Math.max\(Style.space\((\d+)\)/)[1])
+  const body = qml.slice(qml.indexOf("id: editorBody"))
+  const bodyInsets = [...body.matchAll(/anchors.(?:top|bottom)Margin: Style.space\((\d+)\)/g)]
+    .slice(0, 2).reduce((sum, match) => sum + Number(match[1]), 0)
+  const infoSpace = Number(qml.match(/height: parent.height - Style.space\((\d+)\)/)[1])
+  const titleHeight = Number(pane.match(/height: Style.space\((\d+)\)/)[1])
+  const bottomInset = Number(pane.match(/anchors.bottomMargin: Style.space\((\d+)\)/)[1])
+  // Measured with the actual Omarchy controls at the default 12px font.
+  // Keep the layout budget coupled to the source: 2.3.2 left only 394px.
+  const tabsHeight = 28
+  const colorFormHeight = 395
+  const available = panelHeight - navHeight - footerHeight - bodyInsets - infoSpace
+    - titleHeight - bottomInset - tabsHeight - tabGap
+  assert.ok(available >= colorFormHeight, `${colorFormHeight}px form exceeds ${available}px viewport`)
+})
+
 test("the workspace form hides irrelevant group size and adapts keyboard navigation", () => {
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
 

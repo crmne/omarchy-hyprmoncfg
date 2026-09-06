@@ -2530,7 +2530,7 @@ Panel {
                   anchors.right: parent.right
                   anchors.top: inspectorTabs.bottom
                   anchors.bottom: parent.bottom
-                  anchors.topMargin: Style.space(9)
+                  anchors.topMargin: Style.space(8)
                   scrollBarGap: Style.space(4)
                   formHeight: root.inspectorPage === "display"
                     ? displayControls.implicitHeight : colorControls.implicitHeight

@@ -109,6 +109,29 @@ Rectangle {
       compare(viewport.firstField.text, "First field")
     }
 
+    function test_scroll_boundary_data() {
+      return [
+        { tag: "exact fit", extraHeight: 0, scrolls: false },
+        { tag: "spare fraction", extraHeight: 0.5, scrolls: false },
+        { tag: "one pixel overflow", extraHeight: -1, scrolls: true },
+        { tag: "short window", extraHeight: -80, scrolls: true }
+      ]
+    }
+
+    function test_scroll_boundary(data) {
+      viewport.height = viewport.formHeight + data.extraHeight
+      tryCompare(viewport, "interactive", data.scrolls)
+      tryCompare(viewport.ScrollBar.vertical, "visible", data.scrolls)
+      mouseWheel(viewport, 100, 100, 0, -1200)
+      var expected = Math.max(0, -data.extraHeight)
+      tryCompare(viewport, "contentY", expected)
+      viewport.lastField.forceActiveFocus()
+      wait(0)
+      compare(viewport.contentY, expected)
+      verify(fullyVisible(viewport.lastField))
+      if (!data.scrolls) compare(viewport.firstField.width, viewport.width)
+    }
+
     function test_focus_outside_the_form_does_not_scroll() {
       viewport.currentField = viewport.lastField
       tryVerify(function() { return fullyVisible(viewport.lastField) })

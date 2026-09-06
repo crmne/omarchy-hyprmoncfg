@@ -10,9 +10,11 @@ Flickable {
   property Item currentField: null
   property real scrollBarGap: 4
   readonly property Item focusedField: root.Window.window ? root.Window.window.activeFocusItem : null
+  readonly property bool scrollable: contentHeight > height
 
   contentWidth: width
   contentHeight: formHeight
+  interactive: scrollable
   clip: true
   boundsBehavior: Flickable.StopAtBounds
   flickableDirection: Flickable.VerticalFlick
@@ -54,6 +56,7 @@ Flickable {
   ScrollBar.vertical: ScrollBar {
     id: scrollBar
     policy: ScrollBar.AsNeeded
-    active: size < 1
+    visible: root.scrollable
+    active: root.scrollable
   }
 }
