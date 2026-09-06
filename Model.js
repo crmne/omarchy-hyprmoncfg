@@ -913,9 +913,9 @@ function namedProfile(profile, name) {
 // Omarchy installs plugins as git checkouts under ~/.config/omarchy/plugins and
 // never updates them on its own, so the panel has to notice for itself. The
 // check mirrors `omarchy plugin update`: fetch, then compare HEAD to FETCH_HEAD.
-// Fetching is throttled, because opening a panel is not a reason to talk to a
-// remote every time. Exit 10 means an update is waiting; anything else means
-// there is nothing to say.
+// FETCH_HEAD is also the cache: no separate timestamp file to create or secure.
+// Only a valid, recent fetch can skip the network. Exit 10 means an update is
+// waiting, zero means current, and other statuses leave the last result alone.
 function pluginUpdateCheckCommand(pluginId, throttleHours) {
   var hours = Number(throttleHours || 6)
   return [
@@ -924,16 +924,11 @@ function pluginUpdateCheckCommand(pluginId, throttleHours) {
     'set -e; ' +
       'dir="$HOME/.config/omarchy/plugins/$1"; ' +
       '[ -d "$dir/.git" ] || exit 3; ' +
-      'runtime="${XDG_RUNTIME_DIR:-}"; ' +
-      '[ -n "$runtime" ] && [ -d "$runtime" ] || exit 6; ' +
-      '[ "$(stat -c "%u:%a" -- "$runtime" 2>/dev/null)" = "$(id -u):700" ] || exit 6; ' +
-      'stamp="$runtime/$1.update-check"; ' +
-      'if [ -z "$(find "$stamp" -newermt "-$2 hours" 2>/dev/null)" ]; then ' +
-      'git -C "$dir" fetch --quiet origin HEAD 2>/dev/null || exit 4; ' +
-      '[ ! -L "$stamp" ] || exit 6; ' +
-      '(umask 077; touch --no-dereference -- "$stamp") || exit 6; fi; ' +
       'head=$(git -C "$dir" rev-parse HEAD 2>/dev/null) || exit 5; ' +
-      'remote=$(git -C "$dir" rev-parse FETCH_HEAD 2>/dev/null) || exit 5; ' +
+      'remote=$(git -C "$dir" rev-parse --verify FETCH_HEAD 2>/dev/null) || remote=""; ' +
+      'if [ -z "$remote" ] || [ -z "$(find "$dir/.git/FETCH_HEAD" -newermt "-$2 hours" 2>/dev/null)" ]; then ' +
+      'git -C "$dir" fetch --quiet origin HEAD 2>/dev/null || exit 4; ' +
+      'remote=$(git -C "$dir" rev-parse --verify FETCH_HEAD 2>/dev/null) || exit 5; fi; ' +
       '[ "$head" = "$remote" ] || exit 10',
     "sh",
     String(pluginId || ""),

@@ -1265,9 +1265,9 @@ Panel {
   Process {
     id: pluginUpdateProcess
     onExited: function(exitCode) {
-      // Only a clean "behind the remote" answer is worth acting on. A missing
-      // checkout or an unreachable remote is not the user's problem to solve.
-      root.pluginUpdateAvailable = exitCode === 10
+      // A failed check cannot tell us a previously discovered update went away.
+      if (exitCode === 0 || exitCode === 10)
+        root.pluginUpdateAvailable = exitCode === 10
     }
   }
 
