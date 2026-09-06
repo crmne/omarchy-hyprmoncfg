@@ -113,7 +113,7 @@ A fresh install takes `hyprmoncfg-bin`, the ready-made build; a machine that alr
 ## Requirements
 
 - Omarchy Quattro with third-party shell plugins
-- hyprmoncfg 1.18.0 or newer (installed from the panel when missing)
+- hyprmoncfg 1.18.1 or newer (installed from the panel when missing)
 
 ## Staying up to date
 
@@ -150,7 +150,7 @@ Your saved profiles remain in `~/.config/hyprmoncfg/profiles`.
 The confirmation service controls previews it starts itself, and can recover a
 preview when the daemon reports that its original client disconnected. A live
 TUI keeps its own confirmation. This recovery requires the daemon's
-`preview.reclaimable` status field, included in the required hyprmoncfg 1.18.0 backend.
+`preview.reclaimable` status field, included in the required hyprmoncfg 1.18.1 backend.
 
 After changes to preview handling, test position and scale changes, disabling
 the panel's own display, keyboard and mouse confirmation, timeout rollback, and
