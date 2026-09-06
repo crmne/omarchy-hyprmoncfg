@@ -55,6 +55,20 @@ A small background service is what watches for this. It catches hotplug, lid and
 - SDR brightness, saturation and transfer curve, with luminance floors and ceilings for SDR and HDR
 - Variable refresh rate: off, on, or fullscreen only
 
+The colour inspector names signal and luminance controls by their display-industry role while preserving the underlying Hyprland fields:
+
+| Panel term | Meaning |
+| --- | --- |
+| Colour depth (bpc) | Bits per colour component in the output signal |
+| Colour space / EOTF | Output primaries plus the electro-optical transfer function; HDR presets use PQ |
+| SDR luminance / saturation scale | Unitless adjustment applied to SDR content in HDR mode |
+| SDR black / white level | Luminance endpoints, in cd/m², used for SDR-to-HDR mapping |
+| Display black / peak / maximum frame-average luminance | Overrides for display luminance metadata normally obtained from EDID |
+| WCG / HDR capability | Auto-detect, force off, or force on when hardware detection is wrong |
+| ICC device profile | Absolute path to a display characterization profile |
+
+Every editable per-display field gains an individual reset action after it diverges from the loaded profile. Resetting restores that one saved value without discarding unrelated edits. All-zero display luminance overrides leave EDID detection in control.
+
 **Profiles and switching**
 
 - One profile per place you work, applied automatically on hotplug, lid and resume

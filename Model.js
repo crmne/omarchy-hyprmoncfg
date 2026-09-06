@@ -395,6 +395,60 @@ function outputDisplayLabel(profile, key) {
   return makeModel || String(output.description || "").trim() || String(output.name || key || "Display")
 }
 
+// Profile JSON uses explicit neutral values for some Hyprland defaults and
+// zero as hyprmoncfg's "do not emit an EDID override" sentinel. Keeping those
+// values here gives every front-end field the same reset semantics.
+var outputFieldDefaults = {
+  enabled: true,
+  mode: "preferred",
+  scale: 1,
+  vrr: 0,
+  transform: 0,
+  x: 0,
+  y: 0,
+  mirror_of: "",
+  bitdepth: 8,
+  cm: "srgb",
+  sdr_brightness: 1,
+  sdr_saturation: 1,
+  sdr_min_luminance: 0.2,
+  sdr_max_luminance: 80,
+  sdr_eotf: "default",
+  min_luminance: 0,
+  max_luminance: 0,
+  max_avg_luminance: 0,
+  supports_wide_color: 0,
+  supports_hdr: 0,
+  icc: ""
+}
+
+function outputFieldValue(profile, key, field) {
+  if (!(field in outputFieldDefaults)) return undefined
+  var output = outputByKey(profile, key)
+  var fallback = outputFieldDefaults[field]
+  if (!output || output[field] === undefined || output[field] === null) return fallback
+
+  if (typeof fallback === "boolean") return output[field] !== false
+  if (typeof fallback === "number") {
+    var number = Number(output[field])
+    return isFinite(number) ? number : fallback
+  }
+  return String(output[field])
+}
+
+function outputFieldChanged(profile, defaults, key, field) {
+  if (!outputByKey(defaults, key)) return false
+  return outputFieldValue(profile, key, field) !== outputFieldValue(defaults, key, field)
+}
+
+function outputFieldResetEdit(defaults, key, field) {
+  var value = outputFieldValue(defaults, key, field)
+  if (value === undefined || !outputByKey(defaults, key)) return null
+  var edit = {}
+  edit[field] = value
+  return edit
+}
+
 function clampBrightness(value) {
   var number = Number(value)
   if (!isFinite(number)) return 1
@@ -946,6 +1000,9 @@ if (typeof module !== "undefined") {
     snapOutputPosition: snapOutputPosition,
     outputName: outputName,
     outputDisplayLabel: outputDisplayLabel,
+    outputFieldValue: outputFieldValue,
+    outputFieldChanged: outputFieldChanged,
+    outputFieldResetEdit: outputFieldResetEdit,
     clampBrightness: clampBrightness,
     brightnessTarget: brightnessTarget,
     initialOutputKey: initialOutputKey,

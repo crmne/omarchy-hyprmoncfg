@@ -385,6 +385,61 @@ test("editor options stay compact and only offer applicable profiles", () => {
   ])
 })
 
+test("individual output fields reset to the loaded profile values", () => {
+  const defaults = {
+    outputs: [{
+      key: "desk",
+      mode: "3440x1440@165.00Hz",
+      scale: 1,
+      bitdepth: 10,
+      cm: "hdredid",
+      sdr_brightness: 1,
+      sdr_saturation: 1,
+      min_luminance: 0.055,
+      max_luminance: 456,
+      supports_hdr: 0
+    }]
+  }
+  const draft = Model.clone(defaults)
+  draft.outputs[0].scale = 1.25
+  draft.outputs[0].sdr_brightness = 1.35
+  draft.outputs[0].supports_hdr = 1
+
+  assert.equal(Model.outputFieldChanged(draft, defaults, "desk", "scale"), true)
+  assert.equal(Model.outputFieldChanged(draft, defaults, "desk", "sdr_brightness"), true)
+  assert.equal(Model.outputFieldChanged(draft, defaults, "desk", "supports_hdr"), true)
+  assert.equal(Model.outputFieldChanged(draft, defaults, "desk", "cm"), false)
+  assert.deepEqual(Model.outputFieldResetEdit(defaults, "desk", "scale"), { scale: 1 })
+  assert.deepEqual(Model.outputFieldResetEdit(defaults, "desk", "sdr_brightness"), {
+    sdr_brightness: 1
+  })
+  assert.deepEqual(Model.outputFieldResetEdit(defaults, "desk", "supports_hdr"), {
+    supports_hdr: 0
+  })
+})
+
+test("field reset restores neutral or auto-detected values omitted from a profile", () => {
+  const defaults = { outputs: [{ key: "desk" }] }
+  const draft = {
+    outputs: [{
+      key: "desk",
+      max_luminance: 1000,
+      max_avg_luminance: 600,
+      icc: "/profiles/desk.icc"
+    }]
+  }
+
+  assert.deepEqual(Model.outputFieldResetEdit(defaults, "desk", "max_luminance"), {
+    max_luminance: 0
+  })
+  assert.deepEqual(Model.outputFieldResetEdit(defaults, "desk", "max_avg_luminance"), {
+    max_avg_luminance: 0
+  })
+  assert.deepEqual(Model.outputFieldResetEdit(defaults, "desk", "icc"), { icc: "" })
+  assert.equal(Model.outputFieldChanged(draft, defaults, "missing", "icc"), false)
+  assert.equal(Model.outputFieldResetEdit(defaults, "desk", "not_a_field"), null)
+})
+
 test("workspace preview is rendered from the daemon plan", () => {
   const plan = [
     { output_key: "left", workspaces: ["1", "2", "3", "4"] },
@@ -489,6 +544,43 @@ test("the panel has management-first compact mode and a TUI-shaped expanded mode
   assert.match(qml, /fontSize: Style\.font\.caption/)
   assert.doesNotMatch(qml, /ProfileRow/)
   assert.match(qml, /match_score/)
+})
+
+test("the inspectors use standards-based colour terms and per-field profile resets", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const dropdown = fs.readFileSync(path.join(__dirname, "..", "PanelDropdown.qml"), "utf8")
+
+  for (const label of [
+    "COLOR DEPTH (BPC)",
+    "COLOR SPACE / EOTF",
+    "SDR LUMINANCE SCALE",
+    "SDR SATURATION SCALE",
+    "SDR BLACK LEVEL (cd/m²)",
+    "SDR WHITE LEVEL (cd/m²)",
+    "SDR EOTF",
+    "DISPLAY BLACK (cd/m²)",
+    "DISPLAY PEAK (cd/m²)",
+    "MAX FRAME-AVERAGE (cd/m²)",
+    "WCG CAPABILITY",
+    "HDR CAPABILITY",
+    "ICC DEVICE PROFILE"
+  ]) assert.match(qml, new RegExp(label.replace(/[()²/]/g, "\\$&")))
+
+  assert.match(qml, /bpc = bits per color component/)
+  assert.match(qml, /EOTF = electro-optical transfer function/)
+  assert.match(qml, /PQ = Perceptual Quantizer/)
+  assert.match(qml, /WCG = wide color gamut/)
+  assert.match(qml, /BT\.2020 \+ PQ \(HDR\)/)
+  assert.match(qml, /EDID primaries \+ PQ/)
+  assert.match(qml, /function resetOutputField\(field\)/)
+  assert.equal((qml.match(/resetVisible: root\.outputFieldChanged/g) || []).length, 17)
+  assert.equal((qml.match(/onResetRequested: root\.resetOutputField/g) || []).length, 17)
+  assert.equal((qml.match(/visible: root\.outputFieldChanged/g) || []).length, 4)
+  assert.equal((qml.match(/onClicked: root\.resetOutputField/g) || []).length, 4)
+  assert.match(qml, /visible: root\.outputFieldChanged\("icc"\)/)
+  assert.match(qml, /onClicked: root\.resetOutputField\("icc"\)/)
+  assert.match(dropdown, /signal resetRequested\(\)/)
+  assert.match(dropdown, /tooltipText: root\.resetTooltip/)
 })
 
 test("the workspace form hides irrelevant group size and adapts keyboard navigation", () => {

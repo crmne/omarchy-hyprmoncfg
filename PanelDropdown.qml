@@ -25,6 +25,8 @@ Item {
   property int popupRowHeight: Style.spacing.popupRowHeight
   property bool showLabel: true
   property bool hasCursor: false
+  property bool resetVisible: false
+  property string resetTooltip: "Reset to loaded profile value"
 
   readonly property var popupBorderSpec: Border.localOrSurfaceSpec(
     "popups", "border", popupBorder, Color.popups.border, Style.normalBorderWidth)
@@ -32,6 +34,7 @@ Item {
 
   signal changed(string value)
   signal hovered(bool isHovered)
+  signal resetRequested()
 
   onOwnerOpenChanged: if (!ownerOpen) menu.close()
   onVisibleChanged: if (!visible) menu.close()
@@ -121,9 +124,10 @@ Item {
       Text {
         textFormat: Text.PlainText
         id: chevron
-        anchors.right: parent.right
+        anchors.right: resetAction.visible ? resetAction.left : parent.right
         anchors.verticalCenter: parent.verticalCenter
-        anchors.rightMargin: trigger.borderRight + Style.spacing.controlGap
+        anchors.rightMargin: resetAction.visible ? Style.spacing.xxs
+          : trigger.borderRight + Style.spacing.controlGap
         text: menu.opened ? "󰅃" : "󰅀"
         color: Qt.darker(root.foreground, 1.2)
         font.family: root.fontFamily
@@ -131,12 +135,32 @@ Item {
       }
 
       MouseArea {
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.right: resetAction.visible ? resetAction.left : parent.right
         cursorShape: Qt.PointingHandCursor
         onClicked: {
           trigger.forceActiveFocus()
           root.toggle()
         }
+      }
+
+      PanelActionButton {
+        id: resetAction
+        anchors.right: parent.right
+        anchors.rightMargin: trigger.borderRight + Style.spacing.xxs
+        anchors.verticalCenter: parent.verticalCenter
+        visible: root.resetVisible
+        enabled: root.enabled
+        iconText: "󰑐"
+        tooltipText: root.resetTooltip
+        foreground: root.foreground
+        fontFamily: root.fontFamily
+        fontSize: Style.font.body
+        size: Math.min(root.rowHeight - Style.spacing.xs, Style.space(24))
+        focusable: true
+        onClicked: root.resetRequested()
       }
     }
   }
