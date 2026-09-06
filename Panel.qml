@@ -446,7 +446,13 @@ Panel {
   }
 
   function send(method, params, context) {
-    if (!backendSocket.connected) return ""
+    if (!backendSocket.connected) {
+      root.previewPending = false
+      root.editPending = false
+      root.editorLoading = false
+      root.lastError = "hyprmoncfg is reconnecting. Try again in a moment."
+      return ""
+    }
     root.requestSequence++
     var id = String(root.requestSequence)
     var request = {
@@ -818,14 +824,7 @@ Panel {
   function previewCoordinatorReady(method) {
     return !!root.previewCoordinator
       && root.previewCoordinator.connected === true
-      && root.previewCoordinator.yieldingToPanel !== true
       && typeof root.previewCoordinator[method] === "function"
-  }
-
-  function yieldPreviewToPanel() {
-    if (root.previewCoordinator
-        && typeof root.previewCoordinator.yieldToPanel === "function")
-      root.previewCoordinator.yieldToPanel()
   }
 
   function previewDraft() {
@@ -846,7 +845,6 @@ Panel {
       }
       return
     }
-    root.yieldPreviewToPanel()
     root.send("preview", {
       profile: Model.namedProfile(root.draftProfile, name),
       timeout_seconds: 10,
@@ -868,7 +866,6 @@ Panel {
       }
       return
     }
-    root.yieldPreviewToPanel()
     root.send("preview", {
       profile: profile,
       timeout_seconds: 10,
@@ -1012,7 +1009,6 @@ Panel {
       }
       return
     }
-    root.yieldPreviewToPanel()
     root.send("preview", { profile_name: selected, timeout_seconds: 10 }, {
       kind: "profile",
       name: selected
@@ -1108,10 +1104,15 @@ Panel {
   function syncDaemonPreview(pending) {
     var id = pending ? String(pending.transaction_id || "") : ""
     if (id !== "") {
+      var coordinated = root.previewCoordinator
+        && String(root.previewCoordinator.transactionId || "") === id
+      if (!coordinated && !Model.canConfirmPreview(pending, root.previewTransaction)) return
+      // The shell service recovers abandoned previews when it is available.
+      if (!coordinated && root.previewTransaction !== id
+          && root.previewCoordinatorReady("keep")) return
       root.previewTransaction = id
       root.previewKind = pending.save_on_commit ? "draft" : "profile"
       root.previewDeadline = String(pending.deadline || "")
-      root.previewPending = false
       if (pending.profile && pending.profile.outputs instanceof Array) {
         root.draftProfile = Model.clone(pending.profile)
         root.profileChoice = String(pending.profile_name || pending.profile.name || "")
@@ -1119,8 +1120,7 @@ Panel {
       }
       root.updatePreviewClock()
       previewTimer.start()
-      if ((!root.previewCoordinator || !root.previewCoordinator.connected
-          || root.previewCoordinator.yieldingToPanel)
+      if ((!root.previewCoordinator || !root.previewCoordinator.connected)
           && !root.opened && !previewRecoveryTimer.running)
         previewRecoveryTimer.start()
       return
@@ -1275,6 +1275,7 @@ Panel {
   Connections {
     target: root.previewCoordinator
     ignoreUnknownSignals: true
+    function onTransactionIdChanged() { root.syncDaemonPreview(root.daemonPreview) }
     function onRequestFinished(success, message) {
       root.previewPending = false
       if (!success && String(message || "") !== "") root.lastError = String(message)

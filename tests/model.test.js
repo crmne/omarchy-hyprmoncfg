@@ -45,6 +45,67 @@ test("installer and TUI launches release panel focus before starting the termina
 })
 
 
+// Execute the actual QML handlers with a fake socket. This exercises message
+// ordering without changing the running desktop's monitor configuration.
+function previewGuard() {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "PreviewGuard.qml"), "utf8")
+  const functions = qml.match(/^  function [\s\S]*?^  }/gm)
+  const names = functions.map(source => source.match(/function (\w+)/)[1])
+  const requests = []
+  const root = { requestSequence: 0, pendingMethods: {}, transactionId: "", profileName: "",
+    deadline: "", seconds: 0, stage: "idle", actionPending: false, requestPending: false,
+    saveOnCommit: false, draftApply: false, actionError: "", errorMessage: "",
+    requestFinished() {} }
+  Object.defineProperty(root, "opened", { get: () => root.stage !== "idle" })
+  const socket = { connected: true, write(line) { requests.push(JSON.parse(line)) }, flush() {} }
+  const context = vm.createContext({ root, Model, backendSocket: socket,
+    Hyprland: { focusedMonitor: { name: "eDP-1" } },
+    previewClock: { start() {}, stop() {} } })
+  vm.runInContext(functions.join("\n") + "\nObject.assign(root, {" + names.join(",") + "})", context)
+  return { root, socket, requests, receive(value) { root.handleMessage(JSON.stringify({ protocol_version: 1, ...value })) } }
+}
+
+test("the guard leaves TUI previews alone and adopts abandoned previews", () => {
+  const guard = previewGuard()
+  const preview = { transaction_id: "tui", deadline: new Date(Date.now() + 10000).toISOString(), profile_name: "Desk", reclaimable: false }
+  guard.receive({ type: "event", event: "status", data: { daemon: { preview } } })
+  assert.equal(guard.root.opened, false)
+  guard.receive({ type: "event", event: "status", data: { daemon: { preview: { ...preview, reclaimable: true } } } })
+  assert.equal(guard.root.stage, "confirm")
+  assert.equal(guard.root.keep(), true)
+  assert.equal(guard.requests[0].method, "commit")
+  assert.equal(guard.requests[0].params.transaction_id, "tui")
+})
+
+test("status arriving before the preview response cannot steal ownership or unlock a pending commit", () => {
+  const guard = previewGuard()
+  const deadline = new Date(Date.now() + 10000).toISOString()
+  assert.equal(guard.root.startDraftPreview({ name: "Desk" }, 10), true)
+  const preview = { transaction_id: "ours", deadline, profile_name: "Desk", save_on_commit: true, reclaimable: false }
+  const status = { type: "event", event: "status", data: { daemon: { preview } } }
+  guard.receive(status)
+  assert.equal(guard.root.transactionId, "")
+  guard.receive({ type: "response", id: guard.requests[0].id, result: { id: "ours", deadline } })
+  assert.equal(guard.root.transactionId, "ours")
+  assert.equal(guard.root.keep(), true)
+  guard.receive(status)
+  assert.equal(guard.root.keep(), false)
+  assert.equal(guard.requests.filter(request => request.method === "commit").length, 1)
+  guard.receive({ type: "response", id: guard.requests[1].id, result: {} })
+  assert.equal(guard.root.opened, false)
+})
+
+test("a failed confirmation remains actionable and shows the backend error", () => {
+  const guard = previewGuard()
+  guard.root.syncPreview({ transaction_id: "orphan", reclaimable: true })
+  guard.root.keep()
+  guard.receive({ type: "response", id: guard.requests[0].id, error: { message: "could not save profile" } })
+  assert.equal(guard.root.actionPending, false)
+  assert.equal(guard.root.actionError, "could not save profile")
+  assert.equal(guard.root.revert(), true)
+  assert.equal(guard.requests[1].method, "revert")
+})
+
 test("installation and upgrades use a presented AUR flow, restart the daemon, and open a centered TUI", () => {
   assert.deepEqual(Model.installProcessArgs(), [
     "omarchy",
@@ -585,15 +646,11 @@ test("display previews keep a shell-level confirmation across monitor rebuilds",
   assert.match(panel, /previewCoordinator\.startSavedProfilePreview/)
   assert.match(panel, /root\.previewCoordinator\.connected === true/)
   assert.match(panel, /!root\.previewCoordinator \|\| !root\.previewCoordinator\.connected/)
-  assert.match(panel, /root\.previewCoordinator\.yieldingToPanel/)
-  assert.match(panel, /root\.previewCoordinator\.yieldToPanel\(\)/)
   assert.match(guard, /root\.stage = "applying"/)
-  assert.match(guard, /function yieldToPanel\(\)/)
-  assert.match(guard, /if \(shouldYield\) root\.yieldToPanel\(\)/)
-  assert.match(guard, /if \(root\.yieldingToPanel\)/)
+  assert.match(guard, /Model\.canConfirmPreview\(pending, root\.transactionId\)/)
   assert.match(guard, /This confirmation stays open while your displays reconfigure\./)
   assert.match(guard, /WlrKeyboardFocus\.Exclusive/)
-  assert.match(guard, /WlrKeyboardFocus\.OnDemand/)
+  assert.doesNotMatch(guard, /WlrKeyboardFocus\.OnDemand/)
   assert.match(guard, /model: root\.opened \? Quickshell\.screens : \[\]/)
   assert.match(guard, /mask: Region/)
   assert.match(guard, /onBackingWindowVisibleChanged/)
@@ -604,6 +661,18 @@ test("display previews keep a shell-level confirmation across monitor rebuilds",
   assert.match(guard, /root\.actionError !== ""/)
   assert.match(guard, /event\.text === "y"/)
   assert.match(guard, /event\.text === "n"/)
+})
+
+test("preview confirmation belongs to its client until that client disconnects", () => {
+  const preview = { transaction_id: "tui-preview", reclaimable: false }
+  assert.equal(Model.canConfirmPreview(preview, ""), false)
+  assert.equal(Model.canConfirmPreview(preview, "panel-preview"), false)
+  assert.equal(Model.canConfirmPreview(preview, "tui-preview"), true)
+  assert.equal(Model.canConfirmPreview({ ...preview, reclaimable: true }, ""), true)
+  // Older daemons cannot advertise an orphan: do not guess and steal focus.
+  assert.equal(Model.canConfirmPreview({ transaction_id: "old-preview" }, ""), false)
+  assert.equal(Model.canConfirmPreview(null, "tui-preview"), false)
+  assert.equal(Model.canConfirmPreview({ transaction_id: "", reclaimable: true }, ""), false)
 })
 
 test("the expanded panel mirrors the TUI's contextual keyboard map", () => {

@@ -26,6 +26,13 @@ function parseEnvelope(raw) {
   }
 }
 
+// A status subscription observes other clients too. Only an abandoned preview
+// may be adopted; a live TUI must retain its own confirmation and keyboard.
+function canConfirmPreview(pending, transactionId) {
+  var id = pending ? String(pending.transaction_id || "") : ""
+  return id !== "" && (id === transactionId || pending.reclaimable === true)
+}
+
 function mirrorTarget(monitor) {
   return String((monitor || {}).mirror_of || "").trim()
 }
@@ -924,6 +931,7 @@ if (typeof module !== "undefined") {
     installCommand: installCommand,
     installProcessArgs: installProcessArgs,
     parseEnvelope: parseEnvelope,
+    canConfirmPreview: canConfirmPreview,
     hiddenDisplays: hiddenDisplays,
     layoutDisplays: layoutDisplays,
     displayModelLabel: displayModelLabel,

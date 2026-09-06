@@ -28,8 +28,6 @@ Item {
   property bool draftApply: false
   property bool requestPending: false
   property bool actionPending: false
-  property bool yieldingToPanel: false
-  property bool yieldedPreviewSeen: false
   property string stage: "idle"
   property string errorMessage: ""
   property string actionError: ""
@@ -73,13 +71,6 @@ Item {
     root.targetScreenName = focused ? String(focused.name || "") : ""
   }
 
-  function yieldToPanel() {
-    root.yieldingToPanel = true
-    root.yieldedPreviewSeen = false
-    panelYieldTimeout.restart()
-    root.clear()
-  }
-
   function beginPreview(params, name, save, draft) {
     if (root.opened || root.requestPending || root.actionPending) {
       root.errorMessage = "Finish the current display preview first."
@@ -93,9 +84,6 @@ Item {
     }
 
     root.rememberScreen()
-    root.yieldingToPanel = false
-    root.yieldedPreviewSeen = false
-    panelYieldTimeout.stop()
     root.profileName = String(name || "Display layout")
     root.saveOnCommit = save === true
     root.draftApply = draft === true
@@ -201,17 +189,8 @@ Item {
 
   function syncPreview(pending) {
     var id = pending ? String(pending.transaction_id || "") : ""
-    if (root.yieldingToPanel) {
-      if (id !== "") {
-        root.yieldedPreviewSeen = true
-        panelYieldTimeout.stop()
-      } else if (root.yieldedPreviewSeen) {
-        root.yieldingToPanel = false
-        root.yieldedPreviewSeen = false
-      }
-      return
-    }
     if (id !== "") {
+      if (!Model.canConfirmPreview(pending, root.transactionId)) return
       if (root.transactionId !== id) root.actionError = ""
       root.transactionId = id
       root.profileName = String(pending.profile_name
@@ -221,7 +200,6 @@ Item {
       root.deadline = String(pending.deadline || root.deadline || "")
       root.saveOnCommit = pending.save_on_commit === true || root.saveOnCommit
       root.requestPending = false
-      root.actionPending = false
       root.stage = "confirm"
       root.updateClock()
       previewClock.start()
@@ -288,11 +266,10 @@ Item {
     onConnectedChanged: {
       if (connected) root.send("subscribe", {})
       else {
-        var shouldYield = root.opened || root.requestPending || root.transactionId !== ""
+        var wasPending = root.requestPending
         root.pendingMethods = ({})
-        root.requestPending = false
-        root.actionPending = false
-        if (shouldYield) root.yieldToPanel()
+        root.clear()
+        if (wasPending) root.requestFinished(false, "hyprmoncfg disconnected during the preview. Reconnecting…")
       }
     }
     onError: function(error) { backendSocket.connected = false }
@@ -303,15 +280,6 @@ Item {
     repeat: true
     running: root.socketPath !== "/hyprmoncfgd.sock" && !backendSocket.connected
     onTriggered: backendSocket.connected = true
-  }
-
-  Timer {
-    id: panelYieldTimeout
-    interval: 15000
-    onTriggered: {
-      if (!root.yieldingToPanel || root.yieldedPreviewSeen) return
-      root.yieldingToPanel = false
-    }
   }
 
   Timer {
@@ -329,12 +297,9 @@ Item {
       required property var modelData
       readonly property bool ownsDialog: !!modelData
         && String(modelData.name || "") === root.dialogScreenName
-      property bool focusPrimed: false
 
       function restoreInputFocus() {
         if (!guardWindow.ownsDialog || !guardWindow.backingWindowVisible) return
-        guardWindow.focusPrimed = false
-        focusPrimeTimer.restart()
         Qt.callLater(function() {
           if (guardWindow.ownsDialog && guardWindow.backingWindowVisible)
             keyCatcher.forceActiveFocus()
@@ -348,7 +313,7 @@ Item {
       WlrLayershell.namespace: "hyprmoncfg-preview-guard"
       WlrLayershell.layer: WlrLayer.Overlay
       WlrLayershell.keyboardFocus: ownsDialog
-        ? (focusPrimed ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.Exclusive)
+        ? WlrKeyboardFocus.Exclusive
         : WlrKeyboardFocus.None
       anchors { top: true; bottom: true; left: true; right: true }
       mask: Region {
@@ -358,26 +323,9 @@ Item {
 
       onBackingWindowVisibleChanged: {
         if (backingWindowVisible) guardWindow.restoreInputFocus()
-        else {
-          focusPrimeTimer.stop()
-          focusPrimed = false
-        }
       }
       onOwnsDialogChanged: guardWindow.restoreInputFocus()
       Component.onCompleted: guardWindow.restoreInputFocus()
-
-      Timer {
-        id: focusPrimeTimer
-        interval: 75
-        onTriggered: {
-          if (!guardWindow.ownsDialog || !guardWindow.backingWindowVisible) return
-          guardWindow.focusPrimed = true
-          Qt.callLater(function() {
-            if (guardWindow.ownsDialog && guardWindow.backingWindowVisible)
-              keyCatcher.forceActiveFocus()
-          })
-        }
-      }
 
       ScreenMoveRemap {
         id: remapGuard
