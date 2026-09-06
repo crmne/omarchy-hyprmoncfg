@@ -13,6 +13,53 @@ function panelFunction(name, root, globals = {}) {
   return vm.runInNewContext("(" + source + ")", { root, Model, ...globals })
 }
 
+test("footer controls share their tallest natural height and keep naming beside save", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const footer = qml.slice(qml.indexOf("id: editorFooter"), qml.indexOf("\n      KeyboardHelp {"))
+  const controls = ["openTuiButton", "profileNameInput", "currentProfileBadge", "activateFooterButton", "discardDraftButton", "saveDraftButton"]
+  const height = footer.match(/readonly property real controlHeight: ([\s\S]*?)\n          height:/)[1]
+  for (const tallest of controls) {
+    const sizes = Object.fromEntries(controls.map(id => [id, { implicitHeight: id === tallest ? 43.2 : 30 }]))
+    assert.equal(vm.runInNewContext(height, sizes), 44, tallest)
+  }
+  for (const id of controls)
+    assert.match(footer, new RegExp("id: " + id + "\\s+anchors.verticalCenter: parent.verticalCenter\\s+height: editorFooter.controlHeight|id: " + id + "\\s+visible:[^\\n]+\\s+anchors.verticalCenter: parent.verticalCenter\\s+height: editorFooter.controlHeight"))
+  assert.ok(footer.indexOf("id: openTuiButton") < footer.indexOf("Column {"))
+  assert.ok(footer.indexOf("Column {") < footer.indexOf("id: profileNameInput"))
+  assert.ok(footer.indexOf("id: profileNameInput") < footer.indexOf("id: discardDraftButton"))
+  assert.ok(footer.indexOf("id: discardDraftButton") < footer.indexOf("id: saveDraftButton"))
+  assert.doesNotMatch(footer, /Math.max\(Style.space\(180\)/)
+})
+
+test("Preview & save requires a manually entered name and stays disabled while busy", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const save = qml.slice(qml.indexOf("id: saveDraftButton"))
+  assert.match(save, /text: "Preview & save"/)
+  assert.doesNotMatch(save, /Name & save/)
+  const enabled = save.match(/enabled: ([\s\S]*?)\n              foreground:/)[1]
+  const root = { managedChecked: true, editPending: false, previewPending: false, sourceProfile: "", saveName: "" }
+  const evaluate = () => vm.runInNewContext(enabled, { root })
+  assert.equal(evaluate(), false)
+  root.saveName = "   "
+  assert.equal(evaluate(), false)
+  root.saveName = "Laptop"
+  assert.equal(evaluate(), true)
+  for (const [key, value] of [["editPending", true], ["previewPending", true], ["managedChecked", false]]) {
+    const previous = root[key]
+    root[key] = value
+    assert.equal(evaluate(), false, key)
+    root[key] = previous
+  }
+  root.saveName = ""
+  root.sourceProfile = "Desk"
+  assert.equal(evaluate(), true)
+  root.sourceProfile = ""
+  root.draftName = panelFunction("draftName", root)
+  root.send = () => assert.fail("unnamed layout must not reach the backend")
+  panelFunction("previewDraft", root)()
+  assert.match(root.lastError, /profile name/)
+})
+
 test("installer and TUI launches release panel focus before starting the terminal", () => {
   const trace = []
   const deferred = []

@@ -3665,7 +3665,11 @@ Panel {
           anchors.left: parent.left
           anchors.right: parent.right
           anchors.bottom: parent.bottom
-          height: Style.space(58)
+          readonly property real controlHeight: Math.ceil(Math.max(
+            openTuiButton.implicitHeight, profileNameInput.implicitHeight,
+            currentProfileBadge.implicitHeight, activateFooterButton.implicitHeight,
+            discardDraftButton.implicitHeight, saveDraftButton.implicitHeight))
+          height: Math.max(Style.space(58), controlHeight + Style.space(18))
           color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.025)
           borderSpec: Border.controlSpec(root.draftDirty || root.creatingProfile ? "selected" : "normal", root.foreground, Color.accent)
           radius: Style.cornerRadius
@@ -3677,8 +3681,20 @@ Panel {
             anchors.rightMargin: Style.space(12)
             spacing: Style.space(9)
 
+            Button {
+              id: openTuiButton
+              anchors.verticalCenter: parent.verticalCenter
+              height: editorFooter.controlHeight
+              text: "TUI"
+              iconText: "󰆍"
+              bordered: true
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              onClicked: root.launchTui()
+            }
+
             Column {
-              width: Math.max(Style.space(180), parent.width
+              width: Math.max(0, parent.width
                 - openTuiButton.width
                 - (currentProfileBadge.visible ? currentProfileBadge.width + parent.spacing : 0)
                 - (activateFooterButton.visible ? activateFooterButton.width + parent.spacing : 0)
@@ -3729,6 +3745,7 @@ Panel {
               id: profileNameInput
               visible: root.creatingProfile || (root.draftDirty && root.sourceProfile === "")
               anchors.verticalCenter: parent.verticalCenter
+              height: editorFooter.controlHeight
               width: Style.space(190)
               text: root.saveName
               placeholderText: root.creatingProfile ? "Name this display setup" : "New profile name"
@@ -3738,20 +3755,10 @@ Panel {
               onAccepted: root.previewDraft()
             }
 
-            Button {
-              id: openTuiButton
-              anchors.verticalCenter: parent.verticalCenter
-              text: "TUI"
-              iconText: "󰆍"
-              bordered: true
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-              onClicked: root.launchTui()
-            }
-
             BorderSurface {
               id: currentProfileBadge
               anchors.verticalCenter: parent.verticalCenter
+              height: editorFooter.controlHeight
               visible: root.activePage === "profiles"
                 && root.selectedSavedProfileCurrent
               implicitWidth: currentProfileBadgeRow.implicitWidth + contentLeftInset + contentRightInset
@@ -3793,6 +3800,7 @@ Panel {
             Button {
               id: activateFooterButton
               anchors.verticalCenter: parent.verticalCenter
+              height: editorFooter.controlHeight
               visible: root.activePage === "profiles"
                 && !root.selectedSavedProfileCurrent
               text: "Activate"
@@ -3809,6 +3817,7 @@ Panel {
             Button {
               id: discardDraftButton
               anchors.verticalCenter: parent.verticalCenter
+              height: editorFooter.controlHeight
               visible: root.draftDirty || root.creatingProfile
               text: "Discard"
               bordered: true
@@ -3821,6 +3830,7 @@ Panel {
             Button {
               id: saveDraftButton
               anchors.verticalCenter: parent.verticalCenter
+              height: editorFooter.controlHeight
               visible: root.draftDirty || root.creatingProfile
               text: "Preview & save"
               selected: true
