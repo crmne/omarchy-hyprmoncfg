@@ -3652,6 +3652,7 @@ Panel {
             Column {
               width: Math.max(Style.space(180), parent.width
                 - openTuiButton.width
+                - (currentProfileBadge.visible ? currentProfileBadge.width + parent.spacing : 0)
                 - (activateFooterButton.visible ? activateFooterButton.width + parent.spacing : 0)
                 - (discardDraftButton.visible ? discardDraftButton.width + parent.spacing : 0)
                 - (saveDraftButton.visible ? saveDraftButton.width + parent.spacing : 0)
@@ -3720,15 +3721,57 @@ Panel {
               onClicked: root.launchTui()
             }
 
+            BorderSurface {
+              id: currentProfileBadge
+              anchors.verticalCenter: parent.verticalCenter
+              visible: root.activePage === "profiles"
+                && !!root.selectedSavedSummary
+                && root.selectedSavedSummary.active
+              implicitWidth: currentProfileBadgeRow.implicitWidth + contentLeftInset + contentRightInset
+              implicitHeight: currentProfileBadgeRow.implicitHeight + contentTopInset + contentBottomInset
+              leftPadding: Style.spacing.controlPaddingX
+              rightPadding: Style.spacing.controlPaddingX
+              topPadding: Style.spacing.controlPaddingY
+              bottomPadding: Style.spacing.controlPaddingY
+              color: Style.selectedFillFor(root.foreground, Color.accent)
+              borderSpec: Border.controlSpec("selected", root.foreground, Color.accent)
+              radius: Style.cornerRadius
+
+              Row {
+                id: currentProfileBadgeRow
+                anchors.centerIn: parent
+                spacing: Style.spacing.controlGap
+
+                Text {
+                  textFormat: Text.PlainText
+                  text: "󰄬"
+                  color: Style.selectedStateColor(root.foreground, Color.accent)
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.icon
+                  anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Text {
+                  textFormat: Text.PlainText
+                  text: "Current profile"
+                  color: Style.selectedStateColor(root.foreground, Color.accent)
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.body
+                  font.bold: true
+                  anchors.verticalCenter: parent.verticalCenter
+                }
+              }
+            }
+
             Button {
               id: activateFooterButton
               anchors.verticalCenter: parent.verticalCenter
               visible: root.activePage === "profiles"
-              text: root.selectedSavedSummary && root.selectedSavedSummary.active ? "Active" : "Activate"
+                && !(root.selectedSavedSummary && root.selectedSavedSummary.active)
+              text: "Activate"
               selected: enabled
               bordered: true
               enabled: !root.draftDirty && !!root.selectedSavedProfile
-                && !(root.selectedSavedSummary && root.selectedSavedSummary.active)
                 && !root.profileAutomatic && root.managedChecked
                 && root.previewTransaction === "" && !root.previewPending
               foreground: root.foreground

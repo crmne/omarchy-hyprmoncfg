@@ -706,6 +706,16 @@ test("expanded profiles separate browsing from activation and show saved workspa
   assert.match(canvasQml, /property string emphasis: "layout"/)
 })
 
+test("active saved profiles render as status instead of a disabled action", () => {
+  const panelQml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+
+  assert.match(panelQml, /id: currentProfileBadge/)
+  assert.match(panelQml, /text: "Current profile"/)
+  assert.match(panelQml, /visible: root\.activePage === "profiles"\s+&& !!root\.selectedSavedSummary\s+&& root\.selectedSavedSummary\.active/)
+  assert.match(panelQml, /id: activateFooterButton[\s\S]*?visible: root\.activePage === "profiles"\s+&& !\(root\.selectedSavedSummary && root\.selectedSavedSummary\.active\)[\s\S]*?text: "Activate"/)
+  assert.doesNotMatch(panelQml, /\? "Active" : "Activate"/)
+})
+
 test("profile details and workspace labels mirror the TUI semantics", () => {
   const panelQml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
 
