@@ -55,6 +55,22 @@ A small background service is what watches for this. It catches hotplug, lid and
 - SDR brightness, saturation and transfer curve, with luminance floors and ceilings for SDR and HDR
 - Variable refresh rate: off, on, or fullscreen only
 
+The colour inspector follows [Hyprland's colour terminology](https://wiki.hypr.land/configuring/core/monitors/colors/) while preserving the underlying fields:
+
+| Panel term | Meaning |
+| --- | --- |
+| Colour depth (bpc) | Bits per colour component in the output signal |
+| Colour space / EOTF | Output primaries plus the electro-optical transfer function; HDR presets use PQ |
+| SDR luminance / saturation scale | Unitless adjustment applied to SDR content in HDR mode |
+| SDR black / white level | Luminance endpoints, in cd/m², used for SDR-to-HDR mapping |
+| Display black / peak / maximum frame-average luminance | Overrides for display luminance metadata normally obtained from EDID |
+| WCG / HDR capability | Auto-detect, force off, or force on when hardware detection is wrong |
+| ICC device profile | Absolute path to a display characterization profile |
+
+Every editable per-display field gains an individual reset action after it diverges from the loaded profile. Resetting restores that one saved value without discarding unrelated edits. All-zero display luminance overrides leave EDID detection in control.
+
+Neutral SDR multipliers are shown as 1, including profiles that omit them. Resets preserve saved zero/omitted luminance overrides instead of replacing them with generic display defaults. Mode, scale, and rotation resets use the same layout reflow as ordinary edits, so neighboring displays remain aligned.
+
 **Profiles and switching**
 
 - One profile per place you work, applied automatically on hotplug, lid and resume
@@ -131,7 +147,22 @@ Your saved profiles remain in `~/.config/hyprmoncfg/profiles`.
 
 ## Development
 
+The confirmation service controls previews it starts itself, and can recover a
+preview when the daemon reports that its original client disconnected. A live
+TUI keeps its own confirmation. This recovery requires the daemon's
+`preview.reclaimable` status field; older daemons still support ordinary previews.
+
+After changes to preview handling, test position and scale changes, disabling
+the panel's own display, keyboard and mouse confirmation, timeout rollback, and
+opening the TUI while the plugin is enabled. The automated tests exercise socket
+message ordering; monitor remapping and keyboard focus also need a live session.
+Also verify that the installer terminal accepts keyboard input, field resets
+return to their loaded values without discarding other edits, and identical
+saved layouts show the confirmed current profile consistently.
+
 ```sh
-omarchy plugin validate .
 node --test tests/model.test.js
+qmllint *.qml
+omarchy plugin validate .
+git diff --check
 ```

@@ -402,6 +402,65 @@ function outputDisplayLabel(profile, key) {
   return makeModel || String(output.description || "").trim() || String(output.name || key || "Display")
 }
 
+// Profile JSON uses explicit neutral values for some Hyprland defaults and
+// zero as hyprmoncfg's "do not emit an EDID override" sentinel. Keeping those
+// values here gives every front-end field the same reset semantics.
+var outputFieldDefaults = {
+  enabled: true,
+  mode: "preferred",
+  scale: 1,
+  vrr: 0,
+  transform: 0,
+  x: 0,
+  y: 0,
+  mirror_of: "",
+  bitdepth: 8,
+  cm: "",
+  sdr_brightness: 0,
+  sdr_saturation: 0,
+  sdr_min_luminance: 0,
+  sdr_max_luminance: 0,
+  sdr_eotf: "",
+  min_luminance: 0,
+  max_luminance: 0,
+  max_avg_luminance: 0,
+  supports_wide_color: 0,
+  supports_hdr: 0,
+  icc: ""
+}
+
+function outputFieldValue(profile, key, field) {
+  var edit = outputFieldResetEdit(profile, key, field)
+  if (!edit) return undefined
+  var value = edit[field]
+  if (field === "cm") return value || "srgb"
+  if (field === "sdr_eotf") return value || "default"
+  if (field === "sdr_brightness" || field === "sdr_saturation") return value || 1
+  return value
+}
+
+function outputFieldChanged(profile, defaults, key, field) {
+  if (!outputByKey(defaults, key)) return false
+  return outputFieldValue(profile, key, field) !== outputFieldValue(defaults, key, field)
+}
+
+function outputFieldResetEdit(defaults, key, field) {
+  if (!Object.prototype.hasOwnProperty.call(outputFieldDefaults, field)) return null
+  var output = outputByKey(defaults, key)
+  if (!output) return null
+  var fallback = outputFieldDefaults[field]
+  var value = output[field] === undefined || output[field] === null ? fallback : output[field]
+  if (field === "mode") value = outputMode(output)
+  else if (typeof fallback === "boolean") value = value !== false
+  else if (typeof fallback === "number") value = isFinite(Number(value)) ? Number(value) : fallback
+  else value = String(value)
+  // The editor accepts explicit signal depths, not the wire format's zero.
+  if (field === "bitdepth" && value === 0) value = 8
+  var edit = {}
+  edit[field] = value
+  return edit
+}
+
 function clampBrightness(value) {
   var number = Number(value)
   if (!isFinite(number)) return 1
@@ -564,9 +623,26 @@ function profileWorkspaceSummary(profile) {
     + (maximum > 0 ? " · " + maximum + " workspaces" : "")
 }
 
-function profileMatchLabel(summary) {
+// Prefer a proven live match. If identical saved layouts make it ambiguous,
+// fall back to the daemon's confirmed choice, never a preview or stale name.
+function currentProfileName(document) {
+  var value = document || {}
+  var daemon = value.daemon || {}
+  if (daemon.unmanaged || daemon.running === false || daemon.preview) return ""
+  var active = String(((value.active_profile || {}).name) || "").trim()
+  if (active !== "") return active
+  var override = String(daemon.profile_override || "").trim()
+  return profileSummaryByName(value, override) ? override : ""
+}
+
+function profileIsCurrent(summary, document) {
+  var name = String(((summary || {}).name) || "").trim()
+  return name !== "" && name === currentProfileName(document)
+}
+
+function profileMatchLabel(summary, current) {
   var item = summary || {}
-  var label = item.active ? "Active"
+  var label = (current === undefined ? item.active : current) ? "Active"
     : (item.recommended ? "Recommended"
       : (Number(item.match_score || 0) > 0 ? "Partial match" : "No match"))
   return Number(item.match_score || 0) > 0 ? label + " · score " + Number(item.match_score) : label
@@ -954,6 +1030,9 @@ if (typeof module !== "undefined") {
     snapOutputPosition: snapOutputPosition,
     outputName: outputName,
     outputDisplayLabel: outputDisplayLabel,
+    outputFieldValue: outputFieldValue,
+    outputFieldChanged: outputFieldChanged,
+    outputFieldResetEdit: outputFieldResetEdit,
     clampBrightness: clampBrightness,
     brightnessTarget: brightnessTarget,
     initialOutputKey: initialOutputKey,
@@ -970,6 +1049,8 @@ if (typeof module !== "undefined") {
     displayType: displayType,
     onOff: onOff,
     profileWorkspaceSummary: profileWorkspaceSummary,
+    currentProfileName: currentProfileName,
+    profileIsCurrent: profileIsCurrent,
     profileMatchLabel: profileMatchLabel,
     profileMatchReasonRows: profileMatchReasonRows,
     profileHiddenDisplayRows: profileHiddenDisplayRows,

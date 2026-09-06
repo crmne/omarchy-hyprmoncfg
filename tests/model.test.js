@@ -44,6 +44,76 @@ test("installer and TUI launches release panel focus before starting the termina
   assert.match(root.lastError, /Could not prepare/)
 })
 
+test("field resets preserve wire defaults and derive modes from saved geometry", () => {
+  const baseline = { outputs: [{ key: "desk", width: 1920, height: 1080, refresh: 60 }] }
+  for (const field of ["sdr_min_luminance", "sdr_max_luminance", "sdr_brightness", "sdr_saturation"])
+    assert.deepEqual(Model.outputFieldResetEdit(baseline, "desk", field), { [field]: 0 })
+  assert.deepEqual(Model.outputFieldResetEdit(baseline, "desk", "mode"), { mode: "1920x1080@60.00Hz" })
+  const explicit = Model.clone(baseline)
+  Object.assign(explicit.outputs[0], { bitdepth: 8, cm: "srgb", sdr_eotf: "default", sdr_brightness: 1, sdr_saturation: 1 })
+  for (const field of ["bitdepth", "cm", "sdr_eotf", "sdr_brightness", "sdr_saturation"])
+    assert.equal(Model.outputFieldChanged(explicit, baseline, "desk", field), false, field)
+  for (const field of ["__proto__", "toString", "constructor"])
+    assert.equal(Model.outputFieldResetEdit(baseline, "desk", field), null)
+})
+
+test("resets cannot disable the last display or change unrelated draft fields", () => {
+  const edits = []
+  const root = {
+    selectedOutputKey: "desk",
+    draftProfile: { outputs: [{ key: "desk", enabled: true, scale: 1.5, cm: "hdr" }] },
+    profileDefaults: { outputs: [{ key: "desk", enabled: false, scale: 1, cm: "srgb" }] },
+    editDraft(edit) { edits.push(JSON.parse(JSON.stringify(edit))) }
+  }
+  root.editOutput = panelFunction("editOutput", root)
+  const reset = panelFunction("resetOutputField", root)
+  reset("enabled")
+  assert.equal(edits.length, 0)
+  assert.match(root.lastError, /one display must stay enabled/)
+  reset("scale")
+  assert.deepEqual(edits, [{ output_key: "desk", scale: 1 }])
+  assert.equal(root.draftProfile.outputs[0].cm, "hdr")
+  assert.equal(root.profileDefaults.outputs[0].scale, 1)
+})
+
+test("current profile identity never hides a proven live match behind a stale override", () => {
+  const document = { daemon: { running: true, profile_override: "Desk" },
+    active_profile: { name: "TV" }, profiles: [{ name: "Desk" }, { name: "TV", active: true }] }
+  assert.equal(Model.currentProfileName(document), "TV")
+  document.active_profile = null
+  assert.equal(Model.currentProfileName(document), "Desk")
+  document.daemon.preview = { profile_name: "TV" }
+  assert.equal(Model.currentProfileName(document), "")
+  delete document.daemon.preview
+  document.daemon.unmanaged = true
+  assert.equal(Model.currentProfileName(document), "")
+  delete document.daemon.unmanaged
+  document.daemon.running = false
+  assert.equal(Model.currentProfileName(document), "")
+  document.daemon.running = true
+  document.daemon.profile_override = "Deleted"
+  assert.equal(Model.currentProfileName(document), "")
+  assert.equal(Model.profileMatchLabel({ active: true }, false), "No match")
+})
+
+test("leaving an unchanged decimal field does not block its reset or lose precision", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const component = qml.slice(qml.indexOf("component DecimalField:"))
+  const body = component.match(/onEditingFinished: \{([\s\S]*?)\n        }/)[1]
+  const edits = []
+  const context = vm.createContext({ text: "0.006", activeFocus: false,
+    decimalField: { value: 0.0063, formatted() { return "0.006" }, modified(value) { edits.push(value) } },
+    Qt: { callLater() {} } })
+  const finish = vm.runInContext("(function() {" + body + "})", context)
+  finish()
+  assert.deepEqual(edits, [])
+  context.text = "0.007"
+  finish()
+  assert.deepEqual(edits, [0.007])
+  context.text = "invalid"
+  finish()
+  assert.equal(context.text, "0.006")
+})
 
 // Execute the actual QML handlers with a fake socket. This exercises message
 // ordering without changing the running desktop's monitor configuration.
@@ -163,6 +233,22 @@ test("IPC envelopes require protocol version one", () => {
   })
   assert.equal(Model.parseEnvelope('{"type":"event","protocol_version":2}'), null)
   assert.equal(Model.parseEnvelope("nope"), null)
+})
+
+test("a confirmed manual override is current when duplicate profile states are ambiguous", () => {
+  const document = {
+    daemon: { running: true, profile_override: "Test" },
+    active_profile: null,
+    profiles: [
+      { name: "Test", active: false, recommended: false, match_score: 300 },
+      { name: "adamc-system-default", active: false, recommended: true, match_score: 300 }
+    ]
+  }
+
+  assert.equal(Model.currentProfileName(document), "Test")
+  assert.equal(Model.profileIsCurrent(document.profiles[0], document), true)
+  assert.equal(Model.profileIsCurrent(document.profiles[1], document), false)
+  assert.equal(Model.profileMatchLabel(document.profiles[0], true), "Active · score 300")
 })
 
 test("version compatibility accepts the IPC release and development builds", () => {
@@ -485,6 +571,61 @@ test("editor options stay compact and only offer applicable profiles", () => {
   ])
 })
 
+test("individual output fields reset to the loaded profile values", () => {
+  const defaults = {
+    outputs: [{
+      key: "desk",
+      mode: "3440x1440@165.00Hz",
+      scale: 1,
+      bitdepth: 10,
+      cm: "hdredid",
+      sdr_brightness: 1,
+      sdr_saturation: 1,
+      min_luminance: 0.055,
+      max_luminance: 456,
+      supports_hdr: 0
+    }]
+  }
+  const draft = Model.clone(defaults)
+  draft.outputs[0].scale = 1.25
+  draft.outputs[0].sdr_brightness = 1.35
+  draft.outputs[0].supports_hdr = 1
+
+  assert.equal(Model.outputFieldChanged(draft, defaults, "desk", "scale"), true)
+  assert.equal(Model.outputFieldChanged(draft, defaults, "desk", "sdr_brightness"), true)
+  assert.equal(Model.outputFieldChanged(draft, defaults, "desk", "supports_hdr"), true)
+  assert.equal(Model.outputFieldChanged(draft, defaults, "desk", "cm"), false)
+  assert.deepEqual(Model.outputFieldResetEdit(defaults, "desk", "scale"), { scale: 1 })
+  assert.deepEqual(Model.outputFieldResetEdit(defaults, "desk", "sdr_brightness"), {
+    sdr_brightness: 1
+  })
+  assert.deepEqual(Model.outputFieldResetEdit(defaults, "desk", "supports_hdr"), {
+    supports_hdr: 0
+  })
+})
+
+test("field reset restores neutral or auto-detected values omitted from a profile", () => {
+  const defaults = { outputs: [{ key: "desk" }] }
+  const draft = {
+    outputs: [{
+      key: "desk",
+      max_luminance: 1000,
+      max_avg_luminance: 600,
+      icc: "/profiles/desk.icc"
+    }]
+  }
+
+  assert.deepEqual(Model.outputFieldResetEdit(defaults, "desk", "max_luminance"), {
+    max_luminance: 0
+  })
+  assert.deepEqual(Model.outputFieldResetEdit(defaults, "desk", "max_avg_luminance"), {
+    max_avg_luminance: 0
+  })
+  assert.deepEqual(Model.outputFieldResetEdit(defaults, "desk", "icc"), { icc: "" })
+  assert.equal(Model.outputFieldChanged(draft, defaults, "missing", "icc"), false)
+  assert.equal(Model.outputFieldResetEdit(defaults, "desk", "not_a_field"), null)
+})
+
 test("workspace preview is rendered from the daemon plan", () => {
   const plan = [
     { output_key: "left", workspaces: ["1", "2", "3", "4"] },
@@ -589,6 +730,43 @@ test("the panel has management-first compact mode and a TUI-shaped expanded mode
   assert.match(qml, /fontSize: Style\.font\.caption/)
   assert.doesNotMatch(qml, /ProfileRow/)
   assert.match(qml, /match_score/)
+})
+
+test("the inspectors use standards-based colour terms and per-field profile resets", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const dropdown = fs.readFileSync(path.join(__dirname, "..", "PanelDropdown.qml"), "utf8")
+
+  for (const label of [
+    "COLOR DEPTH (BPC)",
+    "COLOR SPACE / EOTF",
+    "SDR LUMINANCE SCALE",
+    "SDR SATURATION SCALE",
+    "SDR BLACK LEVEL (cd/m²)",
+    "SDR WHITE LEVEL (cd/m²)",
+    "SDR EOTF",
+    "DISPLAY BLACK (cd/m²)",
+    "DISPLAY PEAK (cd/m²)",
+    "MAX FRAME-AVERAGE (cd/m²)",
+    "WCG CAPABILITY",
+    "HDR CAPABILITY",
+    "ICC DEVICE PROFILE"
+  ]) assert.match(qml, new RegExp(label.replace(/[()²/]/g, "\\$&")))
+
+  assert.match(qml, /bpc = bits per color component/)
+  assert.match(qml, /EOTF = electro-optical transfer function/)
+  assert.match(qml, /PQ = Perceptual Quantizer/)
+  assert.match(qml, /WCG = wide color gamut/)
+  assert.match(qml, /BT\.2020 \+ PQ \(HDR\)/)
+  assert.match(qml, /EDID primaries \+ PQ/)
+  assert.match(qml, /function resetOutputField\(field\)/)
+  assert.equal((qml.match(/resetVisible: root\.outputFieldChanged/g) || []).length, 17)
+  assert.equal((qml.match(/onResetRequested: root\.resetOutputField/g) || []).length, 17)
+  assert.equal((qml.match(/visible: root\.outputFieldChanged/g) || []).length, 4)
+  assert.equal((qml.match(/onClicked: root\.resetOutputField/g) || []).length, 4)
+  assert.match(qml, /visible: root\.outputFieldChanged\("icc"\)/)
+  assert.match(qml, /onClicked: root\.resetOutputField\("icc"\)/)
+  assert.match(dropdown, /signal resetRequested\(\)/)
+  assert.match(dropdown, /tooltipText: root\.resetTooltip/)
 })
 
 test("the workspace form hides irrelevant group size and adapts keyboard navigation", () => {
@@ -705,6 +883,8 @@ test("manual profile choice is explicit and can return to automatic matching", (
   assert.match(qml, /Automatic matching is paused/)
   assert.match(qml, /&& !root\.profileAutomatic && root\.managedChecked/)
   assert.match(qml, /root\.profileChoice = selected\s+root\.previewProfile\(selected\)/)
+  assert.match(qml, /Model\.currentProfileName\(root\.document\)/)
+  assert.match(qml, /Model\.profileIsCurrent\(modelData, root\.document\)/)
   assert.equal((qml.match(/label: "Automatically use the best profile"/g) || []).length, 1)
   assert.doesNotMatch(qml, /id: profilePreviewButton/)
 })
@@ -722,10 +902,20 @@ test("expanded profiles separate browsing from activation and show saved workspa
   assert.match(canvasQml, /property string emphasis: "layout"/)
 })
 
+test("active saved profiles render as status instead of a disabled action", () => {
+  const panelQml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+
+  assert.match(panelQml, /id: currentProfileBadge/)
+  assert.match(panelQml, /text: "Current profile"/)
+  assert.match(panelQml, /visible: root\.activePage === "profiles"\s+&& root\.selectedSavedProfileCurrent/)
+  assert.match(panelQml, /id: activateFooterButton[\s\S]*?visible: root\.activePage === "profiles"\s+&& !root\.selectedSavedProfileCurrent[\s\S]*?text: "Activate"/)
+  assert.doesNotMatch(panelQml, /\? "Active" : "Activate"/)
+})
+
 test("profile details and workspace labels mirror the TUI semantics", () => {
   const panelQml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
 
-  assert.match(panelQml, /Model\.profileMatchLabel\(root\.selectedSavedSummary\)/)
+  assert.match(panelQml, /Model\.profileMatchLabel\(root\.selectedSavedSummary, root\.selectedSavedProfileCurrent\)/)
   assert.match(panelQml, /model: root\.selectedSavedMatchReasons/)
   assert.match(panelQml, /Number\(root\.selectedSavedSummary\.output_count \|\| 0\) \+ " saved · "/)
   assert.match(panelQml, /Number\(root\.selectedSavedSummary\.connected_outputs \|\| 0\) \+ " connected"/)
