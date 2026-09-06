@@ -65,6 +65,22 @@ test("IPC envelopes require protocol version one", () => {
   assert.equal(Model.parseEnvelope("nope"), null)
 })
 
+test("a confirmed manual override is current when duplicate profile states are ambiguous", () => {
+  const document = {
+    daemon: { running: true, profile_override: "Test" },
+    active_profile: null,
+    profiles: [
+      { name: "Test", active: false, recommended: false, match_score: 300 },
+      { name: "adamc-system-default", active: false, recommended: true, match_score: 300 }
+    ]
+  }
+
+  assert.equal(Model.currentProfileName(document), "Test")
+  assert.equal(Model.profileIsCurrent(document.profiles[0], document), true)
+  assert.equal(Model.profileIsCurrent(document.profiles[1], document), false)
+  assert.equal(Model.profileMatchLabel(document.profiles[0], true), "Active · score 300")
+})
+
 test("version compatibility accepts the IPC release and development builds", () => {
   assert.equal(Model.versionAtLeast("hyprmoncfg 1.12.0 (abc)", "1.12.0"), true)
   assert.equal(Model.versionAtLeast("hyprmoncfg v1.12.3", "1.12.0"), true)
@@ -689,6 +705,8 @@ test("manual profile choice is explicit and can return to automatic matching", (
   assert.match(qml, /Automatic matching is paused/)
   assert.match(qml, /&& !root\.profileAutomatic && root\.managedChecked/)
   assert.match(qml, /root\.profileChoice = selected\s+root\.previewProfile\(selected\)/)
+  assert.match(qml, /Model\.currentProfileName\(root\.document\)/)
+  assert.match(qml, /Model\.profileIsCurrent\(modelData, root\.document\)/)
   assert.equal((qml.match(/label: "Automatically use the best profile"/g) || []).length, 1)
   assert.doesNotMatch(qml, /id: profilePreviewButton/)
 })
@@ -711,15 +729,15 @@ test("active saved profiles render as status instead of a disabled action", () =
 
   assert.match(panelQml, /id: currentProfileBadge/)
   assert.match(panelQml, /text: "Current profile"/)
-  assert.match(panelQml, /visible: root\.activePage === "profiles"\s+&& !!root\.selectedSavedSummary\s+&& root\.selectedSavedSummary\.active/)
-  assert.match(panelQml, /id: activateFooterButton[\s\S]*?visible: root\.activePage === "profiles"\s+&& !\(root\.selectedSavedSummary && root\.selectedSavedSummary\.active\)[\s\S]*?text: "Activate"/)
+  assert.match(panelQml, /visible: root\.activePage === "profiles"\s+&& root\.selectedSavedProfileCurrent/)
+  assert.match(panelQml, /id: activateFooterButton[\s\S]*?visible: root\.activePage === "profiles"\s+&& !root\.selectedSavedProfileCurrent[\s\S]*?text: "Activate"/)
   assert.doesNotMatch(panelQml, /\? "Active" : "Activate"/)
 })
 
 test("profile details and workspace labels mirror the TUI semantics", () => {
   const panelQml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
 
-  assert.match(panelQml, /Model\.profileMatchLabel\(root\.selectedSavedSummary\)/)
+  assert.match(panelQml, /Model\.profileMatchLabel\(root\.selectedSavedSummary, root\.selectedSavedProfileCurrent\)/)
   assert.match(panelQml, /model: root\.selectedSavedMatchReasons/)
   assert.match(panelQml, /Number\(root\.selectedSavedSummary\.output_count \|\| 0\) \+ " saved · "/)
   assert.match(panelQml, /Number\(root\.selectedSavedSummary\.connected_outputs \|\| 0\) \+ " connected"/)

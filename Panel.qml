@@ -103,9 +103,8 @@ Panel {
   readonly property int monitorCount: {
     return layoutDisplays.length
   }
-  readonly property string activeProfile: root.managedChecked && document && document.active_profile
-    ? String(document.active_profile.name || "")
-    : ""
+  readonly property string activeProfile: root.managedChecked
+    ? Model.currentProfileName(root.document) : ""
   readonly property string recommendedProfile: root.managedChecked && document && document.recommended_profile
     ? String(document.recommended_profile.name || "")
     : ""
@@ -225,6 +224,7 @@ Panel {
     ? root.editorDocument.profiles : []
   readonly property var selectedSavedProfile: Model.savedProfileByName(root.editorDocument, root.selectedSavedProfileName)
   readonly property var selectedSavedSummary: Model.profileSummaryByName(root.document, root.selectedSavedProfileName)
+  readonly property bool selectedSavedProfileCurrent: Model.profileIsCurrent(root.selectedSavedSummary, root.document)
   readonly property var selectedSavedWorkspacePlan: Model.profileWorkspacePlan(root.editorDocument, root.selectedSavedProfileName)
   readonly property var selectedSavedWorkspaceRows: Model.workspacePlanRows(root.selectedSavedWorkspacePlan, root.selectedSavedProfile)
   readonly property var selectedSavedMatchReasons: Model.profileMatchReasonRows(root.selectedSavedSummary)
@@ -3111,10 +3111,12 @@ Panel {
                   model: root.document && root.document.profiles instanceof Array ? root.document.profiles : []
 
                   BorderSurface {
+                    id: savedEntry
                     required property var modelData
                     width: parent.width
                     height: Style.space(32)
                     readonly property bool selected: String(modelData.name || "") === root.selectedSavedProfileName
+                    readonly property bool current: Model.profileIsCurrent(modelData, root.document)
                     color: selected
                       ? Style.selectedFillFor(root.foreground, Color.accent)
                       : "transparent"
@@ -3130,11 +3132,11 @@ Panel {
                         textFormat: Text.PlainText
                         anchors.verticalCenter: parent.verticalCenter
                         width: parent.width - profileMatchText.width - Style.space(8)
-                        text: (modelData.active ? "›  " : "   ") + String(modelData.name || "Profile")
-                        color: modelData.active || parent.parent.selected ? root.foreground : root.dim
+                        text: (savedEntry.current ? "›  " : "   ") + String(modelData.name || "Profile")
+                        color: savedEntry.current || savedEntry.selected ? root.foreground : root.dim
                         font.family: root.fontFamily
                         font.pixelSize: Style.font.bodySmall
-                        font.bold: modelData.active
+                        font.bold: savedEntry.current
                         elide: Text.ElideRight
                       }
 
@@ -3179,7 +3181,7 @@ Panel {
                 height: Math.min(parent.height - Style.space(180),
                   Math.max(Style.space(190), Style.space(38 + root.selectedSavedDetailRowCount * 18)))
                 title: "Profile Details"
-                meta: root.selectedSavedSummary && root.selectedSavedSummary.active ? "Active" : ""
+                meta: root.selectedSavedProfileCurrent ? "Active" : ""
                 foreground: root.foreground
                 dim: root.dim
                 accent: Color.accent
@@ -3200,9 +3202,10 @@ Panel {
                   }
                   InfoRow {
                     label: "Match"
-                    value: root.selectedSavedSummary ? Model.profileMatchLabel(root.selectedSavedSummary) : "—"
+                    value: root.selectedSavedSummary
+                      ? Model.profileMatchLabel(root.selectedSavedSummary, root.selectedSavedProfileCurrent) : "—"
                     valueAccent: !!root.selectedSavedSummary
-                      && (root.selectedSavedSummary.active || root.selectedSavedSummary.recommended)
+                      && (root.selectedSavedProfileCurrent || root.selectedSavedSummary.recommended)
                   }
 
                   Repeater {
@@ -3669,7 +3672,7 @@ Panel {
                   : (root.creatingProfile ? "Creating a profile for this setup"
                     : (root.draftDirty ? "Unsaved display changes"
                     : (root.activePage === "profiles"
-                      ? (root.selectedSavedSummary && root.selectedSavedSummary.active
+                      ? (root.selectedSavedProfileCurrent
                         ? "This profile is active"
                         : "Browsing " + root.selectedSavedProfileName)
                       : "Editing " + root.profileStatusTitle)))
@@ -3725,8 +3728,7 @@ Panel {
               id: currentProfileBadge
               anchors.verticalCenter: parent.verticalCenter
               visible: root.activePage === "profiles"
-                && !!root.selectedSavedSummary
-                && root.selectedSavedSummary.active
+                && root.selectedSavedProfileCurrent
               implicitWidth: currentProfileBadgeRow.implicitWidth + contentLeftInset + contentRightInset
               implicitHeight: currentProfileBadgeRow.implicitHeight + contentTopInset + contentBottomInset
               leftPadding: Style.spacing.controlPaddingX
@@ -3767,7 +3769,7 @@ Panel {
               id: activateFooterButton
               anchors.verticalCenter: parent.verticalCenter
               visible: root.activePage === "profiles"
-                && !(root.selectedSavedSummary && root.selectedSavedSummary.active)
+                && !root.selectedSavedProfileCurrent
               text: "Activate"
               selected: enabled
               bordered: true

@@ -611,9 +611,26 @@ function profileWorkspaceSummary(profile) {
     + (maximum > 0 ? " · " + maximum + " workspaces" : "")
 }
 
-function profileMatchLabel(summary) {
+// An exact live-state match can be ambiguous when multiple saved profiles
+// intentionally share the same effective monitor layout. In manual mode the
+// daemon's confirmed profile_override is the authoritative identity; in
+// automatic mode active_profile remains authoritative.
+function currentProfileName(document) {
+  var value = document || {}
+  var daemon = value.daemon || {}
+  var override = String(daemon.profile_override || "").trim()
+  if (override !== "") return override
+  return String(((value.active_profile || {}).name) || "").trim()
+}
+
+function profileIsCurrent(summary, document) {
+  var name = String(((summary || {}).name) || "").trim()
+  return name !== "" && name === currentProfileName(document)
+}
+
+function profileMatchLabel(summary, current) {
   var item = summary || {}
-  var label = item.active ? "Active"
+  var label = current === true || item.active ? "Active"
     : (item.recommended ? "Recommended"
       : (Number(item.match_score || 0) > 0 ? "Partial match" : "No match"))
   return Number(item.match_score || 0) > 0 ? label + " · score " + Number(item.match_score) : label
@@ -1019,6 +1036,8 @@ if (typeof module !== "undefined") {
     displayType: displayType,
     onOff: onOff,
     profileWorkspaceSummary: profileWorkspaceSummary,
+    currentProfileName: currentProfileName,
+    profileIsCurrent: profileIsCurrent,
     profileMatchLabel: profileMatchLabel,
     profileMatchReasonRows: profileMatchReasonRows,
     profileHiddenDisplayRows: profileHiddenDisplayRows,
