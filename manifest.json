@@ -23,7 +23,7 @@
   },
   "hyprmoncfg": {
     "package": "hyprmoncfg",
-    "minimumVersion": "1.18.1",
+    "minimumVersion": "1.18.2",
     "protocolVersion": 1
   }
 }
