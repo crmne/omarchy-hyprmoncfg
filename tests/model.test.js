@@ -28,6 +28,25 @@ test("unnamed layouts explain saving and focus the profile name without applying
   assert.match(root.lastError, /profile name.*Enter/)
 })
 
+test("unnamed drafts keep the save button available while busy and unmanaged drafts stay blocked", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const button = qml.match(/id: saveDraftButton\b([\s\S]*?)\n            }/)[1]
+  const binding = button.match(/enabled:\s*([\s\S]*?)(?=\n\s+\w+:)/)[1]
+  const defaults = { managedChecked: true, editPending: false, previewPending: false,
+    sourceProfile: "", saveName: "" }
+  const enabled = (changes = {}) => vm.runInNewContext("(" + binding + ")", {
+    root: { ...defaults, ...changes },
+  })
+
+  assert.equal(enabled(), true, "an unnamed draft must offer the naming action")
+  assert.equal(enabled({ saveName: "   " }), true, "a blank name must still allow guidance")
+  assert.equal(enabled({ saveName: "desk" }), true, "a named draft can preview")
+  assert.equal(enabled({ sourceProfile: "desk" }), true, "an existing profile can preview")
+  assert.equal(enabled({ managedChecked: false }), false, "unmanaged layouts remain read-only")
+  assert.equal(enabled({ editPending: true }), false, "pending edits block saving")
+  assert.equal(enabled({ previewPending: true }), false, "pending previews block saving")
+})
+
 test("installer and TUI launches release panel focus before starting the terminal", () => {
   const trace = []
   const deferred = []
