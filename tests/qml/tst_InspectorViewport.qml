@@ -122,12 +122,17 @@ Rectangle {
       viewport.height = viewport.formHeight + data.extraHeight
       tryCompare(viewport, "interactive", data.scrolls)
       tryCompare(viewport.ScrollBar.vertical, "visible", data.scrolls)
-      mouseWheel(viewport, 100, 100, 0, -1200)
+      // Older Qt drops sub-millisecond flicks. Use individual wheel notches
+      // so a one-pixel distance still has time to animate.
+      for (var notch = 0; notch < 2; notch++) {
+        mouseWheel(viewport, 100, 100, 0, -120)
+        tryCompare(viewport, "moving", false)
+      }
       var expected = Math.max(0, -data.extraHeight)
-      tryCompare(viewport, "contentY", expected)
-      viewport.lastField.forceActiveFocus()
-      wait(0)
       compare(viewport.contentY, expected)
+      viewport.contentY = 0
+      viewport.lastField.forceActiveFocus()
+      tryCompare(viewport, "contentY", expected)
       verify(fullyVisible(viewport.lastField))
       if (!data.scrolls) compare(viewport.firstField.width, viewport.width)
     }
