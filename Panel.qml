@@ -435,8 +435,8 @@ Panel {
 
   function launchTui() {
     tuiProcess.command = ["gtk-launch", "hyprmoncfg-omarchy"]
-    tuiProcess.startDetached()
     root.close()
+    Qt.callLater(function() { tuiProcess.startDetached() })
   }
 
   function connectBackend() {
@@ -1426,7 +1426,9 @@ Panel {
         return
       }
       installerProcess.command = Model.installProcessArgs()
-      installerProcess.startDetached()
+      // Release the overlay's keyboard focus before presenting a sudo prompt.
+      root.close()
+      Qt.callLater(function() { installerProcess.startDetached() })
       installPoll.restart()
       installTimeout.restart()
     }

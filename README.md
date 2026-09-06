@@ -77,7 +77,7 @@ A small background service is what watches for this. It catches hotplug, lid and
 omarchy plugin add https://github.com/crmne/omarchy-hyprmoncfg.git --enable
 ```
 
-If hyprmoncfg is missing, open the panel and choose **Install hyprmoncfg**. Omarchy opens its normal presented terminal and runs:
+If hyprmoncfg is missing, open the panel and choose **Install hyprmoncfg**. The panel closes before Omarchy opens its presented terminal, so the terminal can receive keyboard input at the password prompt. Installation monitoring continues while the panel is closed. The terminal runs:
 
 ```sh
 if pacman -Q hyprmoncfg-bin >/dev/null 2>&1; then

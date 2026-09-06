@@ -5,6 +5,45 @@ const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 const Model = require("../Model.js")
+const vm = require("node:vm")
+
+function panelFunction(name, root, globals = {}) {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const source = qml.match(new RegExp("^  function " + name + "\\([\\s\\S]*?^  }", "m"))[0]
+  return vm.runInNewContext("(" + source + ")", { root, Model, ...globals })
+}
+
+test("installer and TUI launches release panel focus before starting the terminal", () => {
+  const trace = []
+  const deferred = []
+  const root = { installing: true, close() { trace.push("close") } }
+  const process = { startDetached() { trace.push("launch") } }
+  const globals = { Qt: { callLater(fn) { deferred.push(fn) } }, tuiProcess: process }
+  panelFunction("launchTui", root, globals)()
+  assert.deepEqual(trace, ["close"])
+  deferred.shift()()
+  assert.deepEqual(trace, ["close", "launch"])
+
+  trace.length = 0
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const source = qml.match(/id: installPreparationProcess\s+onExited: (function\(exitCode\) \{[\s\S]*?\n    })/)[1]
+  const prepared = vm.runInNewContext("(" + source + ")", { root, Model, ...globals,
+    installerProcess: process,
+    installPoll: { restart() { trace.push("poll") } },
+    installTimeout: { restart() { trace.push("timeout") } }
+  })
+  prepared(0)
+  assert.deepEqual(trace, ["close", "poll", "timeout"])
+  deferred.shift()()
+  assert.equal(trace.at(-1), "launch")
+  trace.length = 0
+  prepared(1)
+  assert.deepEqual(trace, [])
+  assert.equal(deferred.length, 0)
+  assert.equal(root.installing, false)
+  assert.match(root.lastError, /Could not prepare/)
+})
+
 
 test("installation and upgrades use a presented AUR flow, restart the daemon, and open a centered TUI", () => {
   assert.deepEqual(Model.installProcessArgs(), [
