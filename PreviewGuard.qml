@@ -104,7 +104,7 @@ Item {
     var value = profile || ({})
     return root.beginPreview({
       profile: value,
-      timeout_seconds: Math.max(1, Number(timeoutSeconds || 10)),
+      timeout_seconds: Math.max(1, Number(timeoutSeconds || Model.previewTimeoutSeconds())),
       save_on_commit: true
     }, String(value.name || "Display layout"), true, true)
   }
@@ -113,7 +113,7 @@ Item {
     var value = profile || ({})
     return root.beginPreview({
       profile: value,
-      timeout_seconds: Math.max(1, Number(timeoutSeconds || 10)),
+      timeout_seconds: Math.max(1, Number(timeoutSeconds || Model.previewTimeoutSeconds())),
       save_on_commit: false
     }, String(value.name || "Display layout"), false, true)
   }
@@ -123,7 +123,7 @@ Item {
     if (selected === "") return false
     return root.beginPreview({
       profile_name: selected,
-      timeout_seconds: Math.max(1, Number(timeoutSeconds || 10))
+      timeout_seconds: Math.max(1, Number(timeoutSeconds || Model.previewTimeoutSeconds()))
     }, selected, false, false)
   }
 
@@ -411,12 +411,14 @@ Item {
               textFormat: Text.PlainText
               width: parent.width
               text: root.stage === "applying"
-                ? "This confirmation stays open while your displays reconfigure."
+                ? ("You'll have " + Model.previewTimeoutSeconds()
+                  + " seconds to keep or revert after the layout appears.")
                 : (root.stage === "error"
                   ? root.errorMessage
                   : (root.actionError !== ""
                     ? root.actionError
-                    : root.profileName + " · " + root.seconds + " seconds before the previous layout returns"))
+                    : (root.profileName + " · " + root.seconds
+                      + " seconds left, then the previous layout returns")))
               color: root.stage === "error" || root.actionError !== "" ? Color.urgent : Color.foreground
               opacity: 0.68
               font.family: Style.font.family

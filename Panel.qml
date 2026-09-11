@@ -865,7 +865,7 @@ Panel {
     root.previewPending = true
     if (root.previewCoordinatorReady("startDraftPreview")) {
       if (!root.previewCoordinator.startDraftPreview(
-          Model.namedProfile(root.draftProfile, name), 10)) {
+          Model.namedProfile(root.draftProfile, name), Model.previewTimeoutSeconds())) {
         root.previewPending = false
         root.lastError = String(root.previewCoordinator.errorMessage
           || "Could not open the display confirmation.")
@@ -874,7 +874,7 @@ Panel {
     }
     root.send("preview", {
       profile: Model.namedProfile(root.draftProfile, name),
-      timeout_seconds: 10,
+      timeout_seconds: Model.previewTimeoutSeconds(),
       save_on_commit: true
     }, { kind: "draft" })
   }
@@ -886,7 +886,7 @@ Panel {
     root.lastError = ""
     root.previewPending = true
     if (root.previewCoordinatorReady("startDraftApply")) {
-      if (!root.previewCoordinator.startDraftApply(profile, 10)) {
+      if (!root.previewCoordinator.startDraftApply(profile, Model.previewTimeoutSeconds())) {
         root.previewPending = false
         root.lastError = String(root.previewCoordinator.errorMessage
           || "Could not open the display confirmation.")
@@ -895,7 +895,7 @@ Panel {
     }
     root.send("preview", {
       profile: profile,
-      timeout_seconds: 10,
+      timeout_seconds: Model.previewTimeoutSeconds(),
       save_on_commit: false
     }, { kind: "draft-apply" })
   }
@@ -1029,14 +1029,14 @@ Panel {
     root.lastError = ""
     root.previewPending = true
     if (root.previewCoordinatorReady("startSavedProfilePreview")) {
-      if (!root.previewCoordinator.startSavedProfilePreview(selected, 10)) {
+      if (!root.previewCoordinator.startSavedProfilePreview(selected, Model.previewTimeoutSeconds())) {
         root.previewPending = false
         root.lastError = String(root.previewCoordinator.errorMessage
           || "Could not open the display confirmation.")
       }
       return
     }
-    root.send("preview", { profile_name: selected, timeout_seconds: 10 }, {
+    root.send("preview", { profile_name: selected, timeout_seconds: Model.previewTimeoutSeconds() }, {
       kind: "profile",
       name: selected
     })
@@ -1803,7 +1803,7 @@ Panel {
             Text {
               textFormat: Text.PlainText
               id: compactHeroGlyph
-              text: root.monitorCount > 1 ? "󰍺" : "󰍹"
+              text: "󰕭"
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.display
@@ -2065,13 +2065,15 @@ Panel {
 
                 Text {
                   textFormat: Text.PlainText
-                  visible: root.previewTransaction !== ""
+                  visible: root.previewTransaction !== "" || !root.editPending
                   width: parent.width
-                  text: root.previewSeconds + " seconds to decide"
-                  color: root.dim
+                  text: root.previewTransaction !== ""
+                    ? (root.previewSeconds + " seconds left, then the previous layout returns")
+                    : ("Preview lasts " + Model.previewTimeoutSeconds() + " seconds. Keep it before it reverts.")
+                  color: root.foreground
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.caption
-                  elide: Text.ElideRight
+                  wrapMode: Text.WordWrap
                 }
               }
 
@@ -2097,7 +2099,9 @@ Panel {
                 id: compactApplyDraft
                 text: root.previewTransaction !== ""
                   ? "Keep"
-                  : (root.sourceProfile !== "" ? "Preview" : "Finish in editor")
+                  : (root.sourceProfile !== ""
+                    ? ("Preview · " + Model.previewTimeoutSeconds() + "s")
+                    : "Finish in editor")
                 selected: true
                 bordered: true
                 enabled: !root.editPending && !root.previewPending
@@ -2138,7 +2142,7 @@ Panel {
               Text {
                 textFormat: Text.PlainText
                 anchors.verticalCenter: parent.verticalCenter
-                text: root.monitorCount > 1 ? "󰍺" : "󰍹"
+                text: "󰕭"
                 color: root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.icon
@@ -2350,10 +2354,11 @@ Panel {
               Text {
                 textFormat: Text.PlainText
                 width: parent.width
-                text: root.previewSeconds + " seconds before the previous layout returns"
-                color: root.dim
+                wrapMode: Text.WordWrap
+                text: root.previewSeconds + " seconds left, then the previous layout returns"
+                color: root.foreground
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
+                font.pixelSize: Style.font.bodySmall
               }
             }
 
@@ -3832,7 +3837,7 @@ Panel {
               anchors.verticalCenter: parent.verticalCenter
               height: editorFooter.controlHeight
               visible: root.draftDirty || root.creatingProfile
-              text: "Preview & save"
+              text: "Preview & save · " + Model.previewTimeoutSeconds() + "s"
               selected: true
               bordered: true
               enabled: root.managedChecked && !root.editPending && !root.previewPending

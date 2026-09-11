@@ -60,7 +60,7 @@ BarWidget {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: root.monitorCount > 1 ? "󰍺" : "󰍹"
+    text: "󰕭"
     dimmed: root.barIconDimmed
     tooltipText: root.activeProfile !== "" ? "Display · " + root.activeProfile : "Display · hyprmoncfg"
     iconComponent: Component {

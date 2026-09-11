@@ -34,7 +34,7 @@ test("footer controls share their tallest natural height and keep naming beside 
 test("Preview & save requires a manually entered name and stays disabled while busy", () => {
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
   const save = qml.slice(qml.indexOf("id: saveDraftButton"))
-  assert.match(save, /text: "Preview & save"/)
+  assert.match(save, /text: "Preview & save · " \+ Model\.previewTimeoutSeconds\(\) \+ "s"/)
   assert.doesNotMatch(save, /Name & save/)
   const enabled = save.match(/enabled: ([\s\S]*?)\n              foreground:/)[1]
   const root = { managedChecked: true, editPending: false, previewPending: false, sourceProfile: "", saveName: "" }
@@ -691,11 +691,26 @@ test("workspace preview is rendered from the daemon plan", () => {
   assert.equal(Model.workspaceText(plan, "missing"), "")
 })
 
+test("preview lasts 15 seconds and the panel says so before you confirm", () => {
+  assert.equal(Model.previewTimeoutSeconds(), 15)
+  const panel = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const guard = fs.readFileSync(path.join(__dirname, "..", "PreviewGuard.qml"), "utf8")
+  assert.match(panel, /timeout_seconds: Model\.previewTimeoutSeconds\(\)/)
+  assert.doesNotMatch(panel, /timeout_seconds: 10/)
+  assert.match(panel, /startDraftPreview\(\s*Model\.namedProfile\(root\.draftProfile, name\), Model\.previewTimeoutSeconds\(\)/)
+  assert.match(guard, /timeoutSeconds \|\| Model\.previewTimeoutSeconds\(\)/)
+  assert.match(panel, /text: "󰕭"/)
+  assert.doesNotMatch(panel, /󰍹/)
+  assert.doesNotMatch(panel, /󰍺/)
+})
+
 test("bar icon stays legible through transient daemon restarts", () => {
   const qml = fs.readFileSync(path.join(__dirname, "..", "BarWidget.qml"), "utf8")
   assert.doesNotMatch(qml, /text: "H"/)
   assert.doesNotMatch(qml, /slotSize: Style\.bar\.statusSlot/)
-  assert.match(qml, /text: root\.monitorCount > 1 \? "󰍺" : "󰍹"/)
+  assert.match(qml, /text: "󰕭"/)
+  assert.doesNotMatch(qml, /󰍹/)
+  assert.doesNotMatch(qml, /󰍺/)
   assert.match(qml, /dimmed: root\.barIconDimmed/)
   assert.doesNotMatch(qml, /dimmed: !root\.backendConnected/)
   assert.match(qml, /id: barDisplayGlyph/)
@@ -901,6 +916,9 @@ test("the compact change row becomes the one preview confirmation row", () => {
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
   assert.match(qml, /visible: root\.draftDirty \|\| root\.previewTransaction !== ""/)
   assert.match(qml, /root\.previewKind === "profile" \? "Keep this profile\?" : "Keep this layout\?"/)
+  assert.match(qml, /Preview lasts " \+ Model\.previewTimeoutSeconds\(\) \+ " seconds\. Keep it before it reverts\./)
+  assert.match(qml, /root\.previewSeconds \+ " seconds left, then the previous layout returns"/)
+  assert.match(qml, /"Preview · " \+ Model\.previewTimeoutSeconds\(\) \+ "s"/)
   assert.match(qml, /root\.previewTransaction !== "" \? "Revert" : "Discard"/)
   assert.match(qml, /if \(root\.previewTransaction !== ""\) root\.keepPreview\(\)/)
   assert.doesNotMatch(qml, /id: compactPreviewRow/)
@@ -927,7 +945,7 @@ test("display previews keep a shell-level confirmation across monitor rebuilds",
   assert.match(panel, /!root\.previewCoordinator \|\| !root\.previewCoordinator\.connected/)
   assert.match(guard, /root\.stage = "applying"/)
   assert.match(guard, /Model\.canConfirmPreview\(pending, root\.transactionId\)/)
-  assert.match(guard, /This confirmation stays open while your displays reconfigure\./)
+  assert.match(guard, /You'll have " \+ Model\.previewTimeoutSeconds\(\)\s*\+ " seconds to keep or revert after the layout appears\./)
   assert.match(guard, /WlrKeyboardFocus\.Exclusive/)
   assert.doesNotMatch(guard, /WlrKeyboardFocus\.OnDemand/)
   assert.match(guard, /model: root\.opened \? Quickshell\.screens : \[\]/)

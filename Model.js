@@ -26,6 +26,11 @@ function parseEnvelope(raw) {
   }
 }
 
+// Requested preview window and the copy that advertises it. Keep these together.
+function previewTimeoutSeconds() {
+  return 15
+}
+
 // A status subscription observes other clients too. Only an abandoned preview
 // may be adopted; a live TUI must retain its own confirmation and keyboard.
 function canConfirmPreview(pending, transactionId) {
@@ -1002,6 +1007,7 @@ if (typeof module !== "undefined") {
     installCommand: installCommand,
     installProcessArgs: installProcessArgs,
     parseEnvelope: parseEnvelope,
+    previewTimeoutSeconds: previewTimeoutSeconds,
     canConfirmPreview: canConfirmPreview,
     hiddenDisplays: hiddenDisplays,
     layoutDisplays: layoutDisplays,
