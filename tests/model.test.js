@@ -1,8 +1,6 @@
 const test = require("node:test")
 const assert = require("node:assert/strict")
-const childProcess = require("node:child_process")
 const fs = require("node:fs")
-const os = require("node:os")
 const path = require("node:path")
 const Model = require("../Model.js")
 const vm = require("node:vm")
@@ -1181,157 +1179,30 @@ test("an upgraded package whose daemon is still the old binary offers a restart"
   assert.match(qml, /else if \(root\.daemonOutdated\)/)
 })
 
-test("the panel notices its own updates, since Omarchy never pulls plugins on its own", () => {
-  const check = Model.pluginUpdateCheckCommand("crmne.hyprmoncfg", 6)
-  assert.equal(check[0], "sh")
-  assert.deepEqual(check.slice(4), ["crmne.hyprmoncfg", "6"])
-  // The plugin id reaches the shell as an argument, never spliced into the script.
-  assert.doesNotMatch(check[2], /crmne\.hyprmoncfg/)
-  // Same comparison omarchy-plugin-update makes, and a throttle so opening the
-  // panel is not a reason to reach a remote every time.
-  assert.match(check[2], /git -C "\$dir" fetch --quiet origin HEAD/)
-  assert.match(check[2], /rev-parse HEAD/)
-  assert.match(check[2], /rev-parse --verify FETCH_HEAD/)
-  assert.match(check[2], /newermt/)
-  assert.match(check[2], /exit 10/)
-  assert.match(check[2], /find "\$dir\/\.git\/FETCH_HEAD"/)
-  assert.doesNotMatch(check[2], /XDG_RUNTIME_DIR|update-check|touch|umask/)
-  assert.doesNotMatch(check[2], /\/tmp/)
+test("panel updates open the marketplace without changing or reloading plugin code", () => {
+  const opened = []
+  const calls = []
+  const activate = panelFunction("activateRow", {
+    restartService() { calls.push("restart-service") }
+  }, {
+    Qt: { openUrlExternally(url) { opened.push(url) } }
+  })
 
-  const update = Model.pluginUpdateCommand("crmne.hyprmoncfg")
-  assert.equal(update[0], "sh")
-  assert.deepEqual(update.slice(3), ["sh", "crmne.hyprmoncfg"])
-  assert.doesNotMatch(update[2], /crmne\.hyprmoncfg/)
-  assert.match(update[2], /omarchy plugin update "\$1" --yes >\/dev\/null 2>&1/)
-  assert.match(update[2], /before=\$\(git -C "\$dir" rev-parse HEAD/)
-  assert.match(update[2], /after=\$\(git -C "\$dir" rev-parse HEAD/)
-  assert.match(update[2], /exit 10/)
+  activate("panel-updates")
+  assert.deepEqual(opened, ["https://plugins.omarchy.org/plugin.html?id=crmne.hyprmoncfg"])
+  assert.deepEqual(calls, [])
+  activate("restart-service")
+  assert.deepEqual(calls, ["restart-service"])
+  assert.equal(opened.length, 1)
+  activate("unknown")
+  assert.equal(opened.length, 1)
 
-  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
-  assert.match(qml, /root\.pluginUpdateAvailable = exitCode === 10/)
-  assert.match(qml, /Update this panel/)
-})
-
-function updateCheckFixture(t) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "hyprmoncfg-update-check-"))
-  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
-  const upstream = path.join(directory, "upstream")
-  const plugin = path.join(directory, ".config", "omarchy", "plugins", "crmne.hyprmoncfg")
-  const runtime = path.join(directory, "runtime")
-  const fetched = path.join(plugin, ".git", "FETCH_HEAD")
-  fs.mkdirSync(upstream)
-  fs.mkdirSync(path.dirname(plugin), { recursive: true })
-  fs.mkdirSync(runtime, { mode: 0o700 })
-
-  function git(cwd, ...args) {
-    return childProcess.execFileSync("git", ["-C", cwd, ...args], {
-      encoding: "utf8", stdio: ["ignore", "pipe", "pipe"]
-    }).trim()
-  }
-  git(upstream, "init", "--initial-branch=main")
-  function commit() {
-    git(upstream, "-c", "user.name=Panel Test", "-c", "user.email=panel@example.test",
-      "-c", "commit.gpgSign=false", "commit", "--allow-empty", "-m", "Panel update")
-  }
-  commit()
-  git(directory, "clone", "--quiet", upstream, plugin)
-
-  const check = Model.pluginUpdateCheckCommand("crmne.hyprmoncfg", 6)
-  // Redirect the checkout lookup without changing the real HOME or user config.
-  check[2] = check[2].replaceAll("$HOME", "$PANEL_TEST_HOME")
-  function run(runtimeDirectory = runtime) {
-    const result = childProcess.spawnSync(check[0], check.slice(1), {
-      env: { ...process.env, PANEL_TEST_HOME: directory, XDG_RUNTIME_DIR: runtimeDirectory },
-      encoding: "utf8", timeout: 10000
-    })
-    assert.ifError(result.error)
-    return result.status
-  }
-  function expire() {
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
-    fs.utimesSync(fetched, yesterday, yesterday)
-  }
-  function offline() { git(plugin, "remote", "set-url", "origin", path.join(directory, "unreachable")) }
-  function online() { git(plugin, "remote", "set-url", "origin", upstream) }
-  return { directory, plugin, runtime, fetched, git, commit, run, expire, offline, online }
-}
-
-test("a fresh checkout detects an update without creating a runtime timestamp", t => {
-  const fixture = updateCheckFixture(t)
-  fixture.commit()
-  const before = fixture.git(fixture.plugin, "rev-parse", "HEAD")
-  assert.equal(fs.existsSync(fixture.fetched), false)
-  assert.equal(fixture.run(), 10)
-  assert.equal(fixture.git(fixture.plugin, "rev-parse", "HEAD"), before)
-  assert.equal(fixture.git(fixture.plugin, "status", "--porcelain"), "")
-  assert.deepEqual(fs.readdirSync(fixture.runtime), [])
-})
-
-test("a current checkout stays current and reuses a fresh fetch while offline", t => {
-  const fixture = updateCheckFixture(t)
-  assert.equal(fixture.run(), 0)
-  fixture.offline()
-  assert.equal(fixture.run(), 0)
-})
-
-test("an available update stays available from a fresh cached fetch", t => {
-  const fixture = updateCheckFixture(t)
-  fixture.commit()
-  assert.equal(fixture.run(), 10)
-  fixture.offline()
-  assert.equal(fixture.run(), 10)
-})
-
-test("an expired fetch checks upstream again and retries after a fetch failure", t => {
-  const fixture = updateCheckFixture(t)
-  assert.equal(fixture.run(), 0)
-  fixture.commit()
-  fixture.expire()
-  fixture.offline()
-  assert.equal(fixture.run(), 4)
-  fixture.online()
-  assert.equal(fixture.run(), 10)
-})
-
-test("an empty fetch result cannot suppress a new update check", t => {
-  const fixture = updateCheckFixture(t)
-  fixture.commit()
-  fs.writeFileSync(fixture.fetched, "")
-  assert.equal(fixture.run(), 10)
-})
-
-test("update checks neither require a runtime directory nor follow old timestamp symlinks", t => {
-  const fixture = updateCheckFixture(t)
-  fixture.commit()
-  const victim = path.join(fixture.directory, "keep-me")
-  const stamp = path.join(fixture.runtime, "crmne.hyprmoncfg.update-check")
-  fs.writeFileSync(victim, "untouched")
-  fs.symlinkSync(victim, stamp)
-  const original = fs.statSync(victim)
-  fs.chmodSync(fixture.runtime, 0o755)
-  for (const runtime of ["", path.join(fixture.directory, "missing"), fixture.runtime]) {
-    assert.equal(fixture.run(runtime), 10)
-    assert.equal(fs.readFileSync(victim, "utf8"), "untouched")
-    assert.equal(fs.statSync(victim).mtimeMs, original.mtimeMs)
-    assert.equal(fs.lstatSync(stamp).isSymbolicLink(), true)
-  }
-})
-
-test("failed update checks preserve a known update instead of clearing the notice", () => {
-  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
-  const source = qml.match(/id: pluginUpdateProcess\s+onExited: (function\(exitCode\) \{[\s\S]*?\n    })/)[1]
-  const root = { pluginUpdateAvailable: false }
-  const exited = vm.runInNewContext("(" + source + ")", { root })
-  exited(4)
-  assert.equal(root.pluginUpdateAvailable, false)
-  exited(10)
-  assert.equal(root.pluginUpdateAvailable, true)
-  for (const code of [3, 4, 5, 6, 128]) {
-    exited(code)
-    assert.equal(root.pluginUpdateAvailable, true)
-  }
-  exited(0)
-  assert.equal(root.pluginUpdateAvailable, false)
+  // Runtime code must not retain an alternative path around the review page.
+  const runtime = fs.readdirSync(path.join(__dirname, ".."))
+    .filter(name => /\.(qml|js)$/.test(name))
+    .map(name => fs.readFileSync(path.join(__dirname, "..", name), "utf8"))
+    .join("\n")
+  assert.doesNotMatch(runtime, /omarchy(?:-| )plugin(?:-| )update|git[^\n]*fetch|FETCH_HEAD|omarchy(?:-| )restart(?:-| )shell/)
 })
 
 test("action rows keep their cursor positions in step with what is on screen", () => {
@@ -1344,79 +1215,4 @@ test("action rows keep their cursor positions in step with what is on screen", (
   assert.match(qml, /return root\.layoutRowIndex \+ 1/)
   assert.doesNotMatch(qml, /serviceBroken \? 2 : 1/)
   assert.doesNotMatch(qml, /serviceBroken \? 3 : 2/)
-})
-
-test("updating the panel finishes the job by reloading the shell", () => {
-  // rescanPlugins does not re-execute the QML of a plugin already loaded, so
-  // an update that stops at the files leaves the old panel on screen.
-  assert.deepEqual(Model.shellRestartCommand(), [
-    "sh", "-c", "setsid -f omarchy-restart-shell >/dev/null 2>&1"
-  ])
-  // setsid matters: the restart must outlive the shell it is about to kill.
-  assert.match(Model.shellRestartCommand()[2], /setsid/)
-
-  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
-  assert.match(qml, /if \(exitCode === 10\)/)
-  assert.match(qml, /shellRestartProcess\.startDetached\(\)/)
-})
-
-test("updating touches only this plugin, asks nothing, and never buffers updater output", () => {
-  const command = Model.pluginUpdateCommand("crmne.hyprmoncfg")
-
-  // Naming the plugin is what keeps omarchy-plugin-update from walking every
-  // installed plugin: without an id it updates all of them.
-  assert.ok(command.includes("crmne.hyprmoncfg"), "the plugin id must be passed")
-  // --yes skips the diff and the gum confirm, which a panel has no terminal to
-  // answer anyway.
-  assert.match(command[2], /--yes/, "the update must not wait on a prompt")
-
-  // The updater may be verbose or compromised. Its stdout and stderr go to the
-  // null device, and the bounded exit status tells QML whether HEAD changed.
-  assert.match(command[2], />\/dev\/null 2>&1/)
-  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
-  assert.doesNotMatch(qml, /pluginUpdateOutput/)
-  assert.doesNotMatch(qml, /id: pluginUpdateRunProcess\s+stdout: StdioCollector/)
-})
-
-test("the panel updater discards subprocess output and reports a changed checkout by exit status", () => {
-  const temporaryHome = fs.mkdtempSync(path.join(os.tmpdir(), "hyprmoncfg-panel-update-"))
-  const pluginDir = path.join(temporaryHome, ".config", "omarchy", "plugins", "crmne.hyprmoncfg")
-  const fakeBin = path.join(temporaryHome, "bin")
-  const fakeOmarchy = path.join(fakeBin, "omarchy")
-  const fakeGit = path.join(fakeBin, "git")
-
-  fs.mkdirSync(path.join(pluginDir, ".git"), { recursive: true })
-  fs.mkdirSync(fakeBin)
-  fs.writeFileSync(fakeOmarchy, [
-    "#!/bin/sh",
-    "head -c 131072 /dev/zero",
-    "head -c 131072 /dev/zero >&2",
-    'touch "$HOME/panel-update-finished"'
-  ].join("\n"), { mode: 0o755 })
-  fs.writeFileSync(fakeGit, [
-    "#!/bin/sh",
-    'if [ -e "$HOME/panel-update-finished" ]; then',
-    "  printf '%s\\n' after",
-    "else",
-    "  printf '%s\\n' before",
-    "fi"
-  ].join("\n"), { mode: 0o755 })
-
-  try {
-    const command = Model.pluginUpdateCommand("crmne.hyprmoncfg")
-    const result = childProcess.spawnSync(command[0], command.slice(1), {
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        HOME: temporaryHome,
-        PATH: fakeBin + path.delimiter + process.env.PATH
-      }
-    })
-
-    assert.equal(result.status, 10)
-    assert.equal(result.stdout, "")
-    assert.equal(result.stderr, "")
-  } finally {
-    fs.rmSync(temporaryHome, { recursive: true, force: true })
-  }
 })

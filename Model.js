@@ -910,58 +910,6 @@ function namedProfile(profile, name) {
   return copy
 }
 
-// Omarchy installs plugins as git checkouts under ~/.config/omarchy/plugins and
-// never updates them on its own, so the panel has to notice for itself. The
-// check mirrors `omarchy plugin update`: fetch, then compare HEAD to FETCH_HEAD.
-// FETCH_HEAD is also the cache: no separate timestamp file to create or secure.
-// Only a valid, recent fetch can skip the network. Exit 10 means an update is
-// waiting, zero means current, and other statuses leave the last result alone.
-function pluginUpdateCheckCommand(pluginId, throttleHours) {
-  var hours = Number(throttleHours || 6)
-  return [
-    "sh",
-    "-c",
-    'set -e; ' +
-      'dir="$HOME/.config/omarchy/plugins/$1"; ' +
-      '[ -d "$dir/.git" ] || exit 3; ' +
-      'head=$(git -C "$dir" rev-parse HEAD 2>/dev/null) || exit 5; ' +
-      'remote=$(git -C "$dir" rev-parse --verify FETCH_HEAD 2>/dev/null) || remote=""; ' +
-      'if [ -z "$remote" ] || [ -z "$(find "$dir/.git/FETCH_HEAD" -newermt "-$2 hours" 2>/dev/null)" ]; then ' +
-      'git -C "$dir" fetch --quiet origin HEAD 2>/dev/null || exit 4; ' +
-      'remote=$(git -C "$dir" rev-parse --verify FETCH_HEAD 2>/dev/null) || exit 5; fi; ' +
-      '[ "$head" = "$remote" ] || exit 10',
-    "sh",
-    String(pluginId || ""),
-    String(hours)
-  ]
-}
-
-// Omarchy's rescanPlugins discovers plugins but does not re-execute the QML of
-// one already loaded, so a plugin that updates itself keeps showing its old
-// code until the shell restarts. setsid takes the restart out of the shell's
-// own process group, so killing the shell cannot kill the command relaunching it.
-function shellRestartCommand() {
-  return ["sh", "-c", "setsid -f omarchy-restart-shell >/dev/null 2>&1"]
-}
-
-// Keep updater output out of the long-lived shell: even a broken or compromised
-// updater cannot grow its memory by writing forever. Exit 10 reports a changed
-// checkout without collecting subprocess text; zero means it was already current.
-function pluginUpdateCommand(pluginId) {
-  return [
-    "sh",
-    "-c",
-    'dir="$HOME/.config/omarchy/plugins/$1"; ' +
-      '[ -d "$dir/.git" ] || exit 3; ' +
-      'before=$(git -C "$dir" rev-parse HEAD 2>/dev/null) || exit 4; ' +
-      'omarchy plugin update "$1" --yes >/dev/null 2>&1 || exit 5; ' +
-      'after=$(git -C "$dir" rev-parse HEAD 2>/dev/null) || exit 4; ' +
-      '[ "$before" = "$after" ] || exit 10',
-    "sh",
-    String(pluginId || "")
-  ]
-}
-
 // releaseVersion pulls the plain version out of `hyprmoncfg version` output,
 // which also carries a commit and a build date.
 function releaseVersion(output) {
@@ -1061,9 +1009,6 @@ if (typeof module !== "undefined") {
     layoutMetrics: layoutMetrics,
     workspaceText: workspaceText,
     namedProfile: namedProfile,
-    pluginUpdateCheckCommand: pluginUpdateCheckCommand,
-    pluginUpdateCommand: pluginUpdateCommand,
-    shellRestartCommand: shellRestartCommand,
     releaseVersion: releaseVersion,
     daemonNeedsRestart: daemonNeedsRestart,
     versionAtLeast: versionAtLeast

@@ -18,8 +18,6 @@ Panel {
 
   property bool installed: false
   property string installedVersion: ""
-  property bool pluginUpdateAvailable: false
-  property bool pluginUpdating: false
   property bool compatible: false
   property bool checkingInstallation: true
   property bool installationStateKnown: false
@@ -173,15 +171,12 @@ Panel {
         title: "Restart daemon",
         subtitle: "Running " + root.runningVersion + ", installed " + root.installedRelease
       })
-    if (root.pluginUpdateAvailable)
-      rows.push({
-        id: "update-plugin",
-        icon: "󰚰",
-        title: root.pluginUpdating ? "Updating this panel…" : "Update this panel",
-        subtitle: root.pluginUpdating
-          ? "Pulling the new version"
-          : "A newer version is available"
-      })
+    rows.push({
+      id: "panel-updates",
+      icon: "󰚰",
+      title: "Panel updates",
+      subtitle: "Review marketplace verification"
+    })
     return rows
   }
   readonly property int layoutRowIndex: 1 + root.actionRows.length
@@ -1245,53 +1240,8 @@ Panel {
 
   function activateRow(id) {
     if (id === "restart-service") root.restartService()
-    else if (id === "update-plugin") root.updatePlugin()
-  }
-
-  function checkPluginUpdate() {
-    if (pluginUpdateProcess.running || root.pluginUpdating) return
-    pluginUpdateProcess.command = Model.pluginUpdateCheckCommand(root.moduleName, 6)
-    pluginUpdateProcess.running = true
-  }
-
-  function updatePlugin() {
-    if (pluginUpdateRunProcess.running || root.pluginUpdating) return
-    root.lastError = ""
-    root.pluginUpdating = true
-    pluginUpdateRunProcess.command = Model.pluginUpdateCommand(root.moduleName)
-    pluginUpdateRunProcess.running = true
-  }
-
-  Process {
-    id: pluginUpdateProcess
-    onExited: function(exitCode) {
-      // A failed check cannot tell us a previously discovered update went away.
-      if (exitCode === 0 || exitCode === 10)
-        root.pluginUpdateAvailable = exitCode === 10
-    }
-  }
-
-  Process {
-    id: pluginUpdateRunProcess
-    onExited: function(exitCode) {
-      root.pluginUpdating = false
-      if (exitCode !== 0 && exitCode !== 10) {
-        root.lastError = "The panel update did not finish. Run `omarchy plugin update " + root.moduleName + "` to see why."
-        return
-      }
-
-      root.pluginUpdateAvailable = false
-      // The files on disk are new, but this panel is still the old code until
-      // the shell reloads it, so finish the job rather than look unchanged.
-      if (exitCode === 10) {
-        shellRestartProcess.command = Model.shellRestartCommand()
-        shellRestartProcess.startDetached()
-      }
-    }
-  }
-
-  Process {
-    id: shellRestartProcess
+    else if (id === "panel-updates")
+      Qt.openUrlExternally("https://plugins.omarchy.org/plugin.html?id=crmne.hyprmoncfg")
   }
 
   Component.onCompleted: root.checkInstallation()
@@ -1318,7 +1268,6 @@ Panel {
       root.keyboardInspectorField = 0
       root.workspaceKeyboardIndex = 0
       root.checkInstallation()
-      root.checkPluginUpdate()
       if (root.compatible) root.checkServiceState()
       if (root.backendConnected) root.requestEditorState()
       brightnessSelectionTimer.restart()
@@ -1987,7 +1936,6 @@ Panel {
               icon: String(modelData.icon)
               title: String(modelData.title)
               subtitle: String(modelData.subtitle)
-              enabled: !root.pluginUpdating || String(modelData.id) !== "update-plugin"
               onActivated: root.activateRow(String(modelData.id))
             }
           }

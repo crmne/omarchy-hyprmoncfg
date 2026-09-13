@@ -117,9 +117,7 @@ A fresh install takes `hyprmoncfg-bin`, the ready-made build; a machine that alr
 
 ## Staying up to date
 
-Omarchy installs plugins as git checkouts and never pulls them, so this one checks for itself. When the checkout is behind its origin, the panel offers **Update this panel**, which runs `omarchy plugin update crmne.hyprmoncfg` and then restarts the Omarchy shell, because Omarchy's plugin rescan does not re-execute the QML of a plugin it has already loaded. Opening the panel checks Git's last fetched commit, refreshing it when missing or more than six hours old. No separate runtime timestamp is needed. Failed checks stay quiet and preserve any update notice already shown.
-
-Versions 2.1.0 through 2.3.0 can miss update notices after a fresh login. To install the fix once, run `omarchy plugin update crmne.hyprmoncfg --yes`, then `omarchy restart shell` to load the updated panel.
+**Panel updates** opens the [marketplace listing](https://plugins.omarchy.org/plugin.html?id=crmne.hyprmoncfg), where you can review versions, the exact verified commit, and installation information before choosing an update. The panel does not fetch upstream Git commits, change its checkout, or restart the Omarchy shell. Marketplace verification covers only the recorded commit; Omarchy's standard install and update commands obtain current upstream code, which may be newer than that snapshot.
 
 Upgrading the hyprmoncfg package is a separate matter: installing runs as root and cannot restart a user service, so the previous daemon keeps serving profiles until someone restarts it. When the running daemon is older than the installed binary, the panel offers **Restart daemon**. The hyprmoncfg TUI says the same in its status line, where the message is also the button.
 
