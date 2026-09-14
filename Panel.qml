@@ -191,7 +191,13 @@ Panel {
   readonly property string installCompletePath: root.runtimeDir + "/hyprmoncfg-panel-install.complete"
   readonly property var previewCoordinator: {
     var host = root.bar && root.bar.shell ? root.bar.shell : null
-    var services = host ? host._services : null
+    if (!host) return null
+    if (typeof host.serviceFor === "function") {
+      var own = null
+      try { own = host.serviceFor(root.moduleName) } catch (e) { own = null }
+      if (own) return own
+    }
+    var services = host._services || null
     return services && services[root.moduleName] ? services[root.moduleName] : null
   }
   readonly property bool barIconDimmed: root.installationStateKnown
