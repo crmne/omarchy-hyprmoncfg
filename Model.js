@@ -253,6 +253,66 @@ function profileLayoutDisplays(profile, editorDisplays) {
   return result
 }
 
+// identifyDisplays numbers connected layout displays in reading order (left to
+// right, then top to bottom) so canvas badges and on-screen overlays agree on
+// which number belongs to which monitor.
+function identifyDisplays(displays) {
+  var source = displays instanceof Array ? displays : []
+  var connected = []
+  for (var i = 0; i < source.length; i++) {
+    var display = source[i] || {}
+    if (display.connected === false || String(display.name || "") === "") continue
+    connected.push({ display: display, index: i })
+  }
+  connected.sort(function(a, b) {
+    var dx = Number(a.display.x || 0) - Number(b.display.x || 0)
+    if (dx !== 0) return dx
+    var dy = Number(a.display.y || 0) - Number(b.display.y || 0)
+    return dy !== 0 ? dy : a.index - b.index
+  })
+  var result = []
+  for (var j = 0; j < connected.length; j++) {
+    var monitor = connected[j].display
+    result.push({
+      key: String(monitor.key || ""),
+      name: String(monitor.name || ""),
+      number: j + 1,
+      model: displayModelLabel(monitor, false),
+      detail: [String(monitor.mode || ""), displayScaleLayoutLabel(monitor)]
+        .filter(function(part) { return part !== "" }).join(" · ")
+    })
+  }
+  return result
+}
+
+// Entries built from live monitors have no profile key, so fall back to the
+// connector name when either side lacks one.
+function identifyNumber(entries, key, name) {
+  var list = entries instanceof Array ? entries : []
+  var wantedKey = String(key || "")
+  var wantedName = String(name || "")
+  for (var i = 0; i < list.length; i++) {
+    var entry = list[i]
+    if (!entry) continue
+    var entryKey = String(entry.key || "")
+    var matched = entryKey !== "" && wantedKey !== ""
+      ? entryKey === wantedKey
+      : wantedName !== "" && String(entry.name || "") === wantedName
+    if (matched) return Number(entry.number || 0)
+  }
+  return 0
+}
+
+function identifyEntryForScreen(entries, screenName) {
+  var list = entries instanceof Array ? entries : []
+  var wanted = String(screenName || "")
+  if (wanted === "") return null
+  for (var i = 0; i < list.length; i++) {
+    if (list[i] && String(list[i].name || "") === wanted) return list[i]
+  }
+  return null
+}
+
 function hiddenProfileDisplays(profile) {
   var outputs = profile && profile.outputs instanceof Array ? profile.outputs : []
   var off = []
@@ -964,6 +1024,9 @@ if (typeof module !== "undefined") {
     outputLogicalSize: outputLogicalSize,
     outputMode: outputMode,
     profileLayoutDisplays: profileLayoutDisplays,
+    identifyDisplays: identifyDisplays,
+    identifyNumber: identifyNumber,
+    identifyEntryForScreen: identifyEntryForScreen,
     hiddenProfileDisplays: hiddenProfileDisplays,
     outputByKey: outputByKey,
     wrapIndex: wrapIndex,

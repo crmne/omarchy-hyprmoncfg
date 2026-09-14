@@ -1216,3 +1216,90 @@ test("action rows keep their cursor positions in step with what is on screen", (
   assert.doesNotMatch(qml, /serviceBroken \? 2 : 1/)
   assert.doesNotMatch(qml, /serviceBroken \? 3 : 2/)
 })
+
+test("identify numbers connected displays in reading order", () => {
+  const displays = [
+    { key: "acer-c", name: "DP-7", make: "Acer", model: "V277U", mode: "2560x1440@59.95", scale: 1.33333, width: 1920, height: 1080, x: 3840, y: 0, connected: true },
+    { key: "laptop", name: "eDP-1", make: "BOE", model: "0x095F", mode: "2256x1504@60", scale: 1.33333, width: 1692, height: 1128, x: 0, y: 500, internal: true, connected: true },
+    { key: "acer-a", name: "DP-9", make: "Acer", model: "V277U", mode: "2560x1440@59.95", scale: 1.33333, width: 1920, height: 1080, x: 1692, y: 0, connected: true },
+    { key: "gone", name: "HDMI-A-1", make: "LG", model: "27UK", x: 900, y: 0, connected: false },
+    { key: "below", name: "DP-11", make: "Acer", model: "V277U", x: 1692, y: 1080, connected: true }
+  ]
+  const entries = Model.identifyDisplays(displays)
+
+  assert.deepEqual(entries.map(entry => [entry.number, entry.name]), [
+    [1, "eDP-1"], [2, "DP-9"], [3, "DP-11"], [4, "DP-7"]
+  ])
+  assert.equal(entries[0].model, "Internal · BOE 0x095F")
+  assert.equal(entries[1].detail, "2560x1440@59.95 · 1.33333x = 1920×1080")
+
+  // Canvas badges and screen overlays look up the same entry.
+  assert.equal(Model.identifyNumber(entries, "acer-c"), 4)
+  assert.equal(Model.identifyNumber(entries, "gone"), 0)
+  assert.equal(Model.identifyEntryForScreen(entries, "DP-11").number, 3)
+  assert.equal(Model.identifyEntryForScreen(entries, "HDMI-A-1"), null)
+  assert.equal(Model.identifyEntryForScreen(entries, ""), null)
+
+  // Identical positions keep their profile order instead of shuffling.
+  const tied = Model.identifyDisplays([
+    { key: "b", name: "DP-2", x: 0, y: 0 },
+    { key: "a", name: "DP-1", x: 0, y: 0 }
+  ])
+  assert.deepEqual(tied.map(entry => entry.name), ["DP-2", "DP-1"])
+  assert.deepEqual(Model.identifyDisplays(null), [])
+
+  // Before the editor loads, the panel identifies live monitors, which carry
+  // no profile key but still match their screens by connector name.
+  const live = Model.identifyDisplays(Model.layoutDisplays([
+    { name: "DP-9", make: "Acer", model: "V277U", mode: "2560x1440@59.95", scale: 1.33333, x: 6972, y: 0, logical_width: 1920, logical_height: 1080 },
+    { name: "eDP-1", make: "BOE", model: "0x095F", x: 5280, y: 492, logical_width: 1692, logical_height: 1128 }
+  ], []))
+  assert.deepEqual(live.map(entry => [entry.number, entry.name, entry.key]), [[1, "eDP-1", ""], [2, "DP-9", ""]])
+  assert.equal(Model.identifyEntryForScreen(live, "DP-9").model, "Acer V277U")
+  // A keyed canvas card still finds its number in a key-less live list by name.
+  assert.equal(Model.identifyNumber(live, "acer-a", "DP-9"), 2)
+  assert.equal(Model.identifyNumber(live, "acer-a", "DP-7"), 0)
+  // Keyed lists never match by name, so two outputs sharing a connector stay distinct.
+  assert.equal(Model.identifyNumber(entries, "other-key", "DP-9"), 0)
+})
+
+test("identify is reachable from the panel and hosted by the persistent service", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  assert.match(qml, /id: "identify-displays"/)
+  assert.match(qml, /if \(key === "i"\) \{\s+root\.identifyDisplays\(\)/)
+  assert.match(qml, /id: identifyButton/)
+
+  const calls = []
+  const identify = panelFunction("identifyDisplays", {
+    identifyAvailable: true,
+    previewTransaction: "",
+    identifyEntries: [{ key: "a", name: "DP-1", number: 1 }],
+    selectedOutputKey: "a",
+    previewCoordinator: { identify(entries, selected, seconds) { calls.push([entries.length, selected, seconds]) } }
+  })
+  identify()
+  assert.deepEqual(calls, [[1, "a", 4]])
+
+  // Never cover the Keep or Revert decision with identification labels.
+  const blocked = panelFunction("identifyDisplays", {
+    identifyAvailable: true,
+    previewTransaction: "pending",
+    identifyEntries: [{ key: "a", name: "DP-1", number: 1 }],
+    previewCoordinator: { identify() { assert.fail("identify must wait for the preview decision") } }
+  })
+  blocked()
+
+  const guard = fs.readFileSync(path.join(__dirname, "..", "PreviewGuard.qml"), "utf8")
+  assert.match(guard, /function identify\(entries, selectedKey, seconds\)/)
+  assert.match(guard, /IdentifyOverlay \{/)
+  const overlay = fs.readFileSync(path.join(__dirname, "..", "IdentifyOverlay.qml"), "utf8")
+  // Labels are informational: they must never take keyboard focus or clicks.
+  assert.match(overlay, /WlrKeyboardFocus\.None/)
+  assert.match(overlay, /mask: Region \{\}/)
+  // Live monitors have no key, so an empty selection must not highlight them all.
+  assert.match(overlay, /root\.selectedKey !== ""/)
+  assert.match(qml, /identifyEntries: Model\.identifyDisplays\(root\.layoutDisplays\)/)
+
+  const help = fs.readFileSync(path.join(__dirname, "..", "KeyboardHelp.qml"), "utf8")
+  assert.match(help, /\{ keys: "i", action: "Identify displays" \}/)
+})

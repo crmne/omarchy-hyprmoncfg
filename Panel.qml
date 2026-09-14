@@ -171,6 +171,13 @@ Panel {
         title: "Restart daemon",
         subtitle: "Running " + root.runningVersion + ", installed " + root.installedRelease
       })
+    if (root.identifyAvailable && root.identifyEntries.length > 0)
+      rows.push({
+        id: "identify-displays",
+        icon: "󰍹",
+        title: "Identify displays",
+        subtitle: "Label each screen with its number"
+      })
     rows.push({
       id: "panel-updates",
       icon: "󰚰",
@@ -200,6 +207,17 @@ Panel {
     var services = host._services || null
     return services && services[root.moduleName] ? services[root.moduleName] : null
   }
+  // Identification needs only the shell service, not the daemon connection.
+  readonly property bool identifyAvailable: !!root.previewCoordinator
+    && typeof root.previewCoordinator.identify === "function"
+  readonly property bool identifying: root.identifyAvailable
+    && root.previewCoordinator.identifying === true
+  // Follow the same display list the canvas draws, which falls back to live
+  // Hyprland monitors before the editor document has loaded.
+  readonly property var identifyEntries: Model.identifyDisplays(root.layoutDisplays)
+  readonly property var canvasIdentifyEntries: root.identifying
+    ? (root.previewCoordinator.identifyEntries || [])
+    : []
   readonly property bool barIconDimmed: root.installationStateKnown
     && root.compatible
     && root.serviceStateKnown
@@ -982,6 +1000,10 @@ Panel {
       root.close()
       return
     }
+    if (key === "i") {
+      root.identifyDisplays()
+      return
+    }
     if (key === "R") {
       if (root.daemonOutdated) root.restartService()
       return
@@ -1244,8 +1266,14 @@ Panel {
     root.launchTui()
   }
 
+  function identifyDisplays() {
+    if (!root.identifyAvailable || root.previewTransaction !== "") return
+    root.previewCoordinator.identify(root.identifyEntries, root.selectedOutputKey, 4)
+  }
+
   function activateRow(id) {
     if (id === "restart-service") root.restartService()
+    else if (id === "identify-displays") root.identifyDisplays()
     else if (id === "panel-updates")
       Qt.openUrlExternally("https://plugins.omarchy.org/plugin.html?id=crmne.hyprmoncfg")
   }
@@ -1963,6 +1991,7 @@ Panel {
               profile: root.draftProfile
               editorDisplays: root.editorDocument.displays
               workspacePlan: root.workspacePlan
+              identifyEntries: root.canvasIdentifyEntries
               emphasis: "layout"
               selectedKey: root.selectedOutputKey
               interactive: false
@@ -2209,6 +2238,22 @@ Panel {
             }
 
             Button {
+              id: identifyButton
+              visible: root.identifyAvailable
+              text: "Identify"
+              iconText: "󰍹"
+              tooltipText: "Show each display's number on its screen (i)"
+              bordered: true
+              selected: root.identifying
+              enabled: root.identifyEntries.length > 0 && root.previewTransaction === ""
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              fontSize: Style.font.caption
+              implicitHeight: compactButton.implicitHeight
+              onClicked: root.identifyDisplays()
+            }
+
+            Button {
               id: keyboardHelpButton
               text: ""
               bordered: true
@@ -2369,6 +2414,7 @@ Panel {
                 profile: root.draftProfile
                 editorDisplays: root.editorDocument.displays
                 workspacePlan: root.workspacePlan
+                identifyEntries: root.canvasIdentifyEntries
                 emphasis: "layout"
                 selectedKey: root.selectedOutputKey
                 interactive: false
@@ -3599,6 +3645,7 @@ Panel {
                   profile: root.draftProfile
                   editorDisplays: root.editorDocument.displays
                   workspacePlan: root.workspacePlan
+                  identifyEntries: root.canvasIdentifyEntries
                   emphasis: "workspaces"
                   selectedKey: root.selectedWorkspaceDisplayKey
                   interactive: false

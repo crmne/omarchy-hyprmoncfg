@@ -19,6 +19,9 @@ BorderSurface {
   property bool detailed: true
   property bool framed: true
   property bool markDisconnected: false
+  // While displays are being identified, each card wears the number shown on
+  // its physical screen.
+  property var identifyEntries: []
   property color foreground: Color.foreground
   property color dim: Qt.darker(foreground, 1.5)
   property color accent: Color.accent
@@ -115,6 +118,30 @@ BorderSurface {
         border.color: selected ? root.accent : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.55)
 
         Behavior on color { ColorAnimation { duration: 100 } }
+
+        Rectangle {
+          readonly property int number: Model.identifyNumber(root.identifyEntries, card.modelData.key, card.modelData.name)
+          visible: number > 0
+          anchors.left: parent.left
+          anchors.top: parent.top
+          anchors.margins: Style.space(4)
+          z: 1
+          width: Math.max(height, identifyBadgeLabel.implicitWidth + Style.space(8))
+          height: identifyBadgeLabel.implicitHeight + Style.space(4)
+          radius: height / 2
+          color: root.accent
+
+          Text {
+            id: identifyBadgeLabel
+            textFormat: Text.PlainText
+            anchors.centerIn: parent
+            text: String(parent.number)
+            color: Color.background
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            font.bold: true
+          }
+        }
 
         Column {
           anchors.centerIn: parent

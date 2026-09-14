@@ -67,6 +67,7 @@ Item {
         { keys: "a", action: "Apply the current draft or selected profile" },
         { keys: "s", action: "Save the current draft as a profile" },
         { keys: "r", action: "Reset from live Hyprland state" },
+        { keys: "i", action: "Identify displays" },
         { keys: "?", action: "Show these keys" },
         { keys: "R", action: "Restart the daemon after an upgrade" },
         { keys: "q, Esc", action: "Close the panel" }
