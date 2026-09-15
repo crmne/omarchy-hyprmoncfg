@@ -904,7 +904,7 @@ test("the compact change row becomes the one preview confirmation row", () => {
   assert.doesNotMatch(qml, /id: compactPreviewRow/)
   assert.match(qml, /id: previewRecoveryTimer/)
   assert.match(qml, /root\.syncDaemonPreview\(value\.daemon \? value\.daemon\.preview : null\)/)
-  assert.match(qml, /root\.bar\.summonBarWidget\(root\.moduleName\)/)
+  assert.match(qml, /host\.summon\(root\.moduleName, ""\)/)
   assert.match(qml, /save_on_commit: true/)
   assert.match(qml, /pending\.profile && pending\.profile\.outputs instanceof Array/)
   assert.match(qml, /root\.draftProfile = Model\.clone\(pending\.profile\)/)
@@ -971,6 +971,19 @@ test("the expanded panel mirrors the TUI's contextual keyboard map", () => {
   assert.match(help, /Any key closes this\./)
   assert.match(help, /Tab, Shift\+Tab/)
   assert.match(help, /Apply the current draft or selected profile/)
+})
+
+test("reuse keyboard help describes native controls instead of workspace shortcuts", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "KeyboardHelp.qml"), "utf8")
+  const body = qml.match(/readonly property var groups: \{([\s\S]*?)\n  \}\n\n  Rectangle/)[1]
+  const groups = page => vm.runInNewContext("(function() {" + body + "})()", { root: { page } })
+  const reuse = groups("reuse")
+  assert.equal(reuse.length, 1)
+  assert.equal(reuse[0].title, "Reuse layout")
+  assert.ok(reuse[0].bindings.some(binding => binding.keys === "Tab, Shift+Tab"))
+  assert.ok(reuse[0].bindings.some(binding => binding.keys === "Esc"))
+  for (const page of ["layout", "profiles", "workspaces"])
+    assert.ok(groups(page).some(group => group.bindings.some(binding => binding.keys === "1  2  3  4")))
 })
 
 test("manual profile choice is explicit and can return to automatic matching", () => {
@@ -1045,7 +1058,8 @@ test("layout dragging uses stationary canvas coordinates in both panel sizes", (
   assert.match(canvasQml, /dragArea\.mapToItem\(canvas, mouse\.x, mouse\.y\)/)
   assert.match(canvasQml, /property bool selectable: interactive/)
   assert.match(canvasQml, /property bool movable: interactive/)
-  assert.match(canvasQml, /if \(!pressed \|\| !root\.movable\) return/)
+  assert.match(canvasQml, /if \(!pressed\) return/)
+  assert.match(canvasQml, /if \(!root\.movable\) return/)
   assert.match(canvasQml, /property bool dragStarted: false/)
   assert.match(canvasQml, /var threshold = Style\.space\(6\)/)
   assert.match(canvasQml, /if \(!dragStarted\)/)
@@ -1086,7 +1100,7 @@ test("unmanaged mode stays inspectable but makes configuration read-only", () =>
   assert.match(qml, /readonly property real unmanagedOpacity: 0\.45/)
   assert.ok((qml.match(/opacity: root\.managedChecked \? 1\.0 : root\.unmanagedOpacity/g) || []).length >= 8)
   assert.match(qml, /if \(!root\.managedChecked \|\| !root\.editorReady/)
-  assert.match(qml, /if \(!root\.managedChecked\) return\s+var name = root\.draftName\(\)/)
+  assert.match(qml, /if \(!root\.managedChecked \|\| root\.reusePending\) return\s+var name = root\.draftName\(\)/)
   assert.match(qml, /enabled: root\.managedChecked && !!root\.selectedOutput/)
   assert.match(qml, /enabled: root\.managedChecked\s+opacity: root\.managedChecked \? 1\.0 : root\.unmanagedOpacity/)
   assert.match(qml, /!root\.managedChecked \? " · read-only"/)
@@ -1107,6 +1121,281 @@ test("profile status distinguishes preview, manual, exact, and new display setup
   assert.match(qml, /return "Automatic matching is paused"/)
   assert.match(qml, /return displays \+ " · Best match for this setup"/)
   assert.match(qml, /return "No saved profile matches these displays"/)
+})
+
+test("hotplug and enable changes invalidate the editor snapshot without focus churn", () => {
+  const laptop = { name: "eDP-1", enabled: true, focused: true, x: 0, y: 0 }
+  const external = { name: "DP-2", enabled: false, focused: false, x: 1600, y: 0 }
+  const connected = Model.monitorStateSignature([laptop, external])
+  assert.notEqual(Model.monitorStateSignature([laptop]), connected)
+  assert.notEqual(Model.monitorStateSignature([laptop, { ...external, enabled: true }]), connected)
+  assert.notEqual(Model.monitorStateSignature([laptop, { ...external, x: 2000 }]), connected)
+  assert.equal(Model.monitorStateSignature([{ ...external, focused: true }, { ...laptop, focused: false }]), connected)
+  assert.equal(laptop.focused, true)
+  assert.equal(Model.monitorStateSignature(undefined), "[]")
+})
+
+function editorRefreshPanel() {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const timer = qml.slice(qml.indexOf("id: editorRefreshTimer"))
+  const running = timer.match(/running: ([\s\S]*?)\n    onTriggered:/)[1]
+  const trigger = timer.match(/onTriggered: ([^\n]+)/)[1]
+  const blocked = qml.match(/readonly property bool editorRefreshBlocked: ([\s\S]*?)\n  property/)[1]
+  const requests = []
+  const packets = []
+  const profile = { name: "Current", outputs: [
+    { key: "laptop", enabled: true, scale: 1.5 }, { key: "desk", enabled: true, scale: 1 }
+  ] }
+  const result = { profile, source_profile: "Current", suggested_profile: "Current",
+    displays: [{ key: "laptop", focused: true }, { key: "desk" }],
+    profiles: [profile, { name: "Other", outputs: [{ key: "desk", enabled: true, scale: 2 }] }],
+    workspace_plan: [] }
+  const state = {
+    document: { monitors: [{ name: "eDP-1", enabled: true }] },
+    documentReady: true, backendConnected: true, opened: true,
+    editorRefreshQueued: false, editorLoading: false, draftDirty: false,
+    creatingProfile: false, editPending: false, previewTransaction: "",
+    previewPending: false, serviceActionPending: false, profileModePending: false,
+    execEditing: false, inputBlocked: false, editorInteractionRevision: 0,
+    managedChecked: true, editorReady: true, activePage: "layout", activeProfile: "Current",
+    selectedOutputKey: "laptop", selectedSavedProfileName: "Current", profileChoice: "Current",
+    sourceProfile: "Current", saveName: "Current", selectedSavedWorkspacePlan: [],
+    editorDocument: Model.clone(result), draftProfile: Model.clone(profile),
+    requestSequence: 0, pendingMethods: {}, pendingContexts: {},
+    syncDaemonPreview() {},
+    normalizeWorkspaceCursor() {}, ensureManualWorkspaceRules() {}
+  }
+  // Execute the real QML property-change handlers when our fake root changes.
+  // This preserves transient input changes that begin and end before a reply.
+  const changedHandlers = {}
+  let readBlocked = () => false
+  const root = new Proxy(state, {
+    set(target, key, value) {
+      const before = readBlocked()
+      const changed = target[key] !== value
+      target[key] = value
+      if (changed && changedHandlers[key]) changedHandlers[key]()
+      if (readBlocked() !== before && changedHandlers.editorRefreshBlocked)
+        changedHandlers.editorRefreshBlocked()
+      return true
+    }
+  })
+  const keyCatcher = { get blocked() { return root.inputBlocked || root.execEditing } }
+  readBlocked = vm.runInNewContext("(function() { return " + blocked + " })", { root, keyCatcher })
+  for (const match of qml.matchAll(/^  on(\w+)Changed: (root\.editorInteractionRevision\+\+)$/gm)) {
+    const name = match[1][0].toLowerCase() + match[1].slice(1)
+    changedHandlers[name] = vm.runInNewContext("(function() { " + match[2] + " })", { root })
+  }
+  Object.defineProperty(root, "editorRefreshBlocked", { get: () => readBlocked() })
+  Object.defineProperty(root, "monitorSummaries", { get: () => root.document.monitors })
+  Object.defineProperty(root, "selectedSavedProfile", {
+    get: () => Model.savedProfileByName(root.editorDocument, root.selectedSavedProfileName)
+  })
+  const globals = { Array, Qt: { callLater() {} },
+    backendSocket: { connected: true, flush() {}, write(line) {
+      const packet = JSON.parse(line)
+      packets.push(packet)
+      requests.push(packet.method)
+    } }, previewTimer: { start() {}, stop() {} } }
+  for (const name of ["send", "updateDocument", "requestEditorState", "updateEditor", "handleMessage",
+    "editDraft", "beginCreateProfile", "loadSelectedSavedProfile", "selectSavedProfile", "beginExecEdit"])
+    root[name] = panelFunction(name, root, globals)
+  return {
+    root, requests, packets, result,
+    receive(id, value = result) {
+      root.handleMessage(JSON.stringify({ protocol_version: 1, type: "response", id, result: value }))
+    },
+    tick() {
+      if (vm.runInNewContext(running, { root }))
+        vm.runInNewContext(trigger, { root })
+    },
+    hotplug() {
+      root.updateDocument({ monitors: [...root.monitorSummaries, { name: "DP-2", enabled: true }] })
+    }
+  }
+}
+
+test("hotplug refresh stays queued through draft editing and previews without replacing the draft", () => {
+  const blockers = {
+    draftDirty: true, creatingProfile: true, editPending: true,
+    previewTransaction: "pending-preview", previewPending: true, opened: false,
+    execEditing: true, inputBlocked: true, profileModePending: true
+  }
+  for (const [property, blocked] of Object.entries(blockers)) {
+    const panel = editorRefreshPanel()
+    const previous = panel.root[property]
+    const draft = Model.clone(panel.root.draftProfile)
+    panel.root[property] = blocked
+    panel.hotplug()
+    panel.tick()
+    assert.equal(panel.root.editorRefreshQueued, true, property)
+    assert.deepEqual(panel.requests, [], property)
+    assert.deepEqual(panel.root.draftProfile, draft, property)
+    panel.root[property] = previous
+    panel.tick()
+    assert.deepEqual(panel.requests, ["editor_state"], property)
+    assert.equal(panel.root.editorRefreshQueued, false, property)
+    assert.equal(panel.root.editorLoading, true, property)
+    assert.deepEqual(panel.root.draftProfile, draft, property)
+  }
+})
+
+test("hotplug during an in-flight editor read gets one follow-up while focus changes get none", () => {
+  const panel = editorRefreshPanel()
+  panel.root.requestEditorState()
+  panel.hotplug()
+  panel.tick()
+  panel.tick()
+  assert.equal(panel.root.editorRefreshQueued, true)
+  assert.deepEqual(panel.requests, ["editor_state"])
+  panel.root.editorLoading = false
+  panel.tick()
+  panel.tick()
+  assert.deepEqual(panel.requests, ["editor_state", "editor_state"])
+  assert.equal(panel.root.editorRefreshQueued, false)
+  panel.root.editorLoading = false
+  panel.root.updateDocument({ monitors: panel.root.monitorSummaries.toReversed().map(
+    monitor => ({ ...monitor, focused: monitor.name === "DP-2" })
+  ) })
+  panel.tick()
+  assert.equal(panel.root.editorRefreshQueued, false)
+  assert.deepEqual(panel.requests, ["editor_state", "editor_state"])
+})
+
+test("late automatic replies preserve a newer edited draft, new profile, or loaded saved profile", () => {
+  for (const interaction of ["edit", "create", "load"]) {
+    const panel = editorRefreshPanel()
+    panel.hotplug()
+    panel.tick()
+    const automaticId = panel.packets[0].id
+    if (interaction === "edit") {
+      panel.root.editDraft({ output_key: "laptop", scale: 1.75 })
+      const edited = Model.clone(panel.root.draftProfile)
+      edited.outputs[0].scale = 1.75
+      panel.receive(panel.packets[1].id, { profile: edited, workspace_plan: [] })
+    } else if (interaction === "create") {
+      panel.root.beginCreateProfile()
+      panel.root.saveName = "New desk"
+    } else {
+      panel.root.selectedSavedProfileName = "Other"
+      panel.root.loadSelectedSavedProfile()
+    }
+    const newer = Model.clone({ draftProfile: panel.root.draftProfile,
+      sourceProfile: panel.root.sourceProfile, saveName: panel.root.saveName,
+      draftDirty: panel.root.draftDirty, creatingProfile: panel.root.creatingProfile })
+    panel.receive(automaticId)
+    assert.deepEqual(Model.clone({ draftProfile: panel.root.draftProfile,
+      sourceProfile: panel.root.sourceProfile, saveName: panel.root.saveName,
+      draftDirty: panel.root.draftDirty, creatingProfile: panel.root.creatingProfile }), newer, interaction)
+    assert.equal(panel.root.editorLoading, false, interaction)
+    assert.equal(panel.root.editorRefreshQueued, true, interaction)
+    const count = panel.packets.length
+    panel.tick()
+    assert.equal(panel.packets.length, count, interaction)
+  }
+})
+
+test("automatic replies wait for input and remember a preview that ended before its reply", () => {
+  for (const interaction of ["editPending", "inputBlocked", "execEditing", "profileModePending", "previewPending"]) {
+    const panel = editorRefreshPanel()
+    panel.hotplug()
+    panel.tick()
+    const draft = panel.root.draftProfile
+    panel.root[interaction] = true
+    if (interaction === "previewPending") panel.root.previewPending = false
+    panel.receive(panel.packets[0].id)
+    assert.equal(panel.root.draftProfile, draft, interaction)
+    assert.equal(panel.root.editorLoading, false, interaction)
+    assert.equal(panel.root.editorRefreshQueued, true, interaction)
+    panel.root[interaction] = false
+    panel.tick()
+    panel.receive(panel.packets.at(-1).id)
+    assert.equal(panel.root.editorRefreshQueued, false, interaction)
+    assert.equal(panel.root.editorLoading, false, interaction)
+  }
+})
+
+test("requeued automatic reads keep clean profile and output selections when they still exist", () => {
+  const panel = editorRefreshPanel()
+  panel.hotplug()
+  panel.tick()
+  panel.root.selectSavedProfile(1)
+  panel.root.selectedOutputKey = "desk"
+  panel.root.profileChoice = "Other"
+  panel.receive(panel.packets[0].id)
+  assert.equal(panel.root.editorRefreshQueued, true)
+  assert.equal(panel.root.selectedSavedProfileName, "Other")
+  panel.tick()
+  panel.receive(panel.packets[1].id)
+  assert.equal(panel.root.editorRefreshQueued, false)
+  assert.equal(panel.root.selectedSavedProfileName, "Other")
+  assert.equal(panel.root.selectedOutputKey, "desk")
+  assert.equal(panel.root.profileChoice, "Other")
+
+  panel.root.editorRefreshQueued = true
+  panel.tick()
+  const reduced = Model.clone(panel.result)
+  reduced.profiles = reduced.profiles.filter(profile => profile.name !== "Other")
+  reduced.profile.outputs = reduced.profile.outputs.filter(output => output.key !== "desk")
+  panel.receive(panel.packets.at(-1).id, reduced)
+  assert.equal(panel.root.selectedSavedProfileName, "Current")
+  assert.equal(panel.root.selectedOutputKey, "laptop")
+})
+
+test("intentional editor refreshes retain upstream's discard and default-selection behavior", () => {
+  const panel = editorRefreshPanel()
+  panel.root.selectedSavedProfileName = "Other"
+  panel.root.loadSelectedSavedProfile()
+  panel.root.selectedOutputKey = "desk"
+  panel.root.requestEditorState()
+  assert.equal(panel.root.pendingContexts[panel.packets[0].id], undefined)
+  panel.receive(panel.packets[0].id)
+  assert.equal(panel.root.draftDirty, false)
+  assert.equal(panel.root.selectedSavedProfileName, "Current")
+  assert.equal(panel.root.selectedOutputKey, "laptop")
+  assert.equal(panel.root.draftProfile.name, "Current")
+})
+
+test("the display count includes connected disabled and mirrored outputs with a layout fallback", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const body = qml.match(/readonly property int monitorCount: \{([\s\S]*?)\n  }/)[1]
+  const root = { backendConnected: true, documentReady: true, monitorSummaries: [
+    { name: "eDP-1", enabled: true }, { name: "DP-1", enabled: false },
+    { name: "DP-2", enabled: true, mirror_of: "eDP-1" }
+  ] }
+  const count = vm.runInNewContext("(function() {" + body + "})", {
+    root, layoutDisplays: [{ name: "eDP-1" }]
+  })
+  assert.equal(count(), 3)
+  root.documentReady = false
+  assert.equal(count(), 1)
+  root.documentReady = true
+  root.backendConnected = false
+  assert.equal(count(), 1)
+})
+
+test("preview recovery summons through the third-party shell facade and stops after reopening", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const timer = qml.slice(qml.indexOf("id: previewRecoveryTimer"))
+  const body = timer.match(/onTriggered: \{([\s\S]*?)\n    }/)[1]
+  const calls = []
+  let stopped = 0
+  const root = { moduleName: "crmne.hyprmoncfg", previewTransaction: "orphan", opened: false,
+    bar: { shell: { summon(...args) { calls.push(args) } } } }
+  const trigger = vm.runInNewContext("(function() {" + body + "})", {
+    root, attempts: 0, stop() { stopped++ }
+  })
+  trigger()
+  assert.deepEqual(calls, [["crmne.hyprmoncfg", ""]])
+  root.opened = true
+  trigger()
+  assert.equal(calls.length, 1)
+  assert.equal(stopped, 1)
+  root.opened = false
+  root.previewTransaction = ""
+  trigger()
+  assert.equal(calls.length, 1)
+  assert.equal(stopped, 2)
 })
 
 test("the layout draws only displays that own their image and names the rest", () => {

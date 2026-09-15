@@ -36,7 +36,7 @@ A small background service is what watches for this. It catches hotplug, lid and
 
 **Keyboard controls**
 
-- The expanded panel mirrors the TUI shortcuts: `1`/`2`/`3` switch pages, `a` applies, `s` saves, `r` resets, and `?` shows the contextual key guide
+- The expanded editor uses `1`/`2`/`3`/`4` to open Layout, Profiles, Workspaces, or Reuse layout. The first three pages mirror the TUI shortcuts: `a` applies, `s` saves, `r` resets, and `?` shows the contextual key guide. Reuse uses Tab, arrow keys, and Enter to move through its selectors and buttons.
 - On the layout, arrows move the selected display; `Shift`, `Ctrl`, and `Alt` preserve the TUI's fine movement and nearest-display snapping
 - Profile browsing and workspace settings use the same arrow, Enter, load, edit, and delete keys as the TUI
 
@@ -86,6 +86,16 @@ Neutral SDR multipliers are shown as 1, including profiles that omit them. Reset
 - Group size appears only for Sequential plans; type an exact workspace count and press `Enter`
 - In manual mode, move each numbered workspace directly between displays with the row arrows or keyboard
 - Per-monitor workspace rules, saved with the profile and applied with it
+
+## Identify screens and reuse a layout
+
+Click a monitor in the compact or expanded layout to outline that physical screen for two seconds. The label helps distinguish identical monitors without moving windows or changing the layout. The cue does not take keyboard or mouse input, and dragging a monitor does not trigger it. Unavailable screens show an explanation instead.
+
+Choose **Use an existing layout…**, or **4 Reuse layout** in the expanded editor, to adapt a saved layout to the monitors currently connected. Similar monitor models appear first, and any saved layout can be used. Assign each saved role to a current screen; **Identify** beside each assignment helps check which screen is which. Choosing an already assigned screen swaps the two roles. You can leave out an absent saved display.
+
+**Create draft for these monitors** uses the current hardware identities and remaps the layout, mirrors, and workspaces. Extra connected displays stay in the draft. Review any adjustments, choose a new name, then use **Preview & save → Keep & save**. The original profiles remain saved, and creating the draft alone does not apply a layout.
+
+Layout reuse requires a daemon that advertises the `reuse_profile` capability. The panel explains when that support is unavailable; other controls remain usable. Reusing a layout does not change automatic profile selection.
 
 ## Install
 
@@ -162,7 +172,7 @@ return to their loaded values without discarding other edits, and identical
 saved layouts show the confirmed current profile consistently.
 
 ```sh
-node --test tests/model.test.js
+node --test tests/*.test.js
 qmllint *.qml
 QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -platform offscreen -input tests/qml
 omarchy plugin validate .

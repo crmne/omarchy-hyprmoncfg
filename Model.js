@@ -37,6 +37,21 @@ function mirrorTarget(monitor) {
   return String((monitor || {}).mirror_of || "").trim()
 }
 
+// Focus changes do not alter the editable layout. Everything else in the
+// daemon's monitor summary can change which displays and settings it shows.
+function monitorStateSignature(monitors) {
+  var list = monitors instanceof Array ? monitors : []
+  var state = list.map(function(monitor) {
+    var item = clone(monitor) || {}
+    delete item.focused
+    return item
+  })
+  state.sort(function(a, b) {
+    return String(a.name || "").localeCompare(String(b.name || ""))
+  })
+  return JSON.stringify(state)
+}
+
 // A monitor only earns a rectangle when it drives its own image. One that is
 // off has no place on the canvas, and one that mirrors another shares its
 // source's position, so drawing it would stack two cards on the same spot.
@@ -951,6 +966,7 @@ if (typeof module !== "undefined") {
     installProcessArgs: installProcessArgs,
     parseEnvelope: parseEnvelope,
     canConfirmPreview: canConfirmPreview,
+    monitorStateSignature: monitorStateSignature,
     hiddenDisplays: hiddenDisplays,
     layoutDisplays: layoutDisplays,
     displayModelLabel: displayModelLabel,
