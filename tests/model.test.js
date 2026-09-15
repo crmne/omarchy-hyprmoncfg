@@ -1140,7 +1140,7 @@ function editorRefreshPanel() {
   const timer = qml.slice(qml.indexOf("id: editorRefreshTimer"))
   const running = timer.match(/running: ([\s\S]*?)\n    onTriggered:/)[1]
   const trigger = timer.match(/onTriggered: ([^\n]+)/)[1]
-  const blocked = qml.match(/readonly property bool editorRefreshBlocked: ([\s\S]*?)\n  property/)[1]
+  const blocked = qml.match(/readonly property bool editorRefreshBlocked: ([\s\S]*?)\n  (?:readonly )?property/)[1]
   const requests = []
   const packets = []
   const profile = { name: "Current", outputs: [
@@ -1153,7 +1153,9 @@ function editorRefreshPanel() {
   const state = {
     document: { monitors: [{ name: "eDP-1", enabled: true }] },
     documentReady: true, backendConnected: true, opened: true,
-    editorRefreshQueued: false, editorLoading: false, draftDirty: false,
+    editorRefreshQueued: false, editorResetQueued: false, editorLoading: false, draftDirty: false,
+    monitorTopologyRevision: 0, editorRetry: false, statusRetry: false, displaysConnecting: false,
+    reusePending: false, reuseTopologyChanged: false, reuseGeneration: 0,
     creatingProfile: false, editPending: false, previewTransaction: "",
     previewPending: false, serviceActionPending: false, profileModePending: false,
     execEditing: false, inputBlocked: false, editorInteractionRevision: 0,
@@ -1187,23 +1189,36 @@ function editorRefreshPanel() {
     changedHandlers[name] = vm.runInNewContext("(function() { " + match[2] + " })", { root })
   }
   Object.defineProperty(root, "editorRefreshBlocked", { get: () => readBlocked() })
+  for (const property of ["readPending", "editorSnapshotStale"]) {
+    const expression = qml.match(new RegExp("readonly property bool " + property
+      + ": ([\\s\\S]*?)\\n  (?:readonly )?property"))[1]
+    const get = vm.runInNewContext("(function() { return " + expression + " })", { root, Model })
+    Object.defineProperty(root, property, { get })
+  }
   Object.defineProperty(root, "monitorSummaries", { get: () => root.document.monitors })
   Object.defineProperty(root, "selectedSavedProfile", {
     get: () => Model.savedProfileByName(root.editorDocument, root.selectedSavedProfileName)
   })
-  const globals = { Array, Qt: { callLater() {} },
+  Object.defineProperty(root, "savedProfiles", { get: () => root.editorDocument.profiles })
+  const globals = { Array, Reuse: require('../LayoutReuse.js'), Qt: { callLater() {} },
+    reusePane: { choose() {}, reset() {}, focusFirst() {} },
     backendSocket: { connected: true, flush() {}, write(line) {
       const packet = JSON.parse(line)
       packets.push(packet)
       requests.push(packet.method)
     } }, previewTimer: { start() {}, stop() {} } }
-  for (const name of ["send", "updateDocument", "requestEditorState", "updateEditor", "handleMessage",
-    "editDraft", "beginCreateProfile", "loadSelectedSavedProfile", "selectSavedProfile", "beginExecEdit"])
+  for (const name of ["send", "updateDocument", "queueEditorRefresh", "requestEditorState", "updateEditor", "handleMessage",
+    "retryConnectingDisplays", "openLayoutReuse", "reuseLayout", "acceptReusedLayout", "open",
+    "changeWorkspaceStrategy", "editWorkspaces", "editDraft", "beginCreateProfile", "loadSelectedSavedProfile", "selectSavedProfile", "beginExecEdit"])
     root[name] = panelFunction(name, root, globals)
   return {
     root, requests, packets, result,
     receive(id, value = result) {
       root.handleMessage(JSON.stringify({ protocol_version: 1, type: "response", id, result: value }))
+    },
+    fail(id) {
+      root.handleMessage(JSON.stringify({ protocol_version: 1, type: "response", id,
+        error: { code: "compositor_busy", message: "Displays are still connecting; try again shortly." } }))
     },
     tick() {
       if (vm.runInNewContext(running, { root }))
@@ -1248,12 +1263,12 @@ test("hotplug during an in-flight editor read gets one follow-up while focus cha
   panel.tick()
   assert.equal(panel.root.editorRefreshQueued, true)
   assert.deepEqual(panel.requests, ["editor_state"])
-  panel.root.editorLoading = false
+  panel.receive(panel.packets[0].id)
   panel.tick()
   panel.tick()
   assert.deepEqual(panel.requests, ["editor_state", "editor_state"])
   assert.equal(panel.root.editorRefreshQueued, false)
-  panel.root.editorLoading = false
+  panel.receive(panel.packets[1].id)
   panel.root.updateDocument({ monitors: panel.root.monitorSummaries.toReversed().map(
     monitor => ({ ...monitor, focused: monitor.name === "DP-2" })
   ) })
@@ -1348,12 +1363,246 @@ test("intentional editor refreshes retain upstream's discard and default-selecti
   panel.root.loadSelectedSavedProfile()
   panel.root.selectedOutputKey = "desk"
   panel.root.requestEditorState()
-  assert.equal(panel.root.pendingContexts[panel.packets[0].id], undefined)
+  assert.equal(panel.root.pendingContexts[panel.packets[0].id].automaticEditorRefresh, false)
   panel.receive(panel.packets[0].id)
   assert.equal(panel.root.draftDirty, false)
   assert.equal(panel.root.selectedSavedProfileName, "Current")
   assert.equal(panel.root.selectedOutputKey, "laptop")
   assert.equal(panel.root.draftProfile.name, "Current")
+})
+
+test("summoning an open panel preserves drafts and input, while reopening issues one reset", () => {
+  for (const interaction of ["draftDirty", "creatingProfile", "inputBlocked"]) {
+    const panel = editorRefreshPanel()
+    panel.root[interaction] = true
+    panel.root.checkInstallation = () => {}
+    panel.root.controller = { show() {} }
+    panel.root.open()
+    assert.deepEqual(panel.requests, [], interaction)
+    assert.equal(panel.root.editorResetQueued, false, interaction)
+  }
+  const panel = editorRefreshPanel()
+  panel.root.opened = false
+  panel.root.draftDirty = true
+  panel.root.checkInstallation = () => {}
+  panel.root.controller = { show() {
+    panel.root.opened = true
+    // The actual onOpenedChanged lifecycle handler requests the reset.
+    panel.root.requestEditorState()
+  } }
+  panel.root.open()
+  assert.deepEqual(panel.requests, ["editor_state"])
+  assert.equal(panel.root.editorResetQueued, false)
+  panel.receive(panel.packets[0].id)
+  assert.equal(panel.root.draftDirty, false)
+  panel.tick()
+  assert.equal(panel.packets.length, 1)
+})
+
+test("Discard keeps its reset intent behind a pending status or automatic editor read", () => {
+  for (const pending of ["status", "editor_state"]) {
+    const panel = editorRefreshPanel()
+    if (pending === "status") panel.root.send("status", {})
+    else panel.root.requestEditorState(true)
+    panel.root.draftDirty = true
+    const draft = panel.root.draftProfile
+    panel.root.requestEditorState()
+    assert.equal(panel.root.readPending, true, pending)
+    assert.equal(panel.root.editorResetQueued, true, pending)
+    panel.tick()
+    assert.equal(panel.packets.length, 1, pending)
+    panel.receive(panel.packets[0].id, pending === "status"
+      ? { monitors: panel.root.monitorSummaries } : panel.result)
+    assert.equal(panel.root.draftProfile, draft, pending)
+    panel.tick()
+    assert.equal(panel.packets.length, 2, pending)
+    assert.equal(panel.root.pendingContexts[panel.packets[1].id].automaticEditorRefresh, false, pending)
+    panel.receive(panel.packets[1].id)
+    assert.equal(panel.root.draftDirty, false, pending)
+    assert.equal(panel.root.editorResetQueued, false, pending)
+  }
+})
+
+test("a timed-out explicit reset retries status first and then discards the dirty draft", () => {
+  const panel = editorRefreshPanel()
+  panel.root.draftDirty = true
+  panel.root.requestEditorState()
+  panel.fail(panel.packets[0].id)
+  assert.equal(panel.root.editorResetQueued, true)
+  panel.tick()
+  assert.deepEqual(panel.requests, ["editor_state"])
+  panel.root.retryConnectingDisplays()
+  assert.deepEqual(panel.requests, ["editor_state", "status"])
+  panel.receive(panel.packets[1].id, { monitors: panel.root.monitorSummaries })
+  panel.tick()
+  assert.deepEqual(panel.requests, ["editor_state", "status", "editor_state"])
+  panel.receive(panel.packets[2].id)
+  assert.equal(panel.root.draftDirty, false)
+  assert.equal(panel.root.editorRetry, false)
+  assert.equal(panel.root.editorSnapshotStale, false)
+})
+
+test("busy errors retain recovery even when interaction invalidates an automatic response", () => {
+  const panel = editorRefreshPanel()
+  panel.root.requestEditorState(true)
+  panel.root.draftDirty = true
+  panel.fail(panel.packets[0].id)
+  assert.equal(panel.root.statusRetry, true)
+  assert.equal(panel.root.editorRetry, true)
+  assert.equal(panel.root.editorResetQueued, false)
+  panel.root.retryConnectingDisplays()
+  panel.receive(panel.packets[1].id, { monitors: panel.root.monitorSummaries })
+  panel.tick()
+  panel.root.retryConnectingDisplays()
+  assert.deepEqual(panel.requests, ["editor_state", "status"])
+  assert.equal(panel.root.draftDirty, true)
+})
+
+test("automatic replies from before a topology change cannot replace layout or reuse snapshots", () => {
+  for (const page of ["layout", "reuse"]) {
+    const panel = editorRefreshPanel()
+    panel.hotplug()
+    if (page === "reuse") panel.root.openLayoutReuse()
+    panel.tick()
+    const draft = panel.root.draftProfile
+    const monitors = Model.clone(panel.root.monitorSummaries)
+    const revision = panel.root.monitorTopologyRevision
+    // Include A -> B -> A: matching final signatures must not revive the read.
+    panel.root.updateDocument({ monitors: [...monitors, { name: "DP-3", enabled: true }] })
+    panel.root.updateDocument({ monitors })
+    assert.equal(panel.root.monitorTopologyRevision, revision + 2)
+    panel.receive(panel.packets[0].id)
+    assert.equal(panel.root.draftProfile, draft, page)
+    assert.equal(panel.root.editorRefreshQueued, true, page)
+    if (page === "reuse") assert.equal(panel.root.reuseTopologyChanged, true)
+    panel.tick()
+    assert.equal(panel.packets.length, 2, page)
+    panel.receive(panel.packets[1].id)
+    assert.equal(panel.root.editorSnapshotStale, false, page)
+    assert.equal(panel.root.reuseTopologyChanged, false, page)
+  }
+})
+
+test("opening reuse after an editor timeout refreshes the editor even when status is unchanged", () => {
+  const panel = editorRefreshPanel()
+  panel.hotplug()
+  panel.tick()
+  panel.fail(panel.packets[0].id)
+  panel.root.openLayoutReuse()
+  assert.equal(panel.root.reuseTopologyChanged, true)
+  assert.equal(panel.root.editorSnapshotStale, true)
+  panel.root.reuseLayout("Current", { laptop: "laptop" })
+  assert.deepEqual(panel.requests, ["editor_state"])
+  panel.root.retryConnectingDisplays()
+  panel.receive(panel.packets[1].id, { monitors: panel.root.monitorSummaries })
+  panel.tick()
+  assert.deepEqual(panel.requests, ["editor_state", "status", "editor_state"])
+  panel.receive(panel.packets[2].id)
+  assert.equal(panel.root.editorSnapshotStale, false)
+  panel.root.reuseLayout("Current", { laptop: "laptop" })
+  assert.equal(panel.packets.at(-1).method, "reuse_profile")
+})
+
+test("newer editor hardware identity refreshes missing status before retrying", () => {
+  const panel = editorRefreshPanel()
+  panel.root.document.monitor_set_hash = "old-unit"
+  panel.root.editorDocument.monitor_set_hash = "old-unit"
+  panel.root.requestEditorState(true)
+  const draft = panel.root.draftProfile
+  const replacement = { ...panel.result, monitor_set_hash: "replacement-unit" }
+  panel.receive(panel.packets[0].id, replacement)
+  assert.equal(panel.root.draftProfile, draft)
+  assert.equal(panel.root.statusRetry, true)
+  panel.tick()
+  assert.equal(panel.packets.length, 1)
+  panel.root.retryConnectingDisplays()
+  panel.receive(panel.packets[1].id, { monitors: panel.root.monitorSummaries,
+    monitor_set_hash: "replacement-unit" })
+  panel.tick()
+  panel.receive(panel.packets[2].id, replacement)
+  assert.equal(panel.root.editorDocument.monitor_set_hash, "replacement-unit")
+  assert.equal(panel.root.editorSnapshotStale, false)
+})
+
+test("reuse rejects a different hardware unit on the same connector and recovers through fresh status", () => {
+  const panel = editorRefreshPanel()
+  panel.root.document.monitor_set_hash = "old-unit"
+  panel.root.editorDocument.monitor_set_hash = "old-unit"
+  panel.root.openLayoutReuse()
+  panel.root.reuseLayout("Current", { laptop: "laptop" })
+  const draft = panel.root.draftProfile
+  panel.receive(panel.packets[0].id, { profile: panel.result.profile, monitor_set_hash: "replacement-unit" })
+  assert.equal(panel.root.draftProfile, draft)
+  assert.equal(panel.root.draftDirty, false)
+  assert.equal(panel.root.statusRetry, true)
+  assert.equal(panel.root.reuseTopologyChanged, true)
+  panel.root.reuseLayout("Current", { laptop: "laptop" })
+  assert.equal(panel.packets.length, 1)
+  panel.root.retryConnectingDisplays()
+  panel.receive(panel.packets[1].id, { monitors: panel.root.monitorSummaries, monitor_set_hash: "replacement-unit" })
+  panel.tick()
+  panel.receive(panel.packets[2].id, { ...panel.result, monitor_set_hash: "replacement-unit" })
+  panel.root.reuseLayout("Current", { laptop: "laptop" })
+  panel.receive(panel.packets[3].id, { profile: panel.result.profile, monitor_set_hash: "replacement-unit" })
+  assert.equal(panel.root.draftDirty, true)
+  assert.equal(panel.root.creatingProfile, true)
+})
+
+test("reuse rejects observed A to B to A topology changes even when hashes and signatures match again", () => {
+  const panel = editorRefreshPanel()
+  panel.root.openLayoutReuse()
+  panel.root.reuseLayout("Current", { laptop: "laptop" })
+  const monitors = Model.clone(panel.root.monitorSummaries)
+  panel.hotplug()
+  panel.root.updateDocument({ monitors })
+  panel.receive(panel.packets[0].id, { profile: panel.result.profile })
+  assert.equal(panel.root.draftDirty, false)
+  assert.equal(panel.root.reuseTopologyChanged, true)
+  assert.equal(panel.root.editorRefreshQueued, true)
+})
+
+test("a timed-out reuse request requires an editor refresh after status recovers", () => {
+  const panel = editorRefreshPanel()
+  panel.root.openLayoutReuse()
+  panel.root.reuseLayout("Current", { laptop: "laptop" })
+  panel.fail(panel.packets[0].id)
+  assert.equal(panel.root.editorRetry, true)
+  assert.equal(panel.root.reuseTopologyChanged, true)
+  panel.root.retryConnectingDisplays()
+  panel.receive(panel.packets[1].id, { monitors: panel.root.monitorSummaries })
+  panel.root.reuseLayout("Current", { laptop: "laptop" })
+  assert.equal(panel.packets.length, 2)
+  panel.tick()
+  assert.equal(panel.packets[2].method, "editor_state")
+})
+
+test("reused generated workspaces materialize assignments when changed to manual", () => {
+  for (const strategy of ["sequential", "interleave"]) {
+    const panel = editorRefreshPanel()
+    const laptopWorkspaces = strategy === "interleave" ? ["1", "3"] : ["1", "2"]
+    const deskWorkspaces = strategy === "interleave" ? ["2", "4"] : ["3", "4"]
+    panel.root.openLayoutReuse()
+    panel.root.reuseLayout("Current", { laptop: "laptop", desk: "desk" })
+    panel.receive(panel.packets[0].id, {
+      profile: { ...panel.result.profile, workspaces: { strategy, max_workspaces: 4, group_size: 2 } },
+      workspace_plan: [{ output_key: "laptop", workspaces: laptopWorkspaces }, { output_key: "desk", workspaces: deskWorkspaces }]
+    })
+    assert.equal(panel.root.manualWorkspaceRulesInitialized, false)
+    panel.root.changeWorkspaceStrategy("manual")
+    const settings = panel.packets[1].params.edit.workspaces
+    assert.equal(settings.strategy, "manual")
+    assert.deepEqual(settings.rules.filter(rule => rule.output_key === "laptop").map(rule => rule.workspace), laptopWorkspaces)
+    assert.deepEqual(settings.rules.filter(rule => rule.output_key === "desk").map(rule => rule.workspace), deskWorkspaces)
+    assert.equal(settings.rules.filter(rule => rule.default).length, 2)
+    assert.equal(settings.rules.filter(rule => rule.default).every(rule => rule.persistent), true)
+  }
+})
+
+test("hardware snapshot checks remain compatible with daemons that omit the additive hash", () => {
+  assert.equal(Model.monitorSnapshotsMatch({}, { monitor_set_hash: "known" }), true)
+  assert.equal(Model.monitorSnapshotsMatch({ monitor_set_hash: "known" }, {}), true)
+  assert.equal(Model.monitorSnapshotsMatch({ monitor_set_hash: "a" }, { monitor_set_hash: "a" }), true)
+  assert.equal(Model.monitorSnapshotsMatch({ monitor_set_hash: "a" }, { monitor_set_hash: "b" }), false)
 })
 
 test("the display count includes connected disabled and mirrored outputs with a layout fallback", () => {

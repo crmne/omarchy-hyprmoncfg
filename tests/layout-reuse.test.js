@@ -83,6 +83,7 @@ function panelFunction(name, root, globals = {}) {
 test('reused draft arriving after hotplug is discarded, not applied to a changed setup', () => {
   const root = { monitorSummaries: [{ name: 'DP-3' }], reusePending: true, draftProfile: live,
     reuseGeneration: 1, previewTransaction: '' }
+  root.queueEditorRefresh = panelFunction('queueEditorRefresh', root)
   panelFunction('acceptReusedLayout', root)({ profile: work }, { generation: 1, templateName: 'Work', monitorSignature: 'outdated' })
   assert.equal(root.draftProfile, live)
   assert.equal(root.reusePending, false)
@@ -159,6 +160,7 @@ test('request, close, new request and late success preserve the newer request', 
 test('busy compositor response ends loading and retains the draft while scheduling recovery', () => {
   const root = { pendingMethods: { e: 'editor_state' }, pendingContexts: {},
     editorLoading: true, draftProfile: live }
+  root.queueEditorRefresh = panelFunction('queueEditorRefresh', root)
   panelFunction('handleMessage', root)(JSON.stringify({ type: 'response', protocol_version: 1, id: 'e',
     error: { code: 'compositor_busy', message: 'Displays are still connecting; try again shortly.' } }))
   assert.equal(root.editorLoading, false)
@@ -202,7 +204,7 @@ test('successful status clears connecting feedback without replacing an edited d
 
 test('identification waits while a timed-out display query leaves a stale snapshot visible', () => {
   const root = { backendConnected: true, editorReady: true, editorLoading: false,
-    editorRefreshQueued: false, displaysConnecting: true }
+    editorSnapshotStale: true }
   panelFunction('identifyOutput', root)('laptop', live)
   assert.match(root.lastError, /Refresh it before identifying/)
 })

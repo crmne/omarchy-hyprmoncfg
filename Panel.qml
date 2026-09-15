@@ -66,6 +66,8 @@ Panel {
   property bool editorReady: false
   property bool editorLoading: false
   property bool editorRefreshQueued: false
+  property bool editorResetQueued: false
+  property int monitorTopologyRevision: 0
   property bool reusePending: false
   property int reuseGeneration: 0
   property bool reuseTopologyChanged: false
@@ -78,6 +80,9 @@ Panel {
     || root.previewTransaction !== "" || root.previewPending || root.reusePending
     || (keyCatcher.blocked && root.activePage !== "reuse")
     || (root.activePage === "reuse" && !root.reuseTopologyChanged)
+  readonly property bool editorSnapshotStale: root.editorRefreshQueued || root.editorRetry
+    || root.statusRetry || root.displaysConnecting
+    || !Model.monitorSnapshotsMatch(root.document, root.editorDocument)
   property bool editPending: false
   property bool draftDirty: false
   property string sourceProfile: ""
@@ -339,12 +344,15 @@ Panel {
   }
 
   function open() {
+    var alreadyOpen = root.opened
     root.controller.show()
     root.cursorActive = false
     root.cursorIndex = 0
     root.checkInstallation()
     if (root.compatible) root.checkServiceState()
-    if (root.backendConnected) root.requestEditorState()
+    // onOpenedChanged reloads a newly opened panel. Summoning an open panel
+    // must preserve its draft and must not queue a second destructive read.
+    if (alreadyOpen && root.backendConnected) root.requestEditorState(true)
   }
 
   function openFromHotkey() { root.open() }
@@ -519,22 +527,32 @@ Panel {
   function retryConnectingDisplays() {
     if (root.readPending || root.previewPending || root.reusePending) return
     if (root.statusRetry) root.send("status", {})
+    else if (root.editorResetQueued) root.requestEditorState()
     else if (root.editorRetry && !root.editorRefreshBlocked) root.requestEditorState(true)
   }
 
+  function queueEditorRefresh(automatic) {
+    root.editorRefreshQueued = true
+    if (automatic !== true) root.editorResetQueued = true
+    if (root.activePage === "reuse") root.reuseTopologyChanged = true
+  }
+
   function requestEditorState(automatic) {
-    if (!root.backendConnected || root.editorLoading || root.reusePending || root.previewTransaction !== "") return
-    if (automatic === true && root.editorRefreshBlocked) return
-    if (root.readPending) {
-      root.editorRefreshQueued = true
+    if (!root.backendConnected || root.reusePending || root.previewTransaction !== "") return
+    var automaticRefresh = automatic === true && !root.editorResetQueued
+    if (automaticRefresh && root.editorRefreshBlocked) return
+    if (root.editorLoading || root.readPending || root.statusRetry) {
+      root.queueEditorRefresh(automaticRefresh)
       return
     }
     root.editorRefreshQueued = false
+    root.editorResetQueued = false
     root.editorLoading = true
-    root.send("editor_state", {}, automatic === true ? {
-      automaticEditorRefresh: true,
-      interactionRevision: root.editorInteractionRevision
-    } : undefined)
+    root.send("editor_state", {}, {
+      automaticEditorRefresh: automaticRefresh,
+      interactionRevision: root.editorInteractionRevision,
+      topologyRevision: root.monitorTopologyRevision
+    })
   }
 
   function updateEditor(value, preserveSelection) {
@@ -590,7 +608,7 @@ Panel {
       displayIdentify.clear()
       return
     }
-    if (!root.backendConnected || !root.editorReady || root.editorLoading || root.editorRefreshQueued || root.displaysConnecting) {
+    if (!root.backendConnected || !root.editorReady || root.editorLoading || root.editorSnapshotStale) {
       root.lastError = "The display list changed. Refresh it before identifying a monitor."
       return
     }
@@ -847,21 +865,23 @@ Panel {
     root.expanded = true
     root.activePage = "reuse"
     root.reuseStatus = ""
-    root.reuseTopologyChanged = root.editorRefreshQueued
+    root.reuseTopologyChanged = root.editorSnapshotStale
     if (name) reusePane.choose(name)
     else reusePane.reset()
     Qt.callLater(function() { reusePane.focusFirst() })
   }
 
   function reuseLayout(name, mapping) {
-    if (!root.managedChecked || !root.editorReady || root.editorLoading || root.readPending || root.reusePending || root.draftDirty
+    if (!root.managedChecked || !root.editorReady || root.editorLoading || root.readPending || root.editorSnapshotStale || root.reusePending || root.draftDirty
         || root.creatingProfile || root.editPending || root.previewTransaction !== "" || root.previewPending) return
     root.lastError = ""
     root.reusePending = true
     root.send("reuse_profile", { name: name, mapping: mapping }, {
       templateName: name,
       generation: ++root.reuseGeneration,
-      monitorSignature: Model.monitorStateSignature(root.monitorSummaries)
+      monitorSignature: Model.monitorStateSignature(root.monitorSummaries),
+      topologyRevision: root.monitorTopologyRevision,
+      monitor_set_hash: String((root.editorDocument || {}).monitor_set_hash || "")
     })
   }
 
@@ -872,9 +892,13 @@ Panel {
       root.lastError = "The draft changed while the layout was prepared. Your current draft was kept."
       return
     }
-    if (context.monitorSignature !== Model.monitorStateSignature(root.monitorSummaries)) {
+    if (context.topologyRevision !== root.monitorTopologyRevision
+        || context.monitorSignature !== Model.monitorStateSignature(root.monitorSummaries)
+        || !Model.monitorSnapshotsMatch(context, result)
+        || !Model.monitorSnapshotsMatch(root.document, result)) {
       root.lastError = "The displays changed. Check the monitor assignments and try again."
-      root.editorRefreshQueued = true
+      root.queueEditorRefresh(true)
+      root.statusRetry = true
       return
     }
     if (!result || !result.profile || !Array.isArray(result.profile.outputs)) {
@@ -890,7 +914,9 @@ Panel {
     root.draftDirty = true
     root.creatingProfile = true
     root.selectedOutputKey = Model.initialOutputKey(root.draftProfile, root.editorDocument.displays)
-    root.manualWorkspaceRulesInitialized = true
+    var workspaceSettings = (root.draftProfile || {}).workspaces || {}
+    root.manualWorkspaceRulesInitialized = String(workspaceSettings.strategy || "") === "manual"
+      && Array.isArray(workspaceSettings.rules) && workspaceSettings.rules.length > 0
     root.reuseNotice = "Copied " + context.templateName + " for these monitors. "
       + ((result.warnings || []).length ? result.warnings.join(" ") : "Check the layout, then preview and save.")
     root.activePage = "layout"
@@ -1270,10 +1296,14 @@ Panel {
     if (root.lastError === "Displays are still connecting; try again shortly.") root.lastError = ""
     var monitorsChanged = Model.monitorStateSignature(root.monitorSummaries)
       !== Model.monitorStateSignature(value.monitors)
+      || String((root.document || {}).monitor_set_hash || "") !== String(value.monitor_set_hash || "")
     root.document = value
     root.documentReady = true
     root.syncDaemonPreview(value.daemon ? value.daemon.preview : null)
-    if (monitorsChanged) root.editorRefreshQueued = true
+    if (monitorsChanged) {
+      root.monitorTopologyRevision++
+      root.queueEditorRefresh(true)
+    }
     if (monitorsChanged && root.activePage === "reuse") {
       root.reuseTopologyChanged = true
       root.reuseStatus = "The displays changed. Review the refreshed assignments before continuing."
@@ -1332,13 +1362,6 @@ Panel {
     root.pendingMethods = Object.assign({}, root.pendingMethods)
     delete root.pendingContexts[String(envelope.id)]
     if (method === "reuse_profile" && context.generation !== root.reuseGeneration) return
-    if (method === "editor_state" && context.automaticEditorRefresh
-        && (root.editorRefreshBlocked
-          || context.interactionRevision !== root.editorInteractionRevision)) {
-      root.editorLoading = false
-      root.editorRefreshQueued = true
-      return
-    }
     if (envelope.error) {
       if (method === "reuse_profile") root.reusePending = false
       if (method === "editor_state") root.editorLoading = false
@@ -1349,9 +1372,26 @@ Panel {
       if (envelope.error.code === "compositor_busy") {
         root.displaysConnecting = true
         root.statusRetry = true
-        if (method === "editor_state") root.editorRetry = true
+        if (method === "editor_state" || method === "reuse_profile") {
+          root.editorRetry = true
+          root.queueEditorRefresh(method === "reuse_profile" || context.automaticEditorRefresh === true)
+        }
       }
       return
+    }
+    if (method === "editor_state") {
+      var snapshotChanged = !Model.monitorSnapshotsMatch(root.document, envelope.result)
+      if (snapshotChanged || context.topologyRevision !== root.monitorTopologyRevision
+          || (context.automaticEditorRefresh
+            && (root.editorRefreshBlocked
+              || context.interactionRevision !== root.editorInteractionRevision))) {
+        root.editorLoading = false
+        root.queueEditorRefresh(context.automaticEditorRefresh === true)
+        // A newer editor snapshot can arrive before status, or after a lost
+        // status event. Refresh status as well so recovery can make progress.
+        if (snapshotChanged) root.statusRetry = true
+        return
+      }
     }
     if (method === "status" || method === "subscribe") {
       root.updateDocument(envelope.result)
@@ -1479,6 +1519,8 @@ Panel {
         root.editorReady = false
         root.editorLoading = false
         root.editorRefreshQueued = false
+        root.editorResetQueued = false
+        root.monitorTopologyRevision++
         root.editPending = false
         root.profileModePending = false
         root.reusePending = false
@@ -1647,8 +1689,9 @@ Panel {
     id: editorRefreshTimer
     interval: 200
     repeat: true
-    running: root.editorRefreshQueued && root.backendConnected && !root.editorRefreshBlocked
-    onTriggered: root.requestEditorState(true)
+    running: root.backendConnected && (root.editorResetQueued
+      || (root.editorRefreshQueued && !root.editorRefreshBlocked))
+    onTriggered: root.requestEditorState(!root.editorResetQueued)
   }
 
   Timer {
@@ -2613,7 +2656,7 @@ Panel {
             editorDisplays: root.editorDocument.displays
             available: root.managedChecked && (root.editorDocument.capabilities || []).indexOf("reuse_profile") >= 0
             busy: root.reusePending || root.editorLoading || root.readPending
-              || root.reuseTopologyChanged
+              || root.editorSnapshotStale || root.reuseTopologyChanged
             statusMessage: root.reuseStatus
             ownerOpen: root.opened
             popupParent: keyCatcher

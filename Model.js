@@ -52,6 +52,14 @@ function monitorStateSignature(monitors) {
   return JSON.stringify(state)
 }
 
+// Older daemons omit the hardware snapshot hash. Keep their existing status
+// signature protection while comparing identities when both peers provide it.
+function monitorSnapshotsMatch(first, second) {
+  var a = String((first || {}).monitor_set_hash || "")
+  var b = String((second || {}).monitor_set_hash || "")
+  return a === "" || b === "" || a === b
+}
+
 // A monitor only earns a rectangle when it drives its own image. One that is
 // off has no place on the canvas, and one that mirrors another shares its
 // source's position, so drawing it would stack two cards on the same spot.
@@ -967,6 +975,7 @@ if (typeof module !== "undefined") {
     parseEnvelope: parseEnvelope,
     canConfirmPreview: canConfirmPreview,
     monitorStateSignature: monitorStateSignature,
+    monitorSnapshotsMatch: monitorSnapshotsMatch,
     hiddenDisplays: hiddenDisplays,
     layoutDisplays: layoutDisplays,
     displayModelLabel: displayModelLabel,
