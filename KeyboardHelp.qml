@@ -50,6 +50,17 @@ Item {
           { keys: "Space", action: "Toggle automatic profile selection" }
         ]
       }]
+    } else if (root.page === "reuse") {
+      contextual = [{
+        title: "Reuse layout",
+        bindings: [
+          { keys: "Tab, Shift+Tab", action: "Move between selectors and buttons" },
+          { keys: "Enter, Space", action: "Open a selector or activate a button" },
+          { keys: "↑  ↓", action: "Choose an option in an open menu" },
+          { keys: "Enter", action: "Confirm the menu choice" },
+          { keys: "Esc", action: "Close the menu or panel" }
+        ]
+      }]
     } else {
       contextual = [{
         title: "Workspaces",
@@ -60,10 +71,10 @@ Item {
         ]
       }]
     }
-    contextual.push({
+    if (root.page !== "reuse") contextual.push({
       title: "Anywhere",
       bindings: [
-        { keys: "1  2  3", action: "Switch tabs" },
+        { keys: "1  2  3  4", action: "Switch tabs (4 opens Reuse layout)" },
         { keys: "a", action: "Apply the current draft or selected profile" },
         { keys: "s", action: "Save the current draft as a profile" },
         { keys: "r", action: "Reset from live Hyprland state" },
@@ -162,7 +173,7 @@ Item {
 
       Text {
         textFormat: Text.PlainText
-        text: "Any key closes this."
+        text: root.page === "reuse" ? "Click outside this card to close." : "Any key closes this."
         color: Qt.darker(root.foreground, 1.5)
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption

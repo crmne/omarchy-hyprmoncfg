@@ -5,6 +5,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "Model.js" as Model
+import "LayoutReuse.js" as Reuse
 
 Panel {
   id: root
@@ -36,6 +37,12 @@ Panel {
   property int requestSequence: 0
   property var pendingMethods: ({})
   property var pendingContexts: ({})
+  readonly property bool readPending: Object.keys(root.pendingMethods).some(function(id) {
+    return ["status", "subscribe", "editor_state", "reuse_profile"].indexOf(root.pendingMethods[id]) >= 0
+  })
+  property bool displaysConnecting: false
+  property bool statusRetry: false
+  property bool editorRetry: false
   property int cursorIndex: 0
   property bool cursorActive: false
   property bool keyboardHelpOpen: false
@@ -58,6 +65,24 @@ Panel {
   property var workspacePlan: []
   property bool editorReady: false
   property bool editorLoading: false
+  property bool editorRefreshQueued: false
+  property bool editorResetQueued: false
+  property int monitorTopologyRevision: 0
+  property bool reusePending: false
+  property int reuseGeneration: 0
+  property bool reuseTopologyChanged: false
+  property string reuseStatus: ""
+  property string reusedTemplateName: ""
+  property string reuseNotice: ""
+  property int editorInteractionRevision: 0
+  readonly property bool editorRefreshBlocked: !root.opened || root.draftDirty
+    || root.creatingProfile || root.editPending || root.profileModePending
+    || root.previewTransaction !== "" || root.previewPending || root.reusePending
+    || (keyCatcher.blocked && root.activePage !== "reuse")
+    || (root.activePage === "reuse" && !root.reuseTopologyChanged)
+  readonly property bool editorSnapshotStale: root.editorRefreshQueued || root.editorRetry
+    || root.statusRetry || root.displaysConnecting
+    || !Model.monitorSnapshotsMatch(root.document, root.editorDocument)
   property bool editPending: false
   property bool draftDirty: false
   property string sourceProfile: ""
@@ -76,6 +101,9 @@ Panel {
   property string previewDeadline: ""
   property int previewSeconds: 0
   property bool previewPending: false
+  readonly property bool identifyBlockedByPreview: root.previewPending || root.previewTransaction !== ""
+    || !!root.daemonPreview || (!!root.previewCoordinator && root.previewCoordinator.opened === true)
+  onIdentifyBlockedByPreviewChanged: if (root.identifyBlockedByPreview) displayIdentify.clear()
   property int brightnessPercent: 1
   property int pendingBrightnessPercent: 1
   property bool brightnessAvailable: false
@@ -85,6 +113,13 @@ Panel {
   property bool brightnessSetQueued: false
   property string brightnessSetConnector: ""
   property string pendingBrightnessConnector: ""
+
+  // Automatic reads must not replace input started after their request. The
+  // existing key catcher also covers text buffers, dropdowns, and exec editing.
+  onEditorRefreshBlockedChanged: root.editorInteractionRevision++
+  onSelectedSavedProfileNameChanged: root.editorInteractionRevision++
+  onSelectedOutputKeyChanged: root.editorInteractionRevision++
+  onProfileChoiceChanged: root.editorInteractionRevision++
 
   readonly property var monitorSummaries: document && document.monitors instanceof Array ? document.monitors : []
   readonly property var layoutDisplays: root.daemonPreview && root.daemonPreview.profile
@@ -99,7 +134,8 @@ Panel {
       ? Model.hiddenProfileDisplays(root.draftProfile)
       : Model.hiddenDisplays(root.backendConnected ? monitorSummaries : []))
   readonly property int monitorCount: {
-    return layoutDisplays.length
+    return root.backendConnected && root.documentReady
+      ? root.monitorSummaries.length : layoutDisplays.length
   }
   readonly property string activeProfile: root.managedChecked
     ? Model.currentProfileName(root.document) : ""
@@ -125,6 +161,7 @@ Panel {
   readonly property bool profileAutomatic: root.profileOverride === ""
   readonly property string profileStatusTitle: {
     if (!root.managedChecked) return "Not managed by hyprmoncfg"
+    if (root.displaysConnecting) return "Displays connecting…"
     if (!root.documentReady) return root.serviceActionPending ? "Starting hyprmoncfg…" : "Loading profile…"
     if (root.pendingProfileName !== "") return root.pendingProfileName
     if (!root.profileAutomatic && root.displayedProfile !== "") return root.displayedProfile
@@ -134,6 +171,7 @@ Panel {
   }
   readonly property string profileStatusSubtitle: {
     if (!root.managedChecked) return "Turn on management for automatic profiles"
+    if (root.displaysConnecting) return "Waiting for display information; keeping the current view"
     if (!root.documentReady) return "Reading the active display layout"
     var displays = root.connectedDisplayCount === 1 ? "1 display" : root.connectedDisplayCount + " displays"
     if (root.pendingProfileName !== "") return displays + " · Awaiting confirmation"
@@ -254,7 +292,8 @@ Panel {
   readonly property var pageOptions: [
     { value: "layout", label: "1  Layout" },
     { value: "profiles", label: "2  Profiles" },
-    { value: "workspaces", label: "3  Workspaces" }
+    { value: "workspaces", label: "3  Workspaces" },
+    { value: "reuse", label: "4  Reuse layout" }
   ]
   readonly property var inspectorOptions: [
     { value: "display", label: "Display" },
@@ -305,16 +344,22 @@ Panel {
   }
 
   function open() {
+    var alreadyOpen = root.opened
     root.controller.show()
     root.cursorActive = false
     root.cursorIndex = 0
     root.checkInstallation()
     if (root.compatible) root.checkServiceState()
-    if (root.backendConnected) root.requestEditorState()
+    // onOpenedChanged reloads a newly opened panel. Summoning an open panel
+    // must preserve its draft and must not queue a second destructive read.
+    if (alreadyOpen && root.backendConnected) root.requestEditorState(true)
   }
 
   function openFromHotkey() { root.open() }
   function close() {
+    root.reuseGeneration++
+    root.reusePending = false
+    displayIdentify.clear()
     if (root.previewTransaction !== "" && !root.previewCoordinator) root.revertPreview()
     root.keyboardHelpOpen = false
     root.execEditing = false
@@ -416,6 +461,7 @@ Panel {
   }
 
   function setManaged(enabled) {
+    if (root.reusePending) return
     if (!root.compatible || serviceProcess.running || root.serviceActionPending) return
     root.lastError = ""
     root.serviceActionPending = true
@@ -454,6 +500,7 @@ Panel {
       root.previewPending = false
       root.editPending = false
       root.editorLoading = false
+      root.reusePending = false
       root.lastError = "hyprmoncfg is reconnecting. Try again in a moment."
       return ""
     }
@@ -466,7 +513,9 @@ Panel {
       method: method
     }
     if (params !== undefined && params !== null) request.params = params
-    root.pendingMethods[id] = method
+    var methods = Object.assign({}, root.pendingMethods)
+    methods[id] = method
+    root.pendingMethods = methods
     if (context !== undefined && context !== null) root.pendingContexts[id] = context
     backendSocket.write(JSON.stringify(request) + "\n")
     backendSocket.flush()
@@ -475,13 +524,38 @@ Panel {
 
   function subscribe() { root.send("subscribe", {}) }
 
-  function requestEditorState() {
-    if (!root.backendConnected || root.editorLoading || root.previewTransaction !== "") return
-    root.editorLoading = true
-    root.send("editor_state", {})
+  function retryConnectingDisplays() {
+    if (root.readPending || root.previewPending || root.reusePending) return
+    if (root.statusRetry) root.send("status", {})
+    else if (root.editorResetQueued) root.requestEditorState()
+    else if (root.editorRetry && !root.editorRefreshBlocked) root.requestEditorState(true)
   }
 
-  function updateEditor(value) {
+  function queueEditorRefresh(automatic) {
+    root.editorRefreshQueued = true
+    if (automatic !== true) root.editorResetQueued = true
+    if (root.activePage === "reuse") root.reuseTopologyChanged = true
+  }
+
+  function requestEditorState(automatic) {
+    if (!root.backendConnected || root.reusePending || root.previewTransaction !== "") return
+    var automaticRefresh = automatic === true && !root.editorResetQueued
+    if (automaticRefresh && root.editorRefreshBlocked) return
+    if (root.editorLoading || root.readPending || root.statusRetry) {
+      root.queueEditorRefresh(automaticRefresh)
+      return
+    }
+    root.editorRefreshQueued = false
+    root.editorResetQueued = false
+    root.editorLoading = true
+    root.send("editor_state", {}, {
+      automaticEditorRefresh: automaticRefresh,
+      interactionRevision: root.editorInteractionRevision,
+      topologyRevision: root.monitorTopologyRevision
+    })
+  }
+
+  function updateEditor(value, preserveSelection) {
     if (!Model.validEditorDocument(value)) {
       root.editorLoading = false
       root.lastError = "hyprmoncfg returned an invalid editor state."
@@ -498,17 +572,24 @@ Panel {
     var savedDefaults = root.sourceProfile !== ""
       ? Model.savedProfileByName(value, root.sourceProfile) : null
     root.profileDefaults = Model.clone(savedDefaults || value.profile)
-    root.selectedOutputKey = Model.initialOutputKey(root.draftProfile, value.displays)
-    root.profileChoice = root.activeProfile !== "" ? root.activeProfile : root.suggestedProfile
-    root.selectedSavedProfileName = root.profileChoice !== ""
-      ? root.profileChoice
-      : (value.profiles instanceof Array && value.profiles.length > 0 ? String(value.profiles[0].name || "") : "")
+    if (!preserveSelection || !Model.outputByKey(root.draftProfile, root.selectedOutputKey))
+      root.selectedOutputKey = Model.initialOutputKey(root.draftProfile, value.displays)
+    if (!preserveSelection || !Model.savedProfileByName(value, root.profileChoice))
+      root.profileChoice = root.activeProfile !== "" ? root.activeProfile : root.suggestedProfile
+    if (!preserveSelection || !Model.savedProfileByName(value, root.selectedSavedProfileName))
+      root.selectedSavedProfileName = root.profileChoice !== ""
+        ? root.profileChoice
+        : (value.profiles instanceof Array && value.profiles.length > 0 ? String(value.profiles[0].name || "") : "")
     root.saveName = root.sourceProfile
     root.editorReady = true
     root.editorLoading = false
     root.editPending = false
     root.draftDirty = false
     root.creatingProfile = false
+    root.reusedTemplateName = ""
+    root.reuseNotice = ""
+    root.reuseTopologyChanged = false
+    root.editorRetry = false
     Qt.callLater(function() {
       root.normalizeWorkspaceCursor()
       if (root.activePage === "workspaces") root.ensureManualWorkspaceRules()
@@ -516,10 +597,25 @@ Panel {
   }
 
   function editDraft(edit) {
-    if (!root.managedChecked || !root.editorReady || root.editPending || root.previewTransaction !== "") return
+    if (!root.managedChecked || !root.editorReady || root.editPending || root.reusePending || root.previewTransaction !== "") return
     root.lastError = ""
     root.editPending = true
     root.send("edit_profile", { profile: root.draftProfile, edit: edit })
+  }
+
+  function identifyOutput(key, profile) {
+    if (root.identifyBlockedByPreview) {
+      displayIdentify.clear()
+      return
+    }
+    if (!root.backendConnected || !root.editorReady || root.editorLoading || root.editorSnapshotStale) {
+      root.lastError = "The display list changed. Refresh it before identifying a monitor."
+      return
+    }
+    var output = Model.outputByKey(profile || root.draftProfile, key)
+    if (!displayIdentify.identify(output, root.editorDocument.profile, root.editorDocument.displays))
+      root.lastError = displayIdentify.lastError
+    else root.lastError = ""
   }
 
   function editOutput(fields, key) {
@@ -744,7 +840,7 @@ Panel {
   }
 
   function loadSelectedSavedProfile() {
-    if (!root.selectedSavedProfile) return
+    if (!root.selectedSavedProfile || root.reusePending) return
     root.draftProfile = Model.clone(root.selectedSavedProfile)
     root.profileDefaults = Model.clone(root.selectedSavedProfile)
     root.workspacePlan = Model.clone(root.selectedSavedWorkspacePlan) || []
@@ -759,6 +855,73 @@ Panel {
     root.activePage = "layout"
     root.keyboardLayoutPane = "canvas"
     root.lastError = ""
+    root.reusedTemplateName = ""
+    root.reuseNotice = ""
+  }
+
+  function openLayoutReuse(name) {
+    if (!root.editorReady || root.editorLoading || root.draftDirty || root.creatingProfile || root.reusePending
+        || root.previewTransaction !== "" || root.previewPending) return
+    root.expanded = true
+    root.activePage = "reuse"
+    root.reuseStatus = ""
+    root.reuseTopologyChanged = root.editorSnapshotStale
+    if (name) reusePane.choose(name)
+    else reusePane.reset()
+    Qt.callLater(function() { reusePane.focusFirst() })
+  }
+
+  function reuseLayout(name, mapping) {
+    if (!root.managedChecked || !root.editorReady || root.editorLoading || root.readPending || root.editorSnapshotStale || root.reusePending || root.draftDirty
+        || root.creatingProfile || root.editPending || root.previewTransaction !== "" || root.previewPending) return
+    root.lastError = ""
+    root.reusePending = true
+    root.send("reuse_profile", { name: name, mapping: mapping }, {
+      templateName: name,
+      generation: ++root.reuseGeneration,
+      monitorSignature: Model.monitorStateSignature(root.monitorSummaries),
+      topologyRevision: root.monitorTopologyRevision,
+      monitor_set_hash: String((root.editorDocument || {}).monitor_set_hash || "")
+    })
+  }
+
+  function acceptReusedLayout(result, context) {
+    if (context.generation !== root.reuseGeneration) return
+    root.reusePending = false
+    if (root.draftDirty || root.creatingProfile || root.previewTransaction !== "" || root.previewPending) {
+      root.lastError = "The draft changed while the layout was prepared. Your current draft was kept."
+      return
+    }
+    if (context.topologyRevision !== root.monitorTopologyRevision
+        || context.monitorSignature !== Model.monitorStateSignature(root.monitorSummaries)
+        || !Model.monitorSnapshotsMatch(context, result)
+        || !Model.monitorSnapshotsMatch(root.document, result)) {
+      root.lastError = "The displays changed. Check the monitor assignments and try again."
+      root.queueEditorRefresh(true)
+      root.statusRetry = true
+      return
+    }
+    if (!result || !result.profile || !Array.isArray(result.profile.outputs)) {
+      root.lastError = "hyprmoncfg returned an invalid layout draft."
+      return
+    }
+    root.draftProfile = Model.clone(result.profile)
+    root.profileDefaults = Model.clone(result.profile)
+    root.workspacePlan = Array.isArray(result.workspace_plan) ? result.workspace_plan : []
+    root.sourceProfile = ""
+    root.reusedTemplateName = context.templateName
+    root.saveName = Reuse.nextName(context.templateName, root.savedProfiles)
+    root.draftDirty = true
+    root.creatingProfile = true
+    root.selectedOutputKey = Model.initialOutputKey(root.draftProfile, root.editorDocument.displays)
+    var workspaceSettings = (root.draftProfile || {}).workspaces || {}
+    root.manualWorkspaceRulesInitialized = String(workspaceSettings.strategy || "") === "manual"
+      && Array.isArray(workspaceSettings.rules) && workspaceSettings.rules.length > 0
+    root.reuseNotice = "Copied " + context.templateName + " for these monitors. "
+      + ((result.warnings || []).length ? result.warnings.join(" ") : "Check the layout, then preview and save.")
+    root.activePage = "layout"
+    root.keyboardLayoutPane = "canvas"
+    Qt.callLater(function() { profileNameInput.forceActiveFocus() })
   }
 
   function deleteSelectedSavedProfile() {
@@ -769,6 +932,7 @@ Panel {
   }
 
   function beginExecEdit() {
+    if (root.reusePending) return
     if (!root.selectedSavedProfile) return
     root.execDraft = String(root.selectedSavedProfile.exec || "")
     root.execEditing = true
@@ -856,10 +1020,14 @@ Panel {
   }
 
   function previewDraft() {
-    if (!root.managedChecked) return
+    if (!root.managedChecked || root.reusePending) return
     var name = root.draftName()
     if (name === "") {
       root.lastError = "Give this layout a profile name before previewing it."
+      return
+    }
+    if (root.reusedTemplateName !== "" && root.savedProfiles.some(function(profile) { return profile.name === name })) {
+      root.lastError = "Choose a new profile name to keep the existing saved layouts."
       return
     }
     root.lastError = ""
@@ -881,7 +1049,7 @@ Panel {
   }
 
   function applyDraft() {
-    if (!root.managedChecked || root.previewTransaction !== "" || root.previewPending) return
+    if (!root.managedChecked || root.reusePending || root.previewTransaction !== "" || root.previewPending) return
     var name = root.draftName() || "draft"
     var profile = Model.namedProfile(root.draftProfile, name)
     root.lastError = ""
@@ -912,6 +1080,7 @@ Panel {
   }
 
   function handleExpandedMove(dx, dy) {
+    if (root.reusePending) return
     if (root.keyboardHelpOpen) {
       root.keyboardHelpOpen = false
       return
@@ -930,6 +1099,7 @@ Panel {
   }
 
   function handleExpandedActivate(returnPressed) {
+    if (root.reusePending) return
     if (root.keyboardHelpOpen) {
       root.keyboardHelpOpen = false
       return
@@ -960,6 +1130,7 @@ Panel {
   }
 
   function handleExpandedText(text) {
+    if (root.reusePending) return
     var key = String(text || "")
     if (root.keyboardHelpOpen) {
       root.keyboardHelpOpen = false
@@ -970,8 +1141,9 @@ Panel {
       else if (key === "n" || key === "N") root.revertPreview()
       return
     }
-    if (key === "1" || key === "2" || key === "3") {
-      root.activePage = key === "1" ? "layout" : (key === "2" ? "profiles" : "workspaces")
+    if (key === "1" || key === "2" || key === "3" || key === "4") {
+      if (key === "4") root.openLayoutReuse()
+      else root.activePage = key === "1" ? "layout" : (key === "2" ? "profiles" : "workspaces")
       return
     }
     if (key === "?") {
@@ -1020,6 +1192,7 @@ Panel {
   }
 
   function previewProfile(name) {
+    if (root.reusePending) return
     var selected = String(name || root.profileChoice || "")
     if (selected === "") return
     if (!root.managedChecked) return
@@ -1051,6 +1224,7 @@ Panel {
   }
 
   function setProfileAutomatic(enabled) {
+    if (root.reusePending) return
     if (!root.managedChecked || !root.backendConnected || root.profileModePending || root.previewTransaction !== "") return
     root.lastError = ""
     if (enabled && root.activeProfile !== "") {
@@ -1062,7 +1236,7 @@ Panel {
   }
 
   function beginCreateProfile() {
-    if (!root.managedChecked || !root.editorReady || root.previewTransaction !== "" || root.previewPending) return
+    if (!root.managedChecked || !root.editorReady || root.reusePending || root.previewTransaction !== "" || root.previewPending) return
     root.lastError = ""
     root.profileDefaults = Model.clone(root.draftProfile)
     root.sourceProfile = ""
@@ -1117,9 +1291,23 @@ Panel {
 
   function updateDocument(value) {
     if (!value || typeof value !== "object") return
+    root.statusRetry = false
+    root.displaysConnecting = false
+    if (root.lastError === "Displays are still connecting; try again shortly.") root.lastError = ""
+    var monitorsChanged = Model.monitorStateSignature(root.monitorSummaries)
+      !== Model.monitorStateSignature(value.monitors)
+      || String((root.document || {}).monitor_set_hash || "") !== String(value.monitor_set_hash || "")
     root.document = value
     root.documentReady = true
     root.syncDaemonPreview(value.daemon ? value.daemon.preview : null)
+    if (monitorsChanged) {
+      root.monitorTopologyRevision++
+      root.queueEditorRefresh(true)
+    }
+    if (monitorsChanged && root.activePage === "reuse") {
+      root.reuseTopologyChanged = true
+      root.reuseStatus = "The displays changed. Review the refreshed assignments before continuing."
+    }
     if (root.serviceActionPending) {
       var unmanaged = !!(value.daemon && value.daemon.unmanaged)
       if (root.serviceTargetManaged === !unmanaged) {
@@ -1171,20 +1359,46 @@ Panel {
     var method = root.pendingMethods[String(envelope.id)] || ""
     var context = root.pendingContexts[String(envelope.id)] || ({})
     delete root.pendingMethods[String(envelope.id)]
+    root.pendingMethods = Object.assign({}, root.pendingMethods)
     delete root.pendingContexts[String(envelope.id)]
+    if (method === "reuse_profile" && context.generation !== root.reuseGeneration) return
     if (envelope.error) {
+      if (method === "reuse_profile") root.reusePending = false
       if (method === "editor_state") root.editorLoading = false
       if (method === "edit_profile") root.editPending = false
       if (method === "preview" || method === "commit" || method === "revert") root.previewPending = false
       if (method === "set_profile_auto") root.profileModePending = false
       root.lastError = String(envelope.error.message || "hyprmoncfg request failed")
+      if (envelope.error.code === "compositor_busy") {
+        root.displaysConnecting = true
+        root.statusRetry = true
+        if (method === "editor_state" || method === "reuse_profile") {
+          root.editorRetry = true
+          root.queueEditorRefresh(method === "reuse_profile" || context.automaticEditorRefresh === true)
+        }
+      }
       return
+    }
+    if (method === "editor_state") {
+      var snapshotChanged = !Model.monitorSnapshotsMatch(root.document, envelope.result)
+      if (snapshotChanged || context.topologyRevision !== root.monitorTopologyRevision
+          || (context.automaticEditorRefresh
+            && (root.editorRefreshBlocked
+              || context.interactionRevision !== root.editorInteractionRevision))) {
+        root.editorLoading = false
+        root.queueEditorRefresh(context.automaticEditorRefresh === true)
+        // A newer editor snapshot can arrive before status, or after a lost
+        // status event. Refresh status as well so recovery can make progress.
+        if (snapshotChanged) root.statusRetry = true
+        return
+      }
     }
     if (method === "status" || method === "subscribe") {
       root.updateDocument(envelope.result)
       if (method === "subscribe" && root.opened) root.requestEditorState()
     }
-    else if (method === "editor_state") root.updateEditor(envelope.result)
+    else if (method === "editor_state") root.updateEditor(envelope.result, context.automaticEditorRefresh === true)
+    else if (method === "reuse_profile") root.acceptReusedLayout(envelope.result, context)
     else if (method === "edit_profile") {
       var result = envelope.result || {}
       if (!result.profile || !(result.profile.outputs instanceof Array)) {
@@ -1279,6 +1493,9 @@ Panel {
       brightnessSelectionTimer.restart()
     } else {
       brightnessSetDebounce.stop()
+      root.reuseGeneration++
+      root.reusePending = false
+      displayIdentify.clear()
     }
   }
 
@@ -1301,8 +1518,16 @@ Panel {
         root.pendingContexts = ({})
         root.editorReady = false
         root.editorLoading = false
+        root.editorRefreshQueued = false
+        root.editorResetQueued = false
+        root.monitorTopologyRevision++
         root.editPending = false
         root.profileModePending = false
+        root.reusePending = false
+        root.reuseGeneration++
+        root.statusRetry = false
+        root.editorRetry = false
+        root.displaysConnecting = false
         root.clearPreview(false)
         if (root.compatible && (root.serviceEnabled || root.serviceActive))
           serviceRefreshTimer.restart()
@@ -1443,6 +1668,31 @@ Panel {
   }
 
   Process { id: tuiProcess }
+
+  DisplayIdentify {
+    id: displayIdentify
+    accent: Color.accent
+    fontFamily: root.fontFamily
+  }
+
+  // Status events arrive while the panel remains open, including hotplug and
+  // automatic profile changes. Refresh its separate editor snapshot after the
+  // burst settles, preserving edits and waiting for any in-flight read.
+  Timer {
+    interval: 1000
+    repeat: true
+    running: root.opened && root.backendConnected && (root.statusRetry || root.editorRetry)
+    onTriggered: root.retryConnectingDisplays()
+  }
+
+  Timer {
+    id: editorRefreshTimer
+    interval: 200
+    repeat: true
+    running: root.backendConnected && (root.editorResetQueued
+      || (root.editorRefreshQueued && !root.editorRefreshBlocked))
+    onTriggered: root.requestEditorState(!root.editorResetQueued)
+  }
 
   Timer {
     id: brightnessSelectionTimer
@@ -1596,8 +1846,9 @@ Panel {
         stop()
         return
       }
-      if (root.bar && typeof root.bar.summonBarWidget === "function")
-        root.bar.summonBarWidget(root.moduleName)
+      var host = root.bar && root.bar.shell ? root.bar.shell : null
+      if (host && typeof host.summon === "function")
+        host.summon(root.moduleName, "")
       if (attempts >= 20) stop()
     }
   }
@@ -1703,7 +1954,7 @@ Panel {
       id: keyCatcher
       anchors.fill: parent
       property bool returnPressed: false
-      blocked: root.execEditing
+      blocked: root.activePage === "reuse" || root.execEditing
         || profileNameInput.activeFocus
         || positionXField.field.activeFocus || positionYField.field.activeFocus
         || workspaceCountField.field.activeFocus || workspaceGroupSizeField.field.activeFocus
@@ -1975,6 +2226,7 @@ Panel {
               accent: Color.accent
               fontFamily: root.fontFamily
               onOutputSelected: function(key) { root.selectedOutputKey = key }
+              onOutputIdentifyRequested: function(key) { root.identifyOutput(key) }
               onOutputMoved: function(key, x, y, snapDistance) {
                 root.editOutput({ x: x, y: y, snap_distance: snapDistance }, key)
               }
@@ -2153,6 +2405,19 @@ Panel {
               fontFamily: root.fontFamily
               onClicked: root.beginCreateProfile()
             }
+
+            Button {
+              width: parent.width
+              text: "Use an existing layout…"
+              bordered: true
+              visible: root.savedProfiles.length > 0
+              enabled: root.managedChecked && root.editorReady && !root.editorLoading
+                && !root.draftDirty && !root.creatingProfile && !root.reusePending
+                && root.previewTransaction === "" && !root.previewPending
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              onClicked: root.openLayoutReuse()
+            }
           }
         }
       }
@@ -2170,6 +2435,7 @@ Panel {
           height: Style.space(38)
 
           Row {
+            id: pageNavigation
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(2)
@@ -2179,6 +2445,7 @@ Panel {
 
               Button {
                 required property var modelData
+                focusable: true
                 text: String(modelData.label || "")
                 selected: String(modelData.value || "") === root.activePage
                 foreground: root.foreground
@@ -2186,7 +2453,12 @@ Panel {
                 fontSize: Style.font.caption
                 horizontalPadding: Style.space(7)
                 verticalPadding: Style.space(3)
-                onClicked: root.activePage = String(modelData.value || "layout")
+                enabled: !root.reusePending && (modelData.value !== "reuse"
+                  || (root.editorReady && !root.draftDirty && !root.creatingProfile))
+                onClicked: {
+                  if (modelData.value === "reuse") root.openLayoutReuse()
+                  else root.activePage = String(modelData.value || "layout")
+                }
               }
             }
           }
@@ -2194,11 +2466,13 @@ Panel {
           Row {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
+            width: Math.max(0, parent.width - pageNavigation.width - Style.space(20))
             spacing: Style.space(10)
 
             Text {
               textFormat: Text.PlainText
               anchors.verticalCenter: parent.verticalCenter
+              width: Math.max(0, parent.width - keyboardHelpButton.width - compactButton.width - parent.spacing * 2)
               text: "Current setup  ·  " + root.profileStatusTitle
                 + (!root.managedChecked ? " · read-only"
                   : (root.profileAutomatic ? " · automatic" : " · pinned"))
@@ -2252,6 +2526,7 @@ Panel {
               text: "Compact"
               iconText: "󰊔"
               bordered: true
+              enabled: !root.reusePending
               foreground: root.foreground
               fontFamily: root.fontFamily
               fontSize: Style.font.caption
@@ -2336,14 +2611,62 @@ Panel {
           }
         }
 
+        BorderSurface {
+          id: reuseBanner
+          visible: root.reuseNotice !== "" && root.previewTransaction === ""
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: editorNav.bottom
+          anchors.topMargin: Style.space(8)
+          height: reuseNoticeLabel.implicitHeight + Style.space(20)
+          color: Style.selectedFillFor(root.foreground, Color.accent)
+          borderSpec: Border.controlSpec("normal", root.foreground, Color.accent)
+          radius: Style.cornerRadius
+          Text {
+            id: reuseNoticeLabel
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.margins: Style.space(10)
+            text: root.reuseNotice
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+          }
+        }
+
         Item {
           id: editorBody
           anchors.left: parent.left
           anchors.right: parent.right
-          anchors.top: previewBanner.visible ? previewBanner.bottom : editorNav.bottom
+          anchors.top: previewBanner.visible ? previewBanner.bottom
+            : (reuseBanner.visible ? reuseBanner.bottom : editorNav.bottom)
           anchors.bottom: editorFooter.top
           anchors.topMargin: Style.space(10)
           anchors.bottomMargin: Style.space(10)
+
+          LayoutReusePane {
+            id: reusePane
+            anchors.fill: parent
+            visible: root.activePage === "reuse"
+            profiles: root.savedProfiles
+            liveProfile: root.editorDocument.profile
+            editorDisplays: root.editorDocument.displays
+            available: root.managedChecked && (root.editorDocument.capabilities || []).indexOf("reuse_profile") >= 0
+            busy: root.reusePending || root.editorLoading || root.readPending
+              || root.editorSnapshotStale || root.reuseTopologyChanged
+            statusMessage: root.reuseStatus
+            ownerOpen: root.opened
+            popupParent: keyCatcher
+            foreground: root.foreground
+            dim: root.dim
+            fontFamily: root.fontFamily
+            onUseRequested: function(name, mapping) { root.reuseLayout(name, mapping) }
+            onIdentifyRequested: function(key) { root.identifyOutput(key, root.editorDocument.profile) }
+            onCloseRequested: root.close()
+          }
 
           Item {
             visible: root.activePage === "layout"
@@ -2381,6 +2704,7 @@ Panel {
                 accent: Color.accent
                 fontFamily: root.fontFamily
                 onOutputSelected: function(key) { root.selectedOutputKey = key }
+              onOutputIdentifyRequested: function(key) { root.identifyOutput(key) }
                 onOutputMoved: function(key, x, y, snapDistance) {
                   root.editOutput({ x: x, y: y, snap_distance: snapDistance }, key)
                 }
