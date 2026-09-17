@@ -34,6 +34,8 @@ Item {
   property string targetScreenName: ""
 
   readonly property bool opened: root.stage !== "idle"
+  readonly property bool identifying: identifyOverlay.active
+  readonly property var identifyEntries: identifyOverlay.entries
   readonly property string dialogScreenName: {
     var screens = Quickshell.screens || []
     for (var i = 0; i < screens.length; i++) {
@@ -64,6 +66,18 @@ Item {
     backendSocket.write(JSON.stringify(request) + "\n")
     backendSocket.flush()
     return id
+  }
+
+  // Identification labels live here rather than in the panel so they outlast
+  // the panel closing and per-monitor bar rebuilds. They never compete with a
+  // preview decision: starting a preview clears them.
+  function identify(entries, selectedKey, seconds) {
+    if (root.opened) return false
+    return identifyOverlay.show(entries, selectedKey, seconds)
+  }
+
+  onOpenedChanged: {
+    if (root.opened) identifyOverlay.hide()
   }
 
   function rememberScreen() {
@@ -280,6 +294,10 @@ Item {
     repeat: true
     running: root.socketPath !== "/hyprmoncfgd.sock" && !backendSocket.connected
     onTriggered: backendSocket.connected = true
+  }
+
+  IdentifyOverlay {
+    id: identifyOverlay
   }
 
   Timer {
