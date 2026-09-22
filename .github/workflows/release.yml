@@ -63,4 +63,8 @@ jobs:
             fi
           } > notes.md
 
-          gh release create "$TAG" --title "$title" --notes-file notes.md
+          release_args=()
+          if [[ "$version" == *-* ]]; then
+            release_args+=(--prerelease)
+          fi
+          gh release create "$TAG" --title "$title" --notes-file notes.md "${release_args[@]}"

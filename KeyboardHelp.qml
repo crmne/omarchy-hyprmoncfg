@@ -43,10 +43,11 @@ Item {
         title: "Selected profile",
         bindings: [
           { keys: "↑  ↓", action: "Browse profiles and their saved setup" },
-          { keys: "Enter, a", action: "Apply it in manual profile mode" },
+          { keys: "Enter, a", action: "Preview this profile" },
           { keys: "l", action: "Load it into the layout editor" },
-          { keys: "e", action: "Edit its exec command" },
-          { keys: "d", action: "Delete it" },
+          { keys: "e", action: "Edit post-apply command" },
+          { keys: "d", action: "Delete with confirmation" },
+          { keys: "Shift+F10", action: "Open profile actions" },
           { keys: "Space", action: "Toggle automatic profile selection" }
         ]
       }]

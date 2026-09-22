@@ -30,38 +30,49 @@ BorderSurface {
   readonly property var displays: Model.profileLayoutDisplays(profile, editorDisplays)
   readonly property var bounds: Model.layoutBounds(displays)
   readonly property var metrics: Model.layoutMetrics(bounds, canvas.width, canvas.height, Style.space(8))
-  readonly property string hiddenDisplays: Model.hiddenProfileDisplays(profile)
+  readonly property var nonSpatialDisplays: Model.nonSpatialDisplays(profile, editorDisplays, markDisconnected)
 
   implicitHeight: Style.space(205)
   color: framed ? Qt.rgba(foreground.r, foreground.g, foreground.b, 0.025) : "transparent"
   borderSpec: framed ? Border.controlSpec("normal", foreground, accent) : Border.none()
   radius: framed ? Style.cornerRadius : 0
 
-  Text {
-    textFormat: Text.PlainText
-    id: hiddenLabel
-    visible: root.hiddenDisplays !== ""
+  Flow {
+    id: hiddenStrip
+    visible: root.nonSpatialDisplays.length > 0
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: parent.top
     anchors.leftMargin: Style.space(10)
     anchors.rightMargin: Style.space(10)
     anchors.topMargin: Style.space(7)
-    text: root.hiddenDisplays
-    color: root.dim
-    font.family: root.fontFamily
-    font.pixelSize: Style.font.caption
-    elide: Text.ElideRight
+    spacing: Style.space(4)
+
+    Repeater {
+      model: root.nonSpatialDisplays
+      Button {
+        required property var modelData
+        text: String(modelData.name) + " · " + String(modelData.state)
+        width: Math.min(implicitWidth, hiddenStrip.width)
+        selected: String(modelData.key) === root.selectedKey
+        foreground: root.foreground
+        fontFamily: root.fontFamily
+        fontSize: Style.font.body
+        enabled: root.selectable
+        focusable: root.selectable
+        onClicked: root.outputSelected(String(modelData.key))
+      }
+    }
   }
 
   Item {
     id: canvas
     anchors.left: parent.left
     anchors.right: parent.right
-    anchors.top: hiddenLabel.visible ? hiddenLabel.bottom : parent.top
+    anchors.top: hiddenStrip.visible ? hiddenStrip.bottom : parent.top
     anchors.bottom: parent.bottom
     anchors.margins: Style.space(8)
-    anchors.topMargin: hiddenLabel.visible ? Style.space(5) : Style.space(8)
+    anchors.topMargin: hiddenStrip.visible ? Style.space(5) : Style.space(8)
 
     Repeater {
       model: 8
@@ -96,6 +107,8 @@ BorderSurface {
         property real dragOffsetY: 0
         readonly property bool selected: String(modelData.key || "") === root.selectedKey
         readonly property string workspaceText: Model.workspaceText(root.workspacePlan, modelData.key)
+        readonly property var summary: Model.displaySummary(modelData,
+          Model.editorMetadata(root.editorDisplays, modelData.key), root.workspacePlan)
         readonly property bool disconnected: root.markDisconnected && modelData.connected === false
         readonly property int fullDetailHeight: Style.space(workspaceText !== ""
           ? (disconnected ? 110 : 98)
@@ -124,7 +137,7 @@ BorderSurface {
           Text {
             textFormat: Text.PlainText
             width: parent.width
-            text: String(card.modelData.name || "Display")
+            text: card.summary.connector
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -137,7 +150,7 @@ BorderSurface {
             textFormat: Text.PlainText
             visible: card.hasModelRoom
             width: parent.width
-            text: Model.displayModelLabel(card.modelData, false)
+            text: card.summary.model
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -162,7 +175,7 @@ BorderSurface {
             textFormat: Text.PlainText
             visible: !card.compact && root.detailed
             width: parent.width
-            text: String(card.modelData.mode || "")
+            text: card.summary.mode
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -174,19 +187,7 @@ BorderSurface {
             textFormat: Text.PlainText
             visible: !card.compact && root.detailed
             width: parent.width
-            text: Model.displayScaleLayoutLabel(card.modelData)
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            horizontalAlignment: Text.AlignHCenter
-            elide: Text.ElideRight
-          }
-
-          Text {
-            textFormat: Text.PlainText
-            visible: !card.compact && root.detailed
-            width: parent.width
-            text: "pos " + Number(card.modelData.x || 0) + "," + Number(card.modelData.y || 0)
+            text: card.summary.placement
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -198,7 +199,7 @@ BorderSurface {
             textFormat: Text.PlainText
             visible: card.workspaceText !== ""
             width: parent.width
-            text: card.workspaceText
+            text: card.summary.workspaces
             color: root.emphasis === "layout"
               ? Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.78)
               : root.accent

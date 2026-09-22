@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "crmne.hyprmoncfg",
   "name": "hyprmoncfg: Multi-Monitor Manager for Omarchy",
-  "version": "2.3.5",
+  "version": "2.4.0-rc.1",
   "author": "Carmine Paolino",
   "license": "MIT",
   "description": "Plug your monitors in and the right layout comes back. Save a profile per setup and hyprmoncfg applies it automatically on hotplug, on lid open and close, and after suspend. Layout editor with per-display brightness, snapping, per-output scale and sharpness checking, HDR, wide gamut and ICC colour management, mirroring, rotation, and a workspace planner. Profiles match monitors by make, model and serial rather than the port they are plugged into, so moving a cable does not break your layout.",
@@ -23,7 +23,7 @@
   },
   "hyprmoncfg": {
     "package": "hyprmoncfg",
-    "minimumVersion": "1.18.3",
+    "minimumVersion": "1.19.0-rc.1",
     "protocolVersion": 1
   }
 }

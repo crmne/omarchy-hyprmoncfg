@@ -11,6 +11,46 @@ function panelFunction(name, root, globals = {}) {
   return vm.runInNewContext("(" + source + ")", { root, Model, ...globals })
 }
 
+test("generated to manual conversion retains all-workspace persistence", () => {
+  const profile = { outputs: [{ key: "a", name: "DP-1", enabled: true }],
+    workspaces: { strategy: "sequential", max_workspaces: 4, group_size: 2, monitor_order: ["a"], persist_all: true } }
+  for (const plan of [[], [{ output_key: "a", workspaces: ["1", "2", "3", "4"] }]]) {
+    const rules = Model.manualWorkspaceRulesFromPlan(plan, profile)
+    assert.equal(rules.length, 4)
+    assert.ok(rules.every(rule => rule.persistent))
+    assert.equal(rules.filter(rule => rule.default).length, 1)
+  }
+})
+
+test("persistence keyboard action respects old daemon capability and manual rules", () => {
+  const edits = []
+  const root = { managedChecked: true, editPending: false, previewTransaction: "",
+    draftProfile: { workspaces: { strategy: "sequential", persist_all: false } },
+    workspaceKeyboardIndex: 4, workspaceGroupSizeApplicable: true, workspacePersistenceKeyboardIndex: 4,
+    workspaceStrategy: "sequential", editorDocument: {}, editWorkspaces: value => edits.push(value) }
+  const adjust = panelFunction("adjustWorkspaceKeyboard", root)
+  adjust(1)
+  assert.equal(edits.length, 0)
+  root.editorDocument.workspace_persistence_supported = true
+  adjust(1)
+  assert.equal(edits[0].persist_all, true)
+  root.workspaceStrategy = "manual"
+  adjust(1)
+  assert.equal(edits.length, 1)
+})
+
+test("profile details end with the command and deletion uses native panel controls", () => {
+  const qml = fs.readFileSync(path.join(__dirname,"..","Panel.qml"),"utf8")
+  const details = qml.slice(qml.indexOf("id: profileDetailsPane"),qml.indexOf("id: workspacePlanPane"))
+  assert.ok(details.indexOf('text: "Post-apply command"') > details.indexOf('value: "(not managed)"'))
+  assert.doesNotMatch(qml, /savedEntry.current \? "›/)
+  assert.match(qml, /id: profileMatchText\s+width: Style.space\(58\)\s+horizontalAlignment: Text.AlignRight/)
+  assert.doesNotMatch(qml, /Controls.Dialog/)
+  assert.match(qml, /function open\(\) \{ visible = true; cancelDeleteButton.forceActiveFocus\(\) \}/)
+  assert.match(qml, /KeyNavigation.tab: cancelDeleteButton/)
+  assert.match(qml, /text: "Delete profile"/)
+})
+
 test("footer controls share their tallest natural height and keep naming beside save", () => {
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
   const footer = qml.slice(qml.indexOf("id: editorFooter"), qml.indexOf("\n      KeyboardHelp {"))
@@ -63,8 +103,10 @@ test("the installed backend requirement matches the manifest and upgrade message
   const required = require("../manifest.json").hyprmoncfg.minimumVersion
   assert.equal(qml.match(/Model.versionAtLeast\(versionOutput.text, "([^"]+)"\)/)[1], required)
   assert.ok(qml.includes("hyprmoncfg " + required + " or newer is still required."))
-  assert.equal(Model.versionAtLeast("hyprmoncfg 1.18.2", required), false)
+  assert.equal(Model.versionAtLeast("hyprmoncfg 1.18.4", required), false)
+  assert.equal(Model.versionAtLeast("hyprmoncfg 1.19.0-rc.0", required), false)
   assert.equal(Model.versionAtLeast("hyprmoncfg " + required, required), true)
+  assert.equal(Model.versionAtLeast("hyprmoncfg 1.19.0", required), true)
 })
 
 test("installer and TUI launches release panel focus before starting the terminal", () => {
@@ -179,15 +221,93 @@ function previewGuard() {
   const root = { requestSequence: 0, pendingMethods: {}, transactionId: "", profileName: "",
     deadline: "", seconds: 0, stage: "idle", actionPending: false, requestPending: false,
     saveOnCommit: false, draftApply: false, actionError: "", errorMessage: "",
-    requestFinished() {} }
+    requestFinished() {}, previewFinished() {} }
   Object.defineProperty(root, "opened", { get: () => root.stage !== "idle" })
   const socket = { connected: true, write(line) { requests.push(JSON.parse(line)) }, flush() {} }
   const context = vm.createContext({ root, Model, backendSocket: socket,
+    identifyOverlay: { clear() {}, show() {} }, Quickshell: { screens: [] },
+    identifyTimeout: { restart() {}, stop() {} },
     Hyprland: { focusedMonitor: { name: "eDP-1" } },
     previewClock: { start() {}, stop() {} } })
   vm.runInContext(functions.join("\n") + "\nObject.assign(root, {" + names.join(",") + "})", context)
   return { root, socket, requests, receive(value) { root.handleMessage(JSON.stringify({ protocol_version: 1, ...value })) } }
 }
+
+test("successful coordinated save refreshes the editor baseline, failed saves do not", () => {
+  for (const statusFirst of [false, true]) {
+    const guard = previewGuard()
+    let refreshed = 0
+    const panel = {previewTransaction:"ours",previewPending:true,
+      draftDirty:true,creatingProfile:true, activeProfile:"Desk",
+      requestEditorState() { refreshed++ },normalizeWorkspaceCursor() {}}
+    panel.clearPreview = panelFunction("clearPreview",panel,{previewTimer:{stop(){}}})
+    const qml = fs.readFileSync(path.join(__dirname,"..","Panel.qml"),"utf8")
+    const handler = qml.match(/function onPreviewFinished\(\) \{([^}]+)\}/)[1]
+    guard.root.previewFinished = () => vm.runInNewContext(handler,{root:panel})
+    guard.root.transactionId="ours"
+    guard.root.saveOnCommit=true
+    guard.root.stage="confirm"
+    guard.root.keep()
+    const id=guard.requests.at(-1).id
+    guard.receive({type:"response",id,error:{message:"disk full"}})
+    assert.equal(refreshed,0)
+    assert.equal(panel.draftDirty,true)
+    assert.equal(guard.root.transactionId,"ours")
+    guard.root.keep()
+    const retryId=guard.requests.at(-1).id
+    if(statusFirst) guard.receive({type:"event",event:"status",data:{daemon:{}}})
+    guard.receive({type:"response",id:retryId,result:{}})
+    assert.equal(refreshed,1)
+    assert.equal(panel.previewTransaction,"")
+    panelFunction("updateEditor",panel,{Qt:{callLater(){}}})({
+      profile:{name:"Desk",outputs:[]},profiles:[{name:"Desk",outputs:[]}],
+      displays:[],source_profile:"Desk",workspace_plan:[]})
+    assert.equal(panel.draftDirty,false)
+    assert.equal(panel.creatingProfile,false)
+    assert.equal(panel.sourceProfile,"Desk")
+  }
+})
+
+test("the guard defaults to 30 seconds and preserves explicit legacy timeouts", () => {
+  for (const [timeout, expected] of [[undefined, 30], [10, 10], [60, 60]]) {
+    const guard = previewGuard()
+    assert.equal(guard.root.startDraftPreview({ name: "Desk" }, timeout), true)
+    assert.equal(guard.requests[0].params.timeout_seconds, expected)
+  }
+})
+
+test("off and mirrored displays remain individually selectable with honest connection labels", () => {
+  const profile = { outputs: [
+    { key: "a", name: "Laptop", enabled: true },
+    { key: "b", name: "Projector", enabled: false },
+    { key: "c", name: "TV", enabled: true, mirror_of: "a" }
+  ] }
+  assert.deepEqual(Model.nonSpatialDisplays(profile, [{ key: "b" }], true), [
+    { key: "b", name: "Projector", state: "Off" },
+    { key: "c", name: "TV", state: "Not connected" }
+  ])
+  assert.equal(Model.nonSpatialDisplays(profile, [], false)[1].state, "Mirrors Laptop")
+  assert.deepEqual(Model.nonSpatialDisplays(null, [], true), [])
+})
+
+test("profile deletion waits for confirmation and keeps the original target", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const functions = qml.match(/^  function (?:deleteSelectedSavedProfile|confirmProfileDelete)\([\s\S]*?^  }/gm)
+  const requests = []
+  let opened = false
+  const root = { selectedSavedProfileName: "Laptop", previewTransaction: "", previewPending: false,
+    send(method, params) { requests.push({ method, params: JSON.parse(JSON.stringify(params)) }) } }
+  const context = vm.createContext({ root, deleteConfirmation: { open() { opened = true } } })
+  vm.runInContext(functions.join("\n") + "\nObject.assign(root, { deleteSelectedSavedProfile, confirmProfileDelete })", context)
+  root.deleteSelectedSavedProfile()
+  assert.equal(opened, true)
+  assert.equal(requests.length, 0)
+  root.selectedSavedProfileName = "Other"
+  root.confirmProfileDelete()
+  assert.deepEqual(requests, [{ method: "delete", params: { name: "Laptop" } }])
+  root.confirmProfileDelete()
+  assert.equal(requests.length, 1)
+})
 
 test("the guard leaves TUI previews alone and adopts abandoned previews", () => {
   const guard = previewGuard()
@@ -311,6 +431,10 @@ test("version compatibility accepts the IPC release and development builds", () 
   assert.equal(Model.versionAtLeast("hyprmoncfg dev", "1.12.0"), true)
   assert.equal(Model.versionAtLeast("hyprmoncfg 1.11.1", "1.12.0"), false)
   assert.equal(Model.versionAtLeast("not installed", "1.12.0"), false)
+  assert.equal(Model.versionAtLeast("hyprmoncfg 1.19.0-rc.0", "1.19.0-rc.1"), false)
+  assert.equal(Model.versionAtLeast("hyprmoncfg 1.19.0-rc.1", "1.19.0-rc.1"), true)
+  assert.equal(Model.versionAtLeast("hyprmoncfg 1.19.0", "1.19.0-rc.1"), true)
+  assert.equal(Model.versionAtLeast("hyprmoncfg 1.19.0-beta.9", "1.19.0-rc.1"), false)
 })
 
 test("layout display data comes from daemon status and matches TUI labels", () => {
@@ -333,7 +457,7 @@ test("layout display data comes from daemon status and matches TUI labels", () =
   assert.equal(displays.length, 1)
   assert.equal(Model.displayModelLabel(displays[0]), "Internal · Samsung Display Corp. ATNA60CL10-0")
   assert.equal(Model.displayModelLabel(displays[0], true), "Internal · ATNA60CL10-0")
-  assert.equal(Model.displayDetailLabel(displays[0]), "2880×1800 · 120 Hz · 1.5x")
+  assert.equal(Model.displayDetailLabel(displays[0]), "2880x1800@120Hz  1.5x")
 })
 
 test("layout preview preserves relative placement", () => {
@@ -425,7 +549,7 @@ test("editor layout derives logical geometry without losing profile fields", () 
   assert.equal(displays[0].width, 2560)
   assert.equal(displays[0].height, 1440)
   assert.equal(displays[0].focused, true)
-  assert.equal(Model.displayScaleLayoutLabel(displays[0]), "1.5x = 2560×1440")
+  assert.equal(Model.displayScaleLayoutLabel(displays[0]), "1.5x = 2560x1440")
   assert.equal(profile.outputs[0].icc, "/profiles/desk.icc")
 })
 
@@ -446,6 +570,20 @@ test("brightness follows the selected connected display without becoming profile
   assert.equal(Model.clampBrightness(42.6), 43)
   assert.equal(Model.clampBrightness(120), 100)
   assert.equal(Object.hasOwn(profile.outputs[0], "brightness"), false)
+})
+
+test("expanded setup status is right aligned with single-spaced separators", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  assert.match(qml, /horizontalAlignment: Text\.AlignRight\s+text: "Current setup · "/)
+  assert.doesNotMatch(qml, /Current setup  ·  /)
+})
+
+test("hardware inspector shows every field directly and only Identify is an action", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "MonitorInfo.qml"), "utf8")
+  assert.match(qml, /model: root\.info\.basic\.concat\(root\.info\.details\)/)
+  assert.doesNotMatch(qml, /detailsExpanded|More details|Less details/)
+  assert.equal((qml.match(/Button\s*\{/g) || []).length, 1)
+  assert.match(qml, /text: "Identify"/)
 })
 
 test("expanded profile and workspace panes use daemon-owned documents", () => {
@@ -763,11 +901,11 @@ test("the panel has management-first compact mode and a TUI-shaped expanded mode
   assert.match(qml, /id: compactColumn/)
   assert.match(qml, /id: expandedEditor/)
   assert.match(qml, /label: "1  Layout"/)
-  assert.match(qml, /label: "2  Profiles"/)
-  assert.match(qml, /label: "3  Workspaces"/)
+  assert.match(qml, /label: "2  Workspaces"/)
+  assert.match(qml, /label: "3  Profiles"/)
   assert.match(qml, /title: "Monitor Layout"/)
-  assert.match(qml, /title: "Info"/)
-  assert.match(qml, /title: "Display  -  Color"/)
+  assert.match(qml, /MonitorInfo \{/)
+  assert.doesNotMatch(qml, /title: "Display  -  Color"/)
   assert.match(qml, /title: "Saved Profiles"/)
   assert.match(qml, /title: "Workspace Planner"/)
   assert.match(qml, /DisplayCanvas \{/)
@@ -845,27 +983,62 @@ test("both inspector forms stay inside a scrollable viewport below the tabs", ()
   assert.match(viewport, /onFocusedFieldChanged:/)
 })
 
-test("the default inspector leaves room for the complete color form", () => {
-  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
-  const pane = fs.readFileSync(path.join(__dirname, "..", "EditorPane.qml"), "utf8")
-  const viewport = qml.slice(qml.indexOf("id: inspectorViewport"))
-  const tabGap = Number(viewport.match(/anchors.topMargin: Style.space\((\d+)\)/)[1])
-  const panelHeight = Number(qml.match(/panel.fittedContentHeight\(Style.space\((\d+)\)\)/)[1])
-  const navHeight = Number(qml.slice(qml.indexOf("id: editorNav")).match(/height: Style.space\((\d+)\)/)[1])
-  const footerHeight = Number(qml.slice(qml.indexOf("id: editorFooter")).match(/height: Math.max\(Style.space\((\d+)\)/)[1])
-  const body = qml.slice(qml.indexOf("id: editorBody"))
-  const bodyInsets = [...body.matchAll(/anchors.(?:top|bottom)Margin: Style.space\((\d+)\)/g)]
-    .slice(0, 2).reduce((sum, match) => sum + Number(match[1]), 0)
-  const infoSpace = Number(qml.match(/height: parent.height - Style.space\((\d+)\)/)[1])
-  const titleHeight = Number(pane.match(/height: Style.space\((\d+)\)/)[1])
-  const bottomInset = Number(pane.match(/anchors.bottomMargin: Style.space\((\d+)\)/)[1])
-  // Measured with the actual Omarchy controls at the default 12px font.
-  // Keep the layout budget coupled to the source: 2.3.2 left only 394px.
-  const tabsHeight = 28
-  const colorFormHeight = 395
-  const available = panelHeight - navHeight - footerHeight - bodyInsets - infoSpace
-    - titleHeight - bottomInset - tabsHeight - tabGap
-  assert.ok(available >= colorFormHeight, `${colorFormHeight}px form exceeds ${available}px viewport`)
+test("monitor information is hardware-only and does not infer maxima from the active mode", () => {
+  const info = Model.monitorHardwareInfo({name:"DP-1",model:"Panel",width:1920,height:1080}, {
+    available_modes:["1920x1080@240Hz","3840x2160@60Hz","bad"],physical_width:708,physical_height:399
+  })
+  assert.deepEqual(info.basic.map(row => row.label), ["Connector","Model","Max resolution"])
+  assert.equal(info.basic[2].value, "3840x2160")
+  assert.equal(info.basic[1].value, "Panel")
+  assert.equal(info.details[0].value, '32" (708x399mm)')
+  assert.equal(Model.monitorHardwareInfo({}, {physical_width:344,physical_height:215}).details[0].value, '16" (344x215mm)')
+  assert.deepEqual(info.details.map(row => row.label), ["Panel size","Type","Serial"])
+  const missing = Model.monitorHardwareInfo({width:1920,height:1080}, {})
+  assert.equal(missing.basic[2].value, "Not reported")
+  assert.doesNotMatch(missing.basic[1].value, /″/)
+})
+
+test("Identify uses shared summaries without numbering and rejects sleeping/off/mirrored screens", () => {
+  const screen = {name:"DP-2", serialNumber:"two"}
+  const doc = {profile:{outputs:[
+    {key:"b",name:"DP-2",serial:"two",width:1920,height:1080},
+    {key:"a",name:"DP-1",width:1920,height:1080,enabled:false}
+  ]},displays:[{key:"a",dpms:true},{key:"b",dpms:true}]}
+  const target = Model.identifyTargets(doc,[screen],"")[0]
+  assert.equal(target.number, undefined)
+  assert.deepEqual(target.summary, Model.displaySummary(doc.profile.outputs[0],doc.displays[1],doc.workspace_plan))
+  assert.equal(target.summary.connector,"DP-2")
+  assert.equal(Model.identifyTargets(doc,[screen],"a").length,0)
+  assert.equal(Model.identifyTargets(doc,[{name:"DP-2",serialNumber:"replacement"}],"b").length,0)
+  doc.displays[1].dpms=false
+  assert.equal(Model.identifyTargets(doc,[screen],"").length,0)
+  doc.displays[1].dpms=true
+  doc.profile.outputs[0].mirror_of="a"
+  assert.equal(Model.identifyTargets(doc,[screen],"").length,0)
+})
+
+test("display summaries keep physical mode separate from canvas geometry", () => {
+  const output = {key:"desk", name:"DP-2", model:"Panel", mode:"3840x2160@143.99Hz",
+    width:3840,height:2160,scale:1.3333334,x:-2880,y:20}
+  const metadata = {key:"desk",physical_width:708,physical_height:399}
+  const plan = [{output_key:"desk",workspaces:[1,2,3,4]}]
+  const summary = Model.displaySummary(output,metadata,plan)
+  assert.equal(summary.model,'Panel 32"')
+  assert.equal(summary.mode,"3840x2160@144Hz")
+  assert.equal(summary.placement,"Scale 1.33x  Position -2880,20")
+  assert.equal(summary.workspaces,"1, 2, 3, 4")
+  const card = Model.profileLayoutDisplays({outputs:[output]},[metadata])[0]
+  assert.deepEqual(Model.displaySummary(card,metadata,plan),summary)
+  assert.equal(Model.displaySummary({}, {}, []).workspaces,"")
+  assert.equal(Model.displaySummary({mode:"preferred"}, {}, []).mode,"preferred")
+})
+
+test("Identify cannot start while another client owns a preview", () => {
+  const guard = previewGuard()
+  guard.root.connected = true
+  guard.receive({type:"event",event:"status",data:{daemon:{preview:{transaction_id:"tui",reclaimable:false}}}})
+  assert.equal(guard.root.identifyDisplays(""),false)
+  assert.equal(guard.requests.length,0)
 })
 
 test("the workspace form hides irrelevant group size and adapts keyboard navigation", () => {
@@ -875,7 +1048,8 @@ test("the workspace form hides irrelevant group size and adapts keyboard navigat
   assert.match(qml, /id: workspaceGroupSizeField\s+visible: root\.workspaceGroupSizeApplicable/)
   assert.match(qml, /width: root\.workspaceGroupSizeApplicable\s+\? \(parent\.width - parent\.spacing\) \/ 2 : parent\.width/)
   // Hiding Group Size also removes its keyboard stop; assignment rows move up.
-  assert.match(qml, /readonly property int workspaceListKeyboardStart: root\.workspaceGroupSizeApplicable \? 4 : 3/)
+  assert.match(qml, /readonly property int workspacePersistenceKeyboardIndex: root\.workspaceGroupSizeApplicable \? 4 : 3/)
+  assert.match(qml, /readonly property int workspaceListKeyboardStart: root\.workspacePersistenceKeyboardIndex \+ 1/)
   assert.match(qml, /root\.workspaceKeyboardIndex === root\.workspaceListKeyboardStart \+ index/)
   assert.doesNotMatch(qml, /root\.workspaceKeyboardIndex === 4 \+ index/)
 })
@@ -980,7 +1154,7 @@ test("manual profile choice is explicit and can return to automatic matching", (
   assert.match(qml, /document\.daemon\.profile_override/)
   assert.match(qml, /root\.send\("set_profile_auto", \{ enabled: enabled \}\)/)
   assert.match(qml, /Automatic matching is paused/)
-  assert.match(qml, /&& !root\.profileAutomatic && root\.managedChecked/)
+  assert.doesNotMatch(qml, /Turn off automatic profile selection before activating/)
   assert.match(qml, /root\.profileChoice = selected\s+root\.previewProfile\(selected\)/)
   assert.match(qml, /Model\.currentProfileName\(root\.document\)/)
   assert.match(qml, /Model\.profileIsCurrent\(modelData, root\.document\)/)
@@ -994,7 +1168,7 @@ test("expanded profiles separate browsing from activation and show saved workspa
 
   assert.match(panelQml, /root\.selectedSavedProfileName = selected/)
   assert.match(panelQml, /id: activateFooterButton/)
-  assert.match(panelQml, /!root\.profileAutomatic && root\.managedChecked/)
+  assert.match(panelQml, /text: "Use this profile"/)
   assert.match(panelQml, /root\.activateSelectedSavedProfile\(\)/)
   assert.match(panelQml, /workspacePlan: root\.selectedSavedWorkspacePlan/)
   assert.match(panelQml, /workspacePlan: root\.selectedSavedWorkspacePlan\s+emphasis: "profile"/)
@@ -1007,7 +1181,7 @@ test("active saved profiles render as status instead of a disabled action", () =
   assert.match(panelQml, /id: currentProfileBadge/)
   assert.match(panelQml, /text: "Current profile"/)
   assert.match(panelQml, /visible: root\.activePage === "profiles"\s+&& root\.selectedSavedProfileCurrent/)
-  assert.match(panelQml, /id: activateFooterButton[\s\S]*?visible: root\.activePage === "profiles"\s+&& !root\.selectedSavedProfileCurrent[\s\S]*?text: "Activate"/)
+  assert.match(panelQml, /id: activateFooterButton[\s\S]*?visible: root\.activePage === "profiles"\s+&& !root\.selectedSavedProfileCurrent[\s\S]*?text: "Use this profile"/)
   assert.doesNotMatch(panelQml, /\? "Active" : "Activate"/)
 })
 
@@ -1052,17 +1226,17 @@ test("layout dragging uses stationary canvas coordinates in both panel sizes", (
   assert.doesNotMatch(canvasQml, /card\.dragOffsetX = mouse\.x - originX/)
 })
 
-test("brightness uses Omarchy's per-monitor hardware path in both panel sizes", () => {
+test("hardware brightness stays in compact mode, outside the profile editor", () => {
   const panelQml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
   const brightnessQml = fs.readFileSync(path.join(__dirname, "..", "BrightnessControl.qml"), "utf8")
 
   assert.match(panelQml, /Model\.brightnessTarget\(root\.draftProfile,/)
   assert.match(panelQml, /\["omarchy-brightness-display", "--monitor", connector\]/)
   assert.match(panelQml, /"--no-osd", "--monitor", connector, percent \+ "%"/)
-  assert.equal((panelQml.match(/BrightnessControl \{/g) || []).length, 2)
+  assert.equal((panelQml.match(/BrightnessControl \{/g) || []).length, 1)
   assert.ok(panelQml.indexOf("BrightnessControl {") < panelQml.indexOf('text: "MONITOR MANAGEMENT"'))
   assert.doesNotMatch(panelQml, /omarchy-brightness-keyboard/)
-  assert.match(brightnessQml, /text: "BRIGHTNESS · " \+ root\.connector/)
+  assert.match(brightnessQml, /text: "Brightness"/)
   assert.match(brightnessQml, /text: "Selected display · " \+ root\.displayLabel/)
   assert.match(brightnessQml, /height: Math\.max\(brightnessSlider\.implicitHeight/)
   assert.match(brightnessQml, /visible: !root\.available/)
@@ -1122,8 +1296,8 @@ test("the layout draws only displays that own their image and names the rest", (
   assert.equal(Model.hiddenDisplays([monitors[0]]), "")
 
   const canvasQml = fs.readFileSync(path.join(__dirname, "..", "DisplayCanvas.qml"), "utf8")
-  assert.match(canvasQml, /id: hiddenLabel/)
-  assert.match(canvasQml, /visible: root\.hiddenDisplays !== ""/)
+  assert.match(canvasQml, /id: hiddenStrip/)
+  assert.match(canvasQml, /visible: root\.nonSpatialDisplays.length > 0/)
 })
 
 test("plugin text never interprets daemon or profile values as rich text", () => {
@@ -1134,7 +1308,7 @@ test("plugin text never interprets daemon or profile values as rich text", () =>
 
   for (const file of qmlFiles) {
     const source = fs.readFileSync(path.join(pluginRoot, file), "utf8")
-    const textItems = source.match(/^\s*Text\s*\{/gm) || []
+    const textItems = source.match(/^\s*(?:\w+:\s*)?Text\s*\{/gm) || []
     const plainTextItems = source.match(/^\s*textFormat:\s*Text\.PlainText\s*$/gm) || []
     assert.equal(plainTextItems.length, textItems.length,
       `${file} must render every Text item as plain text`)
@@ -1160,6 +1334,8 @@ test("an upgraded package whose daemon is still the old binary offers a restart"
   // to say so rather than leave the previous daemon quietly serving profiles.
   assert.equal(Model.daemonNeedsRestart("hyprmoncfg 1.14.0 (abc, 2026-08-18)", "1.13.0"), true)
   assert.equal(Model.daemonNeedsRestart("hyprmoncfg 1.14.0 (abc, 2026-08-18)", "1.14.0"), false)
+  assert.equal(Model.daemonNeedsRestart("hyprmoncfg 1.19.0-rc.1", "1.19.0-rc.0"), true)
+  assert.equal(Model.daemonNeedsRestart("hyprmoncfg 1.19.0-rc.1", "1.19.0-rc.1"), false)
 
   // Nothing to say until both versions are known.
   assert.equal(Model.daemonNeedsRestart("", "1.13.0"), false)
@@ -1179,29 +1355,25 @@ test("an upgraded package whose daemon is still the old binary offers a restart"
   assert.match(qml, /else if \(root\.daemonOutdated\)/)
 })
 
-test("panel updates open the marketplace without changing or reloading plugin code", () => {
-  const opened = []
+test("the panel does not present marketplace verification as an update alert", () => {
   const calls = []
   const activate = panelFunction("activateRow", {
     restartService() { calls.push("restart-service") }
-  }, {
-    Qt: { openUrlExternally(url) { opened.push(url) } }
   })
 
   activate("panel-updates")
-  assert.deepEqual(opened, ["https://plugins.omarchy.org/plugin.html?id=crmne.hyprmoncfg"])
   assert.deepEqual(calls, [])
   activate("restart-service")
   assert.deepEqual(calls, ["restart-service"])
-  assert.equal(opened.length, 1)
   activate("unknown")
-  assert.equal(opened.length, 1)
 
-  // Runtime code must not retain an alternative path around the review page.
+  // Marketplace verification is publication metadata, not a condition the
+  // panel can turn into a useful update alert.
   const runtime = fs.readdirSync(path.join(__dirname, ".."))
     .filter(name => /\.(qml|js)$/.test(name))
     .map(name => fs.readFileSync(path.join(__dirname, "..", name), "utf8"))
     .join("\n")
+  assert.doesNotMatch(runtime, /Panel updates|Review marketplace verification|panel-updates/)
   assert.doesNotMatch(runtime, /omarchy(?:-| )plugin(?:-| )update|git[^\n]*fetch|FETCH_HEAD|omarchy(?:-| )restart(?:-| )shell/)
 })
 

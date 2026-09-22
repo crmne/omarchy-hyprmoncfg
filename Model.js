@@ -104,18 +104,12 @@ function displayModelLabel(display, compact) {
 function displayDetailLabel(display) {
   var monitor = display || {}
   var mode = String(monitor.mode || "").trim()
-  var match = mode.match(/^(\d+)x(\d+)(?:@([\d.]+)Hz)?$/)
   var parts = []
-  if (match) {
-    parts.push(match[1] + "×" + match[2])
-    if (match[3]) parts.push(Math.round(Number(match[3])) + " Hz")
-  } else if (mode !== "") {
-    parts.push(mode)
-  }
+  if (mode !== "") parts.push(formatDisplayMode(mode))
   var scale = Number(monitor.scale || 1)
   if (!isFinite(scale) || scale <= 0) scale = 1
   parts.push(String(Math.round(scale * 100) / 100) + "x")
-  return parts.join(" · ")
+  return parts.join("  ")
 }
 
 function displayScaleLayoutLabel(display) {
@@ -124,7 +118,7 @@ function displayScaleLayoutLabel(display) {
   if (!isFinite(scale) || scale <= 0) scale = 1
   var logicalWidth = Math.max(1, Math.round(Number(monitor.width || 1)))
   var logicalHeight = Math.max(1, Math.round(Number(monitor.height || 1)))
-  return formatScale(scale) + "x = " + logicalWidth + "×" + logicalHeight
+  return formatScale(scale) + "x = " + logicalWidth + "x" + logicalHeight
 }
 
 function layoutBounds(displays) {
@@ -249,6 +243,96 @@ function profileLayoutDisplays(profile, editorDisplays) {
       width: logical.width,
       height: logical.height
     })
+  }
+  return result
+}
+
+function nonSpatialDisplays(profile, editorDisplays, markDisconnected) {
+  var outputs = profile && profile.outputs instanceof Array ? profile.outputs : []
+  var result = []
+  for (var i = 0; i < outputs.length; i++) {
+    var output = outputs[i] || {}
+    var mirror = mirrorTarget(output)
+    if (output.enabled !== false && mirror === "") continue
+    var connected = Object.keys(editorMetadata(editorDisplays, output.key)).length > 0
+    var state = markDisconnected && !connected ? "Not connected"
+      : (output.enabled === false ? "Off" : "Mirrors " + outputName(profile, mirror))
+    result.push({ key: String(output.key || ""), name: String(output.name || "Display"), state: state })
+  }
+  return result
+}
+
+function monitorHardwareInfo(output, metadata) {
+  var item = output || {}, meta = metadata || {}
+  var modes = meta.available_modes instanceof Array ? meta.available_modes : []
+  var bestWidth = 0, bestHeight = 0
+  for (var i = 0; i < modes.length; i++) {
+    var match = String(modes[i]).match(/^(\d+)x(\d+)(?:@|$)/)
+    if (!match) continue
+    var w = Number(match[1]), h = Number(match[2])
+    if (w * h > bestWidth * bestHeight) { bestWidth = w; bestHeight = h }
+  }
+  var width = Number(meta.physical_width || 0), height = Number(meta.physical_height || 0)
+  var validSize = isFinite(width) && isFinite(height) && width > 0 && height > 0
+  var diagonal = validSize ? Math.sqrt(width * width + height * height) / 25.4 : 0
+  return {
+    basic: [
+      { label: "Connector", value: String(item.name || "Not reported") },
+      { label: "Model", value: displayModelLabel(item, false) },
+      { label: "Max resolution", value: bestWidth > 0 ? bestWidth + "x" + bestHeight : "Not reported" }
+    ],
+    details: [
+      { label: "Panel size", value: validSize ? Math.round(diagonal) + '" (' + width + "x" + height + "mm)" : "Not reported" },
+      { label: "Type", value: displayType(meta, item) },
+      { label: "Serial", value: String(item.serial || "").trim() || "Not reported" }
+    ]
+  }
+}
+
+function formatDisplayMode(mode) {
+  mode = String(mode || "")
+  var match = mode.match(/^(\d+)x(\d+)(?:@([\d.]+)(?:Hz)?)?$/i)
+  if (match) {
+    mode = match[1] + "x" + match[2]
+      + (match[3] ? "@" + Number(Number(match[3]).toFixed(1)) + "Hz" : "")
+  }
+  return mode
+}
+
+// Shared presentation for draft canvas cards and fresh live Identify snapshots.
+function displaySummary(output, metadata, plan) {
+  var item = output || {}, info = monitorHardwareInfo(item, metadata)
+  var mode = formatDisplayMode(outputMode(item))
+  var scale = Number(item.scale || 1)
+  if (!isFinite(scale) || scale <= 0) scale = 1
+  var workspaces = workspaceText(plan, item.key)
+  var panelSize = info.details[0].value
+  var sizeSuffix = panelSize === "Not reported" ? "" : " " + panelSize.split(" ")[0]
+  return {
+    connector: String(item.name || "Display"),
+    model: info.basic[1].value + sizeSuffix,
+    mode: mode,
+    placement: "Scale " + Number(scale.toFixed(2)) + "x  Position "
+      + Number(item.x || 0) + "," + Number(item.y || 0),
+    workspaces: workspaces
+  }
+}
+
+function identifyTargets(editor, screens, selectedKey) {
+  var doc = editor || {}, profile = doc.profile || {}, outputs = profile.outputs || []
+  var result = []
+  for (var i = 0; i < outputs.length; i++) {
+    var out = outputs[i], meta = editorMetadata(doc.displays, out.key)
+    if (selectedKey && out.key !== selectedKey) continue
+    if (Object.keys(meta).length === 0 || out.enabled === false || mirrorTarget(out) !== ""
+        || meta.dpms !== true || Number(out.width) <= 0 || Number(out.height) <= 0) continue
+    for (var j = 0; j < screens.length; j++) {
+      var screen = screens[j]
+      if (String(screen.name) !== String(out.name)) continue
+      if (out.serial && screen.serialNumber && String(out.serial) !== String(screen.serialNumber)) continue
+      result.push({ screen: screen, summary: displaySummary(out, meta, doc.workspace_plan) })
+      break
+    }
   }
   return result
 }
@@ -502,7 +586,7 @@ function modeOptions(editorDisplays, key) {
   var modes = metadata.available_modes instanceof Array ? metadata.available_modes : []
   return modes.map(function(mode) {
     var value = String(mode || "")
-    return { value: value, label: displayDetailLabel({ mode: value, scale: 1 }).replace(/ · 1x$/, "") }
+    return { value: value, label: formatDisplayMode(value) }
   })
 }
 
@@ -750,7 +834,7 @@ function normalizeManualWorkspaceDefaults(rules) {
     var rule = items[i] || {}
     var target = String(rule.output_key || rule.output_name || "")
     rule.default = false
-    rule.persistent = false
+    rule.persistent = !!rule.persistent
     if (target !== "" && !seen["key:" + target]) {
       rule.default = true
       rule.persistent = true
@@ -763,6 +847,7 @@ function normalizeManualWorkspaceDefaults(rules) {
 
 function manualWorkspaceRulesFromPlan(plan, profile) {
   var rows = plan instanceof Array ? plan : []
+  var persistAll = !!((profile || {}).workspaces || {}).persist_all
   var rules = []
   for (var i = 0; i < rows.length; i++) {
     var row = rows[i] || {}
@@ -772,7 +857,8 @@ function manualWorkspaceRulesFromPlan(plan, profile) {
       rules.push({
         workspace: String(workspaces[j] || ""),
         output_key: key,
-        output_name: outputName(profile, key)
+        output_name: outputName(profile, key),
+        persistent: persistAll
       })
     }
   }
@@ -794,7 +880,8 @@ function manualWorkspaceRulesFromPlan(plan, profile) {
     rules.push({
       workspace: String(workspace),
       output_key: target,
-      output_name: outputName(profile, target)
+      output_name: outputName(profile, target),
+      persistent: persistAll
     })
   }
   return normalizeManualWorkspaceDefaults(rules)
@@ -913,7 +1000,7 @@ function namedProfile(profile, name) {
 // releaseVersion pulls the plain version out of `hyprmoncfg version` output,
 // which also carries a commit and a build date.
 function releaseVersion(output) {
-  var match = String(output || "").match(/(\d+\.\d+\.\d+)/)
+  var match = String(output || "").match(/v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)/)
   return match ? match[1] : ""
 }
 
@@ -931,16 +1018,34 @@ function versionAtLeast(output, minimum) {
   if (/\bdev\b/.test(text)) return true
 
   function parts(value) {
-    var match = String(value || "").match(/v?(\d+)\.(\d+)\.(\d+)/)
-    return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null
+    var match = String(value || "").match(/v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?/)
+    return match ? {
+      core: [Number(match[1]), Number(match[2]), Number(match[3])],
+      pre: match[4] ? match[4].split(".") : []
+    } : null
   }
 
   var current = parts(text)
   var wanted = parts(minimum)
   if (!current || !wanted) return false
   for (var i = 0; i < 3; i++) {
-    if (current[i] > wanted[i]) return true
-    if (current[i] < wanted[i]) return false
+    if (current.core[i] > wanted.core[i]) return true
+    if (current.core[i] < wanted.core[i]) return false
+  }
+  if (current.pre.length === 0) return true
+  if (wanted.pre.length === 0) return false
+  var count = Math.max(current.pre.length, wanted.pre.length)
+  for (var j = 0; j < count; j++) {
+    if (j >= current.pre.length) return false
+    if (j >= wanted.pre.length) return true
+    var a = current.pre[j]
+    var b = wanted.pre[j]
+    if (a === b) continue
+    var aNumeric = /^\d+$/.test(a)
+    var bNumeric = /^\d+$/.test(b)
+    if (aNumeric && bNumeric) return Number(a) > Number(b)
+    if (aNumeric !== bNumeric) return !aNumeric
+    return a > b
   }
   return true
 }
@@ -965,6 +1070,10 @@ if (typeof module !== "undefined") {
     outputMode: outputMode,
     profileLayoutDisplays: profileLayoutDisplays,
     hiddenProfileDisplays: hiddenProfileDisplays,
+    monitorHardwareInfo: monitorHardwareInfo,
+    displaySummary: displaySummary,
+    identifyTargets: identifyTargets,
+    nonSpatialDisplays: nonSpatialDisplays,
     outputByKey: outputByKey,
     wrapIndex: wrapIndex,
     adjacentOutputKey: adjacentOutputKey,

@@ -32,6 +32,36 @@ Item {
   property string errorMessage: ""
   property string actionError: ""
   property string targetScreenName: ""
+  property bool foreignPreviewActive: false
+  property bool identifyPending: false
+  property string identifyKey: ""
+  property string identifyRequestId: ""
+  property string identifyError: ""
+
+  function identifyDisplays(key) {
+    root.identifyError = ""
+    if (!root.connected || root.opened || root.foreignPreviewActive || root.identifyPending) {
+      root.identifyError = "Identify is unavailable while a preview is active or the service is busy."
+      return false
+    }
+    root.identifyKey = String(key || "")
+    root.identifyPending = true
+    identifyOverlay.clear()
+    root.identifyRequestId = root.send("editor_state", {})
+    identifyTimeout.restart()
+    return true
+  }
+
+  DisplayIdentify { id: identifyOverlay }
+  Timer {
+    id: identifyTimeout
+    interval: 7000
+    onTriggered: {
+      root.identifyPending = false
+      root.identifyError = "Reading displays timed out. Try Identify again."
+    }
+  }
+  onOpenedChanged: if (opened) identifyOverlay.clear()
 
   readonly property bool opened: root.stage !== "idle"
   readonly property string dialogScreenName: {
@@ -104,7 +134,7 @@ Item {
     var value = profile || ({})
     return root.beginPreview({
       profile: value,
-      timeout_seconds: Math.max(1, Number(timeoutSeconds || 10)),
+      timeout_seconds: Math.max(1, Number(timeoutSeconds || 30)),
       save_on_commit: true
     }, String(value.name || "Display layout"), true, true)
   }
@@ -113,7 +143,7 @@ Item {
     var value = profile || ({})
     return root.beginPreview({
       profile: value,
-      timeout_seconds: Math.max(1, Number(timeoutSeconds || 10)),
+      timeout_seconds: Math.max(1, Number(timeoutSeconds || 30)),
       save_on_commit: false
     }, String(value.name || "Display layout"), false, true)
   }
@@ -123,7 +153,7 @@ Item {
     if (selected === "") return false
     return root.beginPreview({
       profile_name: selected,
-      timeout_seconds: Math.max(1, Number(timeoutSeconds || 10))
+      timeout_seconds: Math.max(1, Number(timeoutSeconds || 30))
     }, selected, false, false)
   }
 
@@ -210,6 +240,9 @@ Item {
 
   function updateDocument(value) {
     if (!value || typeof value !== "object") return
+    identifyOverlay.clear()
+    root.foreignPreviewActive = !!(value.daemon && value.daemon.preview)
+    if (root.foreignPreviewActive) identifyOverlay.clear()
     root.syncPreview(value.daemon ? value.daemon.preview : null)
   }
 
@@ -225,6 +258,11 @@ Item {
     delete root.pendingMethods[String(envelope.id)]
     if (envelope.error) {
       var message = String(envelope.error.message || "hyprmoncfg request failed")
+      if (method === "editor_state") {
+        root.identifyPending = false
+        identifyTimeout.stop()
+        root.identifyError = message
+      }
       if (method === "preview") {
         root.requestPending = false
         root.stage = "error"
@@ -237,7 +275,16 @@ Item {
       return
     }
 
-    if (method === "subscribe" || method === "status") {
+    if (method === "editor_state") {
+      if (String(envelope.id) !== root.identifyRequestId) return
+      if (!root.identifyPending) return
+      root.identifyPending = false
+      identifyTimeout.stop()
+      if (root.opened || root.foreignPreviewActive) return
+      var targets = Model.identifyTargets(envelope.result, Quickshell.screens || [], root.identifyKey)
+      if (!targets.length) root.identifyError = "No awake, enabled display is available to identify."
+      else identifyOverlay.show(targets)
+    } else if (method === "subscribe" || method === "status") {
       root.updateDocument(envelope.result)
     } else if (method === "preview") {
       var transaction = envelope.result || ({})
@@ -250,10 +297,12 @@ Item {
       root.requestFinished(true, "")
     } else if (method === "commit" || method === "revert") {
       root.clear()
+      root.previewFinished()
     }
   }
 
   Component.onCompleted: backendSocket.connected = root.socketPath !== "/hyprmoncfgd.sock"
+  signal previewFinished()
 
   Socket {
     id: backendSocket
@@ -266,6 +315,9 @@ Item {
     onConnectedChanged: {
       if (connected) root.send("subscribe", {})
       else {
+        root.identifyPending = false
+        identifyTimeout.stop()
+        identifyOverlay.clear()
         var wasPending = root.requestPending
         root.pendingMethods = ({})
         root.clear()

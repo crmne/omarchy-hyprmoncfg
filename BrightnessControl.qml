@@ -31,7 +31,7 @@ Column {
       anchors.right: brightnessValue.left
       anchors.rightMargin: Style.space(8)
       anchors.verticalCenter: parent.verticalCenter
-      text: "BRIGHTNESS · " + root.connector
+      text: "Brightness"
       elide: Text.ElideRight
       foreground: root.foreground
       fontFamily: root.fontFamily

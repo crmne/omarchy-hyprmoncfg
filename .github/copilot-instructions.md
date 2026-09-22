@@ -1,8 +1,31 @@
 # Copilot instructions
 
-Read and follow `AGENTS.md` and `README.md` before reviewing or changing this
-repository. Keep changes narrowly scoped and preserve existing behavior unless
-the task explicitly changes it.
+For display/profile UI work, follow AGENTS.md's Presentation consistency rules
+and the shared design's Accepted display presentation section. Check helper reuse,
+hardware/live-state separation, compact resolution@Hz formatting, Post-apply
+command naming/order, anchored menus, themed confirmations, and save-success
+baseline handling. Keep remaining panel/TUI capability gaps explicit.
+
+Read and follow `AGENTS.md`, `DESIGN.md`, and `README.md` before reviewing or
+changing this repository. The shared design lives in `crmne/hyprmoncfg/DESIGN.md`.
+Distinguish its roadmap from shipped capabilities. Keep changes narrowly scoped;
+do not require an unrelated pull request to implement the entire design.
+
+## Product review priorities
+
+- Unknown-display extension should preserve named profiles and inherited workspace
+  planning. Expose intentional disabled/strict policies clearly.
+- Check TUI parity for operations, terminology, page order, defaults, profile
+  actions, and preview timing. Native controls differ; semantics should agree.
+- Connected or enabled does not prove usable. Off, modeless, sleeping, mirrored,
+  and disconnected displays need distinct states.
+- Expose profile operations to pointer and keyboard users. Rename belongs in the
+  backend, not a client save/delete sequence. Gate unsupported capabilities.
+- Keep live hardware brightness outside the expanded profile editor, preserve
+  advanced fields, remove repeated headings, and keep tabs and footers readable.
+- Check the dated baseline review and existing recovery/reuse/identify PRs before
+  asking for duplicate work. Proposals and bot assessments do not prove runtime
+  behavior or physical testing.
 
 ## Repository boundaries
 

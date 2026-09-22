@@ -25,11 +25,13 @@ BorderSurface {
     anchors.top: parent.top
     anchors.leftMargin: Style.space(10)
     anchors.rightMargin: Style.space(10)
-    height: Style.space(28)
+    height: root.title !== "" || root.meta !== "" ? Style.space(28) : Style.space(10)
+    visible: root.title !== "" || root.meta !== ""
 
     Text {
       textFormat: Text.PlainText
       id: titleLabel
+      width: Math.min(implicitWidth, parent.width * (root.meta !== "" ? 0.7 : 1))
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       text: root.title

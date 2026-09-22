@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Controls as Controls
 import Quickshell
 import Quickshell.Io
 import qs.Commons
@@ -45,6 +46,7 @@ Panel {
   property bool manualWorkspaceRulesInitialized: false
   property bool execEditing: false
   property string execDraft: ""
+  property string deleteProfileName: ""
 
   property var editorDocument: ({
     profile: { outputs: [], workspaces: {} },
@@ -171,12 +173,6 @@ Panel {
         title: "Restart daemon",
         subtitle: "Running " + root.runningVersion + ", installed " + root.installedRelease
       })
-    rows.push({
-      id: "panel-updates",
-      icon: "󰚰",
-      title: "Panel updates",
-      subtitle: "Review marketplace verification"
-    })
     return rows
   }
   readonly property int layoutRowIndex: 1 + root.actionRows.length
@@ -217,6 +213,16 @@ Panel {
   readonly property string profileDefaultsLabel: root.sourceProfile !== ""
     ? root.sourceProfile : "loaded layout"
   readonly property var selectedOutputMetadata: Model.editorMetadata(root.editorDocument.displays, root.selectedOutputKey)
+  readonly property bool identifyAvailable: !!root.previewCoordinator
+    && typeof root.previewCoordinator.identifyDisplays === "function"
+    && root.previewCoordinator.connected && !root.previewCoordinator.opened
+    && !root.previewCoordinator.identifyPending && !root.daemonPreview && !root.previewPending
+
+  function identifyDisplays(key) {
+    if (!root.identifyAvailable) return
+    if (!root.previewCoordinator.identifyDisplays(key))
+      root.lastError = root.previewCoordinator.identifyError
+  }
   readonly property var brightnessTarget: Model.brightnessTarget(root.draftProfile,
     root.selectedOutputKey, root.editorDocument.displays)
   readonly property string brightnessConnector: String(root.brightnessTarget.connector || "")
@@ -239,7 +245,8 @@ Panel {
   readonly property int manualWorkspaceTargetCount: Model.manualWorkspaceTargetKeys(root.draftProfile).length
   readonly property string workspaceStrategy: String(((root.draftProfile || {}).workspaces || {}).strategy || "manual")
   readonly property bool workspaceGroupSizeApplicable: root.workspaceStrategy === "sequential"
-  readonly property int workspaceListKeyboardStart: root.workspaceGroupSizeApplicable ? 4 : 3
+  readonly property int workspacePersistenceKeyboardIndex: root.workspaceGroupSizeApplicable ? 4 : 3
+  readonly property int workspaceListKeyboardStart: root.workspacePersistenceKeyboardIndex + 1
   readonly property string selectedWorkspaceDisplayKey: {
     var index = root.workspaceKeyboardIndex - root.workspaceListKeyboardStart
     if (index < 0) return ""
@@ -253,8 +260,8 @@ Panel {
   }
   readonly property var pageOptions: [
     { value: "layout", label: "1  Layout" },
-    { value: "profiles", label: "2  Profiles" },
-    { value: "workspaces", label: "3  Workspaces" }
+    { value: "workspaces", label: "2  Workspaces" },
+    { value: "profiles", label: "3  Profiles" }
   ]
   readonly property var inspectorOptions: [
     { value: "display", label: "Display" },
@@ -763,13 +770,29 @@ Panel {
 
   function deleteSelectedSavedProfile() {
     var name = String(root.selectedSavedProfileName || "")
-    if (name === "" || root.previewTransaction !== "") return
+    if (name === "" || root.previewTransaction !== "" || root.previewPending) return
+    if (root.draftDirty || root.editPending) {
+      root.lastError = "Save or discard your edits before deleting a profile."
+      return
+    }
+    root.deleteProfileName = name
+    deleteConfirmation.open()
+  }
+
+  function confirmProfileDelete() {
+    var name = root.deleteProfileName
+    root.deleteProfileName = ""
+    if (name === "" || root.previewTransaction !== "" || root.previewPending) return
     root.lastError = ""
     root.send("delete", { name: name }, { name: name })
   }
 
   function beginExecEdit() {
     if (!root.selectedSavedProfile) return
+    if (root.draftDirty || root.editPending) {
+      root.lastError = "Save or discard your edits before editing a profile command."
+      return
+    }
     root.execDraft = String(root.selectedSavedProfile.exec || "")
     root.execEditing = true
     Qt.callLater(function() { profileExecInput.forceActiveFocus() })
@@ -831,6 +854,10 @@ Panel {
           1, root.workspaceValueMaximum))
       })
     }
+    else if (index === root.workspacePersistenceKeyboardIndex) {
+      if (root.editorDocument.workspace_persistence_supported === true && root.workspaceStrategy !== "manual")
+        root.editWorkspaces({ persist_all: !settings.persist_all })
+    }
     else {
       if (String(settings.strategy || "") === "manual") {
         root.moveManualWorkspace(index - root.workspaceListKeyboardStart, delta)
@@ -866,7 +893,7 @@ Panel {
     root.previewPending = true
     if (root.previewCoordinatorReady("startDraftPreview")) {
       if (!root.previewCoordinator.startDraftPreview(
-          Model.namedProfile(root.draftProfile, name), 10)) {
+          Model.namedProfile(root.draftProfile, name), 30)) {
         root.previewPending = false
         root.lastError = String(root.previewCoordinator.errorMessage
           || "Could not open the display confirmation.")
@@ -875,7 +902,7 @@ Panel {
     }
     root.send("preview", {
       profile: Model.namedProfile(root.draftProfile, name),
-      timeout_seconds: 10,
+      timeout_seconds: 30,
       save_on_commit: true
     }, { kind: "draft" })
   }
@@ -887,7 +914,7 @@ Panel {
     root.lastError = ""
     root.previewPending = true
     if (root.previewCoordinatorReady("startDraftApply")) {
-      if (!root.previewCoordinator.startDraftApply(profile, 10)) {
+      if (!root.previewCoordinator.startDraftApply(profile, 30)) {
         root.previewPending = false
         root.lastError = String(root.previewCoordinator.errorMessage
           || "Could not open the display confirmation.")
@@ -896,7 +923,7 @@ Panel {
     }
     root.send("preview", {
       profile: profile,
-      timeout_seconds: 10,
+      timeout_seconds: 30,
       save_on_commit: false
     }, { kind: "draft-apply" })
   }
@@ -971,7 +998,7 @@ Panel {
       return
     }
     if (key === "1" || key === "2" || key === "3") {
-      root.activePage = key === "1" ? "layout" : (key === "2" ? "profiles" : "workspaces")
+      root.activePage = key === "1" ? "layout" : (key === "2" ? "workspaces" : "profiles")
       return
     }
     if (key === "?") {
@@ -1023,27 +1050,28 @@ Panel {
     var selected = String(name || root.profileChoice || "")
     if (selected === "") return
     if (!root.managedChecked) return
-    if (root.profileAutomatic) {
-      root.lastError = "Turn off automatic profile selection before activating a profile."
-      return
-    }
+    if (root.previewPending || root.previewTransaction !== "") return
     root.lastError = ""
     root.previewPending = true
     if (root.previewCoordinatorReady("startSavedProfilePreview")) {
-      if (!root.previewCoordinator.startSavedProfilePreview(selected, 10)) {
+      if (!root.previewCoordinator.startSavedProfilePreview(selected, 30)) {
         root.previewPending = false
         root.lastError = String(root.previewCoordinator.errorMessage
           || "Could not open the display confirmation.")
       }
       return
     }
-    root.send("preview", { profile_name: selected, timeout_seconds: 10 }, {
+    root.send("preview", { profile_name: selected, timeout_seconds: 30 }, {
       kind: "profile",
       name: selected
     })
   }
 
   function activateSelectedSavedProfile() {
+    if (root.draftDirty || root.editPending) {
+      root.lastError = "Save or discard your edits before using another profile."
+      return
+    }
     var selected = String(root.selectedSavedProfileName || "")
     if (selected === "" || selected === root.activeProfile) return
     root.profileChoice = selected
@@ -1246,8 +1274,6 @@ Panel {
 
   function activateRow(id) {
     if (id === "restart-service") root.restartService()
-    else if (id === "panel-updates")
-      Qt.openUrlExternally("https://plugins.omarchy.org/plugin.html?id=crmne.hyprmoncfg")
   }
 
   Component.onCompleted: root.checkInstallation()
@@ -1260,6 +1286,10 @@ Panel {
     target: root.previewCoordinator
     ignoreUnknownSignals: true
     function onTransactionIdChanged() { root.syncDaemonPreview(root.daemonPreview) }
+    function onPreviewFinished() { root.clearPreview(true) }
+    function onIdentifyErrorChanged() {
+      if (root.previewCoordinator.identifyError) root.lastError = root.previewCoordinator.identifyError
+    }
     function onRequestFinished(success, message) {
       root.previewPending = false
       if (!success && String(message || "") !== "") root.lastError = String(message)
@@ -1279,6 +1309,9 @@ Panel {
       brightnessSelectionTimer.restart()
     } else {
       brightnessSetDebounce.stop()
+      profileActions.close()
+      deleteConfirmation.close()
+      root.deleteProfileName = ""
     }
   }
 
@@ -1320,7 +1353,7 @@ Panel {
       root.checkingInstallation = false
       root.installationStateKnown = true
       var probedInstalled = exitCode === 0
-      var probedCompatible = probedInstalled && Model.versionAtLeast(versionOutput.text, "1.18.3")
+      var probedCompatible = probedInstalled && Model.versionAtLeast(versionOutput.text, "1.19.0-rc.1")
 
       if (root.installing && exitCode === 2) {
         root.installing = false
@@ -1336,7 +1369,7 @@ Panel {
         root.installing = false
         installPoll.stop()
         installTimeout.stop()
-        root.lastError = "The update finished, but hyprmoncfg 1.18.3 or newer is still required."
+        root.lastError = "The update finished, but hyprmoncfg 1.19.0-rc.1 or newer is still required."
         return
       }
 
@@ -1703,7 +1736,7 @@ Panel {
       id: keyCatcher
       anchors.fill: parent
       property bool returnPressed: false
-      blocked: root.execEditing
+      blocked: root.execEditing || profileActions.visible || deleteConfirmation.visible
         || profileNameInput.activeFocus
         || positionXField.field.activeFocus || positionYField.field.activeFocus
         || workspaceCountField.field.activeFocus || workspaceGroupSizeField.field.activeFocus
@@ -1715,7 +1748,7 @@ Panel {
         || rotationDropdown.popupOpen || mirrorDropdown.popupOpen
         || bitdepthDropdown.popupOpen || colorManagementDropdown.popupOpen
         || sdrCurveDropdown.popupOpen || forceWideDropdown.popupOpen || forceHdrDropdown.popupOpen
-        || workspaceStrategyDropdown.popupOpen
+        || workspaceStrategyDropdown.popupOpen || workspacePersistenceDropdown.popupOpen
       onMoveRequested: function(dx, dy) {
         if (!root.expanded && dy !== 0) root.moveCursor(dy)
         else if (root.expanded) root.handleExpandedMove(dx, dy)
@@ -2170,6 +2203,7 @@ Panel {
           height: Style.space(38)
 
           Row {
+            id: editorTabsRow
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(2)
@@ -2183,7 +2217,7 @@ Panel {
                 selected: String(modelData.value || "") === root.activePage
                 foreground: root.foreground
                 fontFamily: root.fontFamily
-                fontSize: Style.font.caption
+                fontSize: Style.font.body
                 horizontalPadding: Style.space(7)
                 verticalPadding: Style.space(3)
                 onClicked: root.activePage = String(modelData.value || "layout")
@@ -2192,6 +2226,8 @@ Panel {
           }
 
           Row {
+            anchors.left: editorTabsRow.right
+            anchors.leftMargin: Style.space(10)
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(10)
@@ -2199,7 +2235,9 @@ Panel {
             Text {
               textFormat: Text.PlainText
               anchors.verticalCenter: parent.verticalCenter
-              text: "Current setup  ·  " + root.profileStatusTitle
+              width: Math.max(0, parent.width - identifyAllButton.width - keyboardHelpButton.width - compactButton.width - parent.spacing * 3)
+              horizontalAlignment: Text.AlignRight
+              text: "Current setup · " + root.profileStatusTitle
                 + (!root.managedChecked ? " · read-only"
                   : (root.profileAutomatic ? " · automatic" : " · pinned"))
               color: root.dim
@@ -2209,7 +2247,20 @@ Panel {
             }
 
             Button {
+              id: identifyAllButton
+              anchors.verticalCenter: parent.verticalCenter
+              text: "Identify all"
+              enabled: root.identifyAvailable
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              fontSize: Style.font.caption
+              bordered: true
+              onClicked: root.identifyDisplays("")
+            }
+
+            Button {
               id: keyboardHelpButton
+              anchors.verticalCenter: parent.verticalCenter
               text: ""
               bordered: true
               foreground: root.foreground
@@ -2217,7 +2268,7 @@ Panel {
               fontSize: Style.font.caption
               implicitWidth: keyboardHelpButtonContent.implicitWidth
                 + horizontalPadding * 2 + Style.normalBorderWidth * 2
-              implicitHeight: compactButton.implicitHeight
+              implicitHeight: identifyAllButton.implicitHeight
 
               Row {
                 id: keyboardHelpButtonContent
@@ -2249,8 +2300,11 @@ Panel {
 
             Button {
               id: compactButton
+              anchors.verticalCenter: parent.verticalCenter
               text: "Compact"
               iconText: "󰊔"
+              iconSize: fontSize
+              implicitHeight: identifyAllButton.implicitHeight
               bordered: true
               foreground: root.foreground
               fontFamily: root.fontFamily
@@ -2395,66 +2449,23 @@ Panel {
               anchors.bottom: parent.bottom
               spacing: Style.space(10)
 
-              EditorPane {
+              MonitorInfo {
                 id: inspectorPane
                 width: parent.width
-                height: Style.space(185)
-                title: "Info"
-                meta: root.selectedOutput ? String(root.selectedOutput.name || "") : ""
+                height: implicitHeight
+                output: root.selectedOutput
+                metadata: root.selectedOutputMetadata
                 foreground: root.foreground
                 dim: root.dim
                 accent: Color.accent
                 fontFamily: root.fontFamily
-                opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
-
-                Column {
-                  anchors.fill: parent
-                  spacing: Style.space(3)
-
-                  InfoRow {
-                    label: "Connector"
-                    value: root.selectedOutput ? String(root.selectedOutput.name || "—") : "—"
-                  }
-                  InfoRow {
-                    label: "Type"
-                    value: Model.displayType(root.selectedOutputMetadata, root.selectedOutput)
-                  }
-                  InfoRow {
-                    label: "Model"
-                    value: root.selectedOutput ? Model.displayModelLabel(root.selectedOutput, false) : "—"
-                  }
-                  InfoRow {
-                    label: "Serial"
-                    value: root.selectedOutput && String(root.selectedOutput.serial || "").trim() !== ""
-                      ? String(root.selectedOutput.serial) : "(none)"
-                  }
-                  InfoRow {
-                    label: "Layout px"
-                    value: root.selectedOutput
-                      ? Model.outputLogicalSize(root.selectedOutput).width + " × " + Model.outputLogicalSize(root.selectedOutput).height
-                      : "—"
-                  }
-                  InfoRow {
-                    label: "Workspace"
-                    value: String(root.selectedOutputMetadata.workspace || "(none)")
-                  }
-                  InfoRow {
-                    label: "DPMS"
-                    value: Model.onOff(root.selectedOutputMetadata.dpms === true)
-                  }
-                  InfoRow {
-                    visible: Number(root.selectedOutputMetadata.physical_width || 0) > 0
-                    label: "Panel mm"
-                    value: Number(root.selectedOutputMetadata.physical_width || 0)
-                      + " × " + Number(root.selectedOutputMetadata.physical_height || 0) + " mm"
-                  }
-                }
+                canIdentify: root.identifyAvailable && !!root.selectedOutput
+                onIdentifyRequested: root.identifyDisplays(root.selectedOutputKey)
               }
 
               EditorPane {
                 width: parent.width
-                height: parent.height - Style.space(195)
-                title: "Display  -  Color"
+                height: parent.height - inspectorPane.height - Style.space(10)
                 active: root.keyboardLayoutPane !== "canvas"
                 foreground: root.foreground
                 dim: root.dim
@@ -2504,32 +2515,6 @@ Panel {
                     visible: root.inspectorPage === "display"
                     width: parent.width
                     spacing: Style.space(9)
-
-                    BrightnessControl {
-                      visible: root.brightnessConnector !== ""
-                      width: parent.width
-                      bar: root.bar
-                      connector: root.brightnessConnector
-                      displayLabel: root.brightnessDisplayLabel
-                      value: root.brightnessPercent
-                      available: root.brightnessAvailable
-                      loading: root.brightnessLoading
-                      foreground: root.foreground
-                      dim: root.dim
-                      accent: Color.accent
-                      fontFamily: root.fontFamily
-                      onPreviewed: function(value) { root.previewBrightness(value) }
-                      onCommitted: function(value) {
-                        brightnessSetDebounce.stop()
-                        root.setBrightness(value)
-                      }
-                    }
-
-                    PanelSeparator {
-                      visible: root.brightnessConnector !== ""
-                      width: parent.width
-                      foreground: root.foreground
-                    }
 
                     Item {
                       width: parent.width
@@ -2652,7 +2637,7 @@ Panel {
                         width: parent.cellWidth
                         height: positionXField.height
 
-                        NumberField {
+                        NumberStepper {
                           id: positionXField
                           anchors.left: parent.left
                           anchors.right: positionXResetAction.visible ? positionXResetAction.left : parent.right
@@ -2691,7 +2676,7 @@ Panel {
                         width: parent.cellWidth
                         height: positionYField.height
 
-                        NumberField {
+                        NumberStepper {
                           id: positionYField
                           anchors.left: parent.left
                           anchors.right: positionYResetAction.visible ? positionYResetAction.left : parent.right
@@ -3061,12 +3046,14 @@ Panel {
                 PanelSeparator { foreground: root.foreground }
 
                 Row {
-                  width: parent.width
+                  x: Style.space(7)
+                  width: parent.width - Style.space(46)
                   height: Style.space(22)
+                  spacing: Style.space(8)
 
                   Text {
                     textFormat: Text.PlainText
-                    width: parent.width - Style.space(58)
+                    width: parent.width - Style.space(58) - parent.spacing
                     text: "PROFILE"
                     color: root.dim
                     font.family: root.fontFamily
@@ -3087,10 +3074,12 @@ Panel {
                 }
 
                 Repeater {
+                  id: profileEntries
                   model: root.document && root.document.profiles instanceof Array ? root.document.profiles : []
 
                   BorderSurface {
                     id: savedEntry
+                    function openActions() { profileActions.openAt(profileMenuButton) }
                     required property var modelData
                     width: parent.width
                     height: Style.space(32)
@@ -3105,13 +3094,14 @@ Panel {
                     Row {
                       anchors.fill: parent
                       anchors.leftMargin: Style.space(7)
-                      anchors.rightMargin: Style.space(7)
+                      anchors.rightMargin: Style.space(39)
+                      spacing: Style.space(8)
 
                       Text {
                         textFormat: Text.PlainText
                         anchors.verticalCenter: parent.verticalCenter
                         width: parent.width - profileMatchText.width - Style.space(8)
-                        text: (savedEntry.current ? "›  " : "   ") + String(modelData.name || "Profile")
+                        text: String(modelData.name || "Profile")
                         color: savedEntry.current || savedEntry.selected ? root.foreground : root.dim
                         font.family: root.fontFamily
                         font.pixelSize: Style.font.bodySmall
@@ -3122,6 +3112,8 @@ Panel {
                       Text {
                         textFormat: Text.PlainText
                         id: profileMatchText
+                        width: Style.space(58)
+                        horizontalAlignment: Text.AlignRight
                         anchors.verticalCenter: parent.verticalCenter
                         text: Number(modelData.match_score || 0) > 0 ? String(modelData.match_score) : "—"
                         color: modelData.recommended ? Color.accent : root.dim
@@ -3132,13 +3124,29 @@ Panel {
                     }
 
                     MouseArea {
+                      id: profileRowMouse
                       anchors.fill: parent
+                      anchors.rightMargin: Style.space(36)
                       hoverEnabled: true
+                      acceptedButtons: Qt.LeftButton | Qt.RightButton
                       enabled: String(parent.modelData.name || "") !== ""
                       cursorShape: Qt.PointingHandCursor
-                      onClicked: {
+                      onClicked: function(mouse) {
                         var selected = String(parent.modelData.name || "")
                         root.selectedSavedProfileName = selected
+                        if (mouse.button === Qt.RightButton) profileActions.openAt(profileRowMouse, mouse.x, mouse.y)
+                      }
+                    }
+                    Button {
+                      id: profileMenuButton
+                      anchors.right: parent.right
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: "⋮"
+                      tooltipText: "Profile actions"
+                      focusable: true
+                      onClicked: {
+                        root.selectedSavedProfileName = String(savedEntry.modelData.name || "")
+                        profileActions.openAt(profileMenuButton)
                       }
                     }
                   }
@@ -3158,7 +3166,7 @@ Panel {
                 id: profileDetailsPane
                 width: parent.width
                 height: Math.min(parent.height - Style.space(180),
-                  Math.max(Style.space(190), Style.space(38 + root.selectedSavedDetailRowCount * 18)))
+                  Math.max(Style.space(190), profileDetailsContent.implicitHeight + Style.space(38)))
                 title: "Profile Details"
                 meta: root.selectedSavedProfileCurrent ? "Active" : ""
                 foreground: root.foreground
@@ -3166,8 +3174,14 @@ Panel {
                 accent: Color.accent
                 fontFamily: root.fontFamily
 
-                Column {
+                Flickable {
                   anchors.fill: parent
+                  contentHeight: profileDetailsContent.implicitHeight
+                  clip: true
+                  boundsBehavior: Flickable.StopAtBounds
+                  Column {
+                  id: profileDetailsContent
+                  width: parent.width
                   spacing: Style.space(4)
 
                   InfoRow {
@@ -3215,12 +3229,6 @@ Panel {
                     }
                   }
 
-                  InfoRow {
-                    label: "Exec"
-                    value: root.selectedSavedProfile && String(root.selectedSavedProfile.exec || "").trim() !== ""
-                      ? String(root.selectedSavedProfile.exec) : "(not set)"
-                  }
-
                   Repeater {
                     model: root.selectedSavedWorkspaceRows
 
@@ -3237,6 +3245,48 @@ Panel {
                     visible: root.selectedSavedWorkspaceRows.length === 0
                     label: "Workspaces"
                     value: "(not managed)"
+                  }
+
+                  Column {
+                    width: parent.width
+                    spacing: Style.space(4)
+                    Text {
+                      text: "Post-apply command"
+                      textFormat: Text.PlainText
+                      color: root.dim
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.bodySmall
+                    }
+                    Button {
+                      width: parent.width
+                      text: ""
+                      implicitHeight: commandLabel.implicitHeight + verticalPadding * 2 + Style.normalBorderWidth * 2
+                      Text {
+                        id: commandLabel
+                        anchors.fill: parent
+                        anchors.leftMargin: parent.horizontalPadding
+                        anchors.rightMargin: parent.horizontalPadding
+                        text: root.selectedSavedProfile && String(root.selectedSavedProfile.exec || "").trim() !== ""
+                          ? String(root.selectedSavedProfile.exec) : "Not set"
+                        textFormat: Text.PlainText
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                        color: root.foreground
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.body
+                      }
+                      bordered: true
+                      focusable: true
+                      leftAlign: true
+                      enabled: root.managedChecked && !!root.selectedSavedProfile
+                        && !root.editPending && !root.previewPending && root.previewTransaction === ""
+                      foreground: root.foreground
+                      fontFamily: root.fontFamily
+                      tooltipText: "Edit post-apply command"
+                      onClicked: root.beginExecEdit()
+                    }
+                  }
+
                   }
                 }
               }
@@ -3332,7 +3382,7 @@ Panel {
                   width: parent.width
                   spacing: Style.space(10)
 
-                  NumberField {
+                  NumberStepper {
                     id: workspaceCountField
                     width: root.workspaceGroupSizeApplicable
                       ? (parent.width - parent.spacing) / 2 : parent.width
@@ -3356,7 +3406,7 @@ Panel {
                     }
                   }
 
-                  NumberField {
+                  NumberStepper {
                     id: workspaceGroupSizeField
                     visible: root.workspaceGroupSizeApplicable
                     width: (parent.width - parent.spacing) / 2
@@ -3377,6 +3427,29 @@ Panel {
                     }
                   }
 
+                }
+
+                PanelDropdown {
+                  id: workspacePersistenceDropdown
+                  popupParent: keyCatcher
+                  ownerOpen: root.opened && root.expanded
+                  width: parent.width
+                  label: "PERSISTENCE"
+                  options: root.editorDocument.workspace_persistence_supported !== true
+                    ? [{ value: "unavailable", label: "Requires newer daemon" }]
+                    : root.workspaceStrategy === "manual"
+                      ? [{ value: "custom", label: "Custom (per rule)" }]
+                      : [{ value: "first", label: "First per display" }, { value: "all", label: "All assigned" }]
+                  value: root.editorDocument.workspace_persistence_supported !== true ? "unavailable"
+                    : root.workspaceStrategy === "manual" ? "custom"
+                    : (((root.draftProfile || {}).workspaces || {}).persist_all ? "all" : "first")
+                  enabled: root.editorReady && !root.editPending
+                    && root.editorDocument.workspace_persistence_supported === true && root.workspaceStrategy !== "manual"
+                  hasCursor: root.expanded && root.activePage === "workspaces"
+                    && root.workspaceKeyboardIndex === root.workspacePersistenceKeyboardIndex
+                  foreground: root.foreground
+                  fontFamily: root.fontFamily
+                  onChanged: function(value) { root.editWorkspaces({ persist_all: value === "all" }) }
                 }
 
                 PanelSeparator { foreground: root.foreground }
@@ -3684,9 +3757,7 @@ Panel {
                 text: root.editPending ? "Checking layout…"
                   : (root.creatingProfile ? "Name it, arrange the displays, then preview and save."
                   : (root.activePage === "profiles"
-                    ? (root.profileAutomatic
-                      ? "Turn off automatic selection to activate a profile."
-                      : "Activation uses a safe 10-second preview.")
+                    ? "Preview, then keep to use this profile until displays change."
                     : "Changes are previewed safely before they can be saved."))
                 color: root.dim
                 font.family: root.fontFamily
@@ -3757,11 +3828,11 @@ Panel {
               height: editorFooter.controlHeight
               visible: root.activePage === "profiles"
                 && !root.selectedSavedProfileCurrent
-              text: "Activate"
+              text: "Use this profile"
               selected: enabled
               bordered: true
               enabled: !root.draftDirty && !!root.selectedSavedProfile
-                && !root.profileAutomatic && root.managedChecked
+                && root.managedChecked
                 && root.previewTransaction === "" && !root.previewPending
               foreground: root.foreground
               fontFamily: root.fontFamily
@@ -3845,7 +3916,7 @@ Panel {
 
             Text {
               textFormat: Text.PlainText
-              text: "Edit Exec for " + root.selectedSavedProfileName
+              text: "Post-apply command for " + root.selectedSavedProfileName
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.subtitle
@@ -3877,6 +3948,124 @@ Panel {
             }
           }
         }
+      }
+    }
+  }
+
+  ProfileActionsMenu {
+    id: profileActions
+    parent: keyCatcher
+    preferredWidth: Style.space(280)
+    rowHeight: Style.space(36)
+    foreground: root.foreground
+    backgroundColor: root.bar ? root.bar.background : Color.background
+    accent: Color.accent
+    fontFamily: root.fontFamily
+    fontSize: Style.font.body
+    property bool available: !root.draftDirty && !root.editPending && !root.previewPending && root.previewTransaction === ""
+    actions: [
+      { id: "use", label: "Use this profile", enabled: available && root.managedChecked },
+      { id: "edit", label: "Edit layout", enabled: available },
+      { id: "exec", label: "Edit post-apply command…", enabled: available },
+      { id: "delete", label: "Delete…", enabled: available }
+    ]
+    onVisibleChanged: if (visible) targetName = root.selectedSavedProfileName
+    onClosed: Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    onChosen: function(action) {
+      root.selectedSavedProfileName = targetName
+      if (action === "use") root.activateSelectedSavedProfile()
+      else if (action === "edit") root.loadSelectedSavedProfile()
+      else if (action === "exec") root.beginExecEdit()
+      else if (action === "delete") root.deleteSelectedSavedProfile()
+    }
+  }
+
+  FocusScope {
+    id: deleteConfirmation
+    parent: keyCatcher
+    anchors.fill: parent
+    z: 400
+    visible: false
+    function open() { visible = true; cancelDeleteButton.forceActiveFocus() }
+    function close() {
+      visible = false
+      root.deleteProfileName = ""
+      Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    }
+    Keys.onEscapePressed: close()
+    MouseArea { anchors.fill: parent; onClicked: deleteConfirmation.close() }
+    BorderSurface {
+      anchors.centerIn: parent
+      width: Math.min(parent.width - Style.space(24), Style.space(440))
+      height: deleteContent.implicitHeight + Style.space(32)
+      color: root.bar ? root.bar.background : Color.background
+      borderSpec: Border.controlSpec("focus", root.foreground, Color.accent)
+      radius: Style.cornerRadius
+      MouseArea { anchors.fill: parent }
+      Column {
+        id: deleteContent
+        x: Style.space(16)
+        y: Style.space(16)
+        width: parent.width - Style.space(32)
+        spacing: Style.space(14)
+        Text {
+          text: "Delete profile?"
+          textFormat: Text.PlainText
+          color: root.foreground
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+          font.bold: true
+        }
+        Text {
+          width: parent.width
+          textFormat: Text.PlainText
+          text: "Delete “" + root.deleteProfileName + "”? Your live layout will not change."
+          wrapMode: Text.Wrap
+          color: root.foreground
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+        }
+        Row {
+          anchors.right: parent.right
+          spacing: Style.space(8)
+          Button {
+            id: cancelDeleteButton
+            KeyNavigation.tab: confirmDeleteButton
+            KeyNavigation.backtab: confirmDeleteButton
+            text: "Cancel"
+            bordered: true
+            focusable: true
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            onClicked: deleteConfirmation.close()
+          }
+          Button {
+            id: confirmDeleteButton
+            KeyNavigation.tab: cancelDeleteButton
+            KeyNavigation.backtab: cancelDeleteButton
+            text: "Delete profile"
+            bordered: true
+            focusable: true
+            foreground: root.urgent
+            fontFamily: root.fontFamily
+            onClicked: {
+              root.confirmProfileDelete()
+              deleteConfirmation.close()
+            }
+          }
+        }
+      }
+    }
+  }
+
+  Shortcut {
+    sequence: "Shift+F10"
+    enabled: root.opened && root.expanded && root.activePage === "profiles"
+      && !keyCatcher.blocked && !!root.selectedSavedProfile
+    onActivated: {
+      for (var i = 0; i < profileEntries.count; i++) {
+        var row = profileEntries.itemAt(i)
+        if (row && row.selected) { row.openActions(); break }
       }
     }
   }
