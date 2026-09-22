@@ -1,6 +1,6 @@
 # 2.4.0 release-candidate testing
 
-Use panel `v2.4.0-rc.1` with backend `v1.19.0-rc.1`. The complete cross-product
+Use panel `v2.4.0-rc.1` with backend `v1.19.0-rc.2`. The complete cross-product
 rubric is in the backend repository at `docs/rc-testing-1.19.0.md`.
 
 For the panel specifically, capture compact and expanded screenshots at a normal
