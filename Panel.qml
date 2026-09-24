@@ -117,6 +117,11 @@ Panel {
   onIdentifyBlockedByPreviewChanged: {
     if (root.identifyBlockedByPreview && root.previewCoordinator
         && typeof root.previewCoordinator.cancelIdentify === "function") root.previewCoordinator.cancelIdentify()
+    if (root.identifyBlockedByPreview && root.reusePending) {
+      root.reuseGeneration++
+      root.reusePending = false
+      root.lastError = "A display preview started. Finish it, then create the draft again."
+    }
   }
   property int brightnessPercent: 1
   property int pendingBrightnessPercent: 1
@@ -882,8 +887,8 @@ Panel {
   }
 
   function openLayoutReuse(name) {
-    if (!root.editorReady || root.editorLoading || root.draftDirty || root.creatingProfile || root.reusePending
-        || root.previewTransaction !== "" || root.previewPending) return
+    if (!root.backendConnected || !root.editorReady || root.editorLoading || root.draftDirty || root.creatingProfile || root.reusePending
+        || root.identifyBlockedByPreview) return
     root.expanded = true
     root.activePage = "reuse"
     root.reuseStatus = ""
@@ -900,8 +905,8 @@ Panel {
   }
 
   function reuseLayout(name, mapping) {
-    if (!root.managedChecked || !root.editorReady || root.editorLoading || root.readPending || root.editorSnapshotStale || root.reusePending || root.draftDirty
-        || root.creatingProfile || root.editPending || root.previewTransaction !== "" || root.previewPending) return
+    if (!root.backendConnected || !root.managedChecked || !root.editorReady || root.editorLoading || root.readPending || root.editorSnapshotStale || root.reusePending || root.draftDirty
+        || root.creatingProfile || root.editPending || root.identifyBlockedByPreview) return
     root.lastError = ""
     root.reusePending = true
     root.send("reuse_profile", { name: name, mapping: mapping }, {
@@ -916,7 +921,7 @@ Panel {
   function acceptReusedLayout(result, context) {
     if (context.generation !== root.reuseGeneration) return
     root.reusePending = false
-    if (root.draftDirty || root.creatingProfile || root.previewTransaction !== "" || root.previewPending) {
+    if (root.draftDirty || root.creatingProfile || root.identifyBlockedByPreview) {
       root.lastError = "The draft changed while the layout was prepared. Your current draft was kept."
       return
     }
@@ -2436,9 +2441,9 @@ Panel {
               text: "Use an existing layout…"
               bordered: true
               visible: root.savedProfiles.length > 0
-              enabled: root.managedChecked && root.editorReady && !root.editorLoading
+              enabled: root.backendConnected && root.managedChecked && root.editorReady && !root.editorLoading
                 && !root.draftDirty && !root.creatingProfile && !root.reusePending
-                && root.previewTransaction === "" && !root.previewPending
+                && !root.identifyBlockedByPreview
               foreground: root.foreground
               fontFamily: root.fontFamily
               onClicked: root.openLayoutReuse()
@@ -2693,8 +2698,8 @@ Panel {
             liveProfile: root.editorDocument.profile
             editorDisplays: root.editorDocument.displays
             available: root.managedChecked && (root.editorDocument.capabilities || []).indexOf("reuse_profile") >= 0
-            busy: root.reusePending || root.editorLoading || root.readPending
-              || root.editorSnapshotStale || root.reuseTopologyChanged
+            busy: !root.backendConnected || !root.editorReady || root.reusePending || root.editorLoading || root.readPending
+              || root.editorSnapshotStale || root.reuseTopologyChanged || root.identifyBlockedByPreview
             statusMessage: root.reuseStatus
             ownerOpen: root.opened
             popupParent: keyCatcher
@@ -4175,9 +4180,9 @@ Panel {
                   focusable: true
                   bordered: true
                   enabled: !root.reusePending && (root.activePage === "reuse"
-                    || (root.managedChecked && root.editorReady && !root.editorLoading
+                    || (root.backendConnected && root.managedChecked && root.editorReady && !root.editorLoading
                       && !root.draftDirty && !root.creatingProfile && !root.editPending
-                      && !!root.selectedSavedProfile && root.previewTransaction === "" && !root.previewPending))
+                      && !!root.selectedSavedProfile && !root.identifyBlockedByPreview))
                   foreground: root.foreground
                   fontFamily: root.fontFamily
                   onClicked: {
@@ -4315,7 +4320,8 @@ Panel {
       { id: "use", label: "Use this profile", enabled: available && root.managedChecked },
       { id: "edit", label: "Edit layout", enabled: available },
       { id: "reuse", label: "Reuse layout…", enabled: available && root.managedChecked
-          && root.editorReady && !root.editorLoading && !root.creatingProfile && !root.reusePending },
+          && root.backendConnected && root.editorReady && !root.editorLoading && !root.creatingProfile
+          && !root.reusePending && !root.identifyBlockedByPreview },
       { id: "exec", label: "Edit post-apply command…", enabled: available },
       { id: "delete", label: "Delete…", enabled: available }
     ]

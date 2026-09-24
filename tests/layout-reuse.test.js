@@ -269,7 +269,7 @@ test('stale reuse errors cannot clear a newer request after close and reopen', (
 
 test('request, close, new request and late success preserve the newer request', () => {
   let sequence = 0
-  const root = { managedChecked: true, editorReady: true, reuseGeneration: 0, previewTransaction: '',
+  const root = { backendConnected: true, managedChecked: true, editorReady: true, reuseGeneration: 0, previewTransaction: '',
     monitorSummaries: [], pendingMethods: {}, pendingContexts: {}, controller: { hide() {} },
     send(method, params, context) {
       const id = String(++sequence)

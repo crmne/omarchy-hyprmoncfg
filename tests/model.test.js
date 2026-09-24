@@ -1451,14 +1451,18 @@ function editorRefreshPanel() {
   // This preserves transient input changes that begin and end before a reply.
   const changedHandlers = {}
   let readBlocked = () => false
+  let readPreviewBlocked = () => false
   const root = new Proxy(state, {
     set(target, key, value) {
       const before = readBlocked()
+      const previewBefore = readPreviewBlocked()
       const changed = target[key] !== value
       target[key] = value
       if (changed && changedHandlers[key]) changedHandlers[key]()
       if (readBlocked() !== before && changedHandlers.editorRefreshBlocked)
         changedHandlers.editorRefreshBlocked()
+      if (readPreviewBlocked() !== previewBefore && changedHandlers.identifyBlockedByPreview)
+        changedHandlers.identifyBlockedByPreview()
       return true
     }
   })
@@ -1470,6 +1474,12 @@ function editorRefreshPanel() {
     changedHandlers[name] = vm.runInNewContext("(function() { " + match[2] + " })", { root })
   }
   Object.defineProperty(root, "editorRefreshBlocked", { get: () => readBlocked() })
+  const previewBlocked = qml.match(/readonly property bool identifyBlockedByPreview: ([\s\S]*?)\n  onIdentifyBlockedByPreviewChanged:/)[1]
+  readPreviewBlocked = vm.runInNewContext("(function() { return " + previewBlocked + " })", { root })
+  Object.defineProperty(root, "identifyBlockedByPreview", { get: () => readPreviewBlocked() })
+  Object.defineProperty(root, "daemonPreview", { get: () => (root.document.daemon || {}).preview || null })
+  const previewChanged = qml.match(/onIdentifyBlockedByPreviewChanged: \{([\s\S]*?)\n  }/)[1]
+  changedHandlers.identifyBlockedByPreview = vm.runInNewContext("(function() { " + previewChanged + " })", { root })
   for (const property of ["readPending", "editorPreviewBlocked", "editorSnapshotStale"]) {
     const expression = qml.match(new RegExp("readonly property bool " + property
       + ": ([\\s\\S]*?)\\n  (?:readonly )?property"))[1]
@@ -2089,6 +2099,92 @@ test("reuse identification waits for pending requests and complete timeout recov
   assert.equal(identifyEnabled(), true, "a current assignment can be identified again")
   pane.mapping = { laptop: "" }
   assert.equal(identifyEnabled(), false, "an omitted saved display cannot be identified")
+})
+
+test("reuse waits for a foreign or coordinated preview without claiming its transaction", () => {
+  for (const owner of ["foreign", "coordinator", "local"]) {
+    const panel = editorRefreshPanel()
+    const pending = { transaction_id: "other-client", reclaimable: false }
+    if (owner === "foreign") {
+      panel.root.syncDaemonPreview = panelFunction("syncDaemonPreview", panel.root)
+      panel.root.updateDocument({ ...panel.root.document, daemon: { preview: pending } })
+      assert.equal(panel.root.previewTransaction, "", "a live foreign preview is not adopted")
+    } else if (owner === "coordinator") panel.root.previewCoordinator = { opened: true }
+    else panel.root.previewPending = true
+    panel.root.openLayoutReuse()
+    assert.equal(panel.root.activePage, "layout", owner)
+    panel.root.reuseLayout("Current", { laptop: "laptop" })
+    assert.deepEqual(panel.requests, [], owner)
+    assert.equal(panel.root.reusePending, false, owner)
+    // Also protect a result at the acceptance boundary, independently of signals.
+    const draft = panel.root.draftProfile
+    panel.root.acceptReusedLayout({ profile: panel.result.profile }, { generation: panel.root.reuseGeneration })
+    assert.equal(panel.root.draftProfile, draft, owner)
+    assert.equal(panel.root.draftDirty, false, owner)
+    if (owner === "foreign") assert.equal(panel.root.daemonPreview.transaction_id, "other-client")
+  }
+})
+
+test("a preview starting during reuse invalidates its reply even after the preview finishes", () => {
+  for (const owner of ["foreign", "coordinator"]) {
+    const panel = editorRefreshPanel()
+    panel.root.openLayoutReuse()
+    panel.root.reuseLayout("Current", { laptop: "laptop" })
+    const request = panel.packets[0]
+    const draft = panel.root.draftProfile
+    if (owner === "foreign")
+      panel.root.updateDocument({ ...panel.root.document, daemon: { preview: { transaction_id: "tui", reclaimable: false } } })
+    else panel.root.previewCoordinator = { opened: true }
+    assert.equal(panel.root.reusePending, false, owner)
+    assert.match(panel.root.lastError, /preview started/)
+    if (owner === "foreign") panel.root.updateDocument({ ...panel.root.document, daemon: {} })
+    else panel.root.previewCoordinator = { opened: false }
+    assert.equal(panel.root.identifyBlockedByPreview, false)
+    panel.receive(request.id, { profile: panel.result.profile })
+    assert.equal(panel.root.draftProfile, draft, owner)
+    assert.equal(panel.root.draftDirty, false, owner)
+    assert.equal(panel.root.creatingProfile, false, owner)
+    panel.root.reuseLayout("Current", { laptop: "laptop" })
+    panel.receive(panel.packets.at(-1).id, { profile: panel.result.profile })
+    assert.equal(panel.root.creatingProfile, true, "a new request works after preview completion")
+  }
+})
+
+test("reuse controls wait for reconnect and a ready editor while retaining the assignments", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const paneQml = fs.readFileSync(path.join(__dirname, "..", "LayoutReusePane.qml"), "utf8")
+  const busy = qml.slice(qml.indexOf("id: reusePane")).match(/busy: ([\s\S]*?)\n            statusMessage:/)[1]
+  const createEnabled = paneQml.slice(paneQml.indexOf("id: reuseAction")).match(/enabled: ([^\n]+)/)[1]
+  const panel = editorRefreshPanel()
+  const pane = { available: true, mapping: { laptop: "laptop" }, hasMapping: true }
+  Object.defineProperty(pane, "busy", {
+    get: vm.runInNewContext("(function() { return " + busy + " })", { root: panel.root })
+  })
+  const enabled = vm.runInNewContext("(function() { return " + createEnabled + " })", { root: pane })
+  panel.root.openLayoutReuse()
+  const editor = panel.root.editorDocument
+  assert.equal(enabled(), true)
+  panel.root.backendConnected = false
+  const disconnected = qml.match(/onConnectedChanged: \{([\s\S]*?)\n    }\n    onError:/)[1]
+  panel.root.clearPreview = panelFunction("clearPreview", panel.root, { previewTimer: { stop() {} } })
+  vm.runInNewContext(disconnected, { root: panel.root, connected: false })
+  assert.equal(panel.root.editorDocument, editor)
+  assert.equal(panel.root.editorSnapshotStale, false, "retained metadata alone need not look stale")
+  assert.equal(enabled(), false)
+  panel.root.reuseLayout("Current", pane.mapping)
+  assert.deepEqual(panel.requests, [])
+  panel.root.backendConnected = true
+  assert.equal(enabled(), false, "reconnection alone does not refresh the editor")
+  panel.root.editorLoading = true
+  assert.equal(enabled(), false)
+  panel.root.editorLoading = false
+  panel.root.editorReady = true
+  assert.equal(enabled(), true)
+  panel.root.previewCoordinator = { opened: true }
+  assert.equal(enabled(), false, "an already-open reuse form waits for a shared preview")
+  panel.root.previewCoordinator = { opened: false }
+  assert.equal(enabled(), true)
+  assert.deepEqual(pane.mapping, { laptop: "laptop" })
 })
 
 test("reused generated workspaces materialize assignments when changed to manual", () => {
