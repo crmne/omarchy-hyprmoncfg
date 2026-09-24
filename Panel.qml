@@ -125,6 +125,9 @@ Panel {
     : (profileOverride !== "" ? profileOverride
       : (activeProfile !== "" ? activeProfile : recommendedProfile))
   readonly property bool profileAutomatic: root.profileOverride === ""
+  readonly property bool newSetupAvailable: root.profileAutomatic && root.documentReady
+    && root.connectedDisplayCount > 0 && !root.exactDisplayProfile
+    && !root.daemonPreview && root.previewTransaction === "" && !root.previewPending
   readonly property string profileStatusTitle: {
     if (!root.managedChecked) return "Not managed by hyprmoncfg"
     if (!root.documentReady) return root.serviceActionPending ? "Starting hyprmoncfg…" : "Loading profile…"
@@ -140,7 +143,7 @@ Panel {
     var displays = root.connectedDisplayCount === 1 ? "1 display" : root.connectedDisplayCount + " displays"
     if (root.pendingProfileName !== "") return displays + " · Awaiting confirmation"
     if (!root.profileAutomatic) return "Automatic matching is paused"
-    if (root.exactDisplayProfileName !== "") return displays + " · Best match for this setup"
+    if (root.exactDisplayProfileName !== "") return displays
     if (root.connectedDisplayCount > 0) return "No saved profile matches these displays"
     return "No connected displays"
   }
@@ -1090,7 +1093,8 @@ Panel {
   }
 
   function beginCreateProfile() {
-    if (!root.managedChecked || !root.editorReady || root.previewTransaction !== "" || root.previewPending) return
+    if (!root.managedChecked || !root.editorReady || root.editPending
+        || root.daemonPreview || root.previewTransaction !== "" || root.previewPending) return
     root.lastError = ""
     root.profileDefaults = Model.clone(root.draftProfile)
     root.sourceProfile = ""
@@ -2116,48 +2120,15 @@ Panel {
               fontFamily: root.fontFamily
             }
 
-            Row {
+            ProfileStatus {
               id: compactProfileStatus
               width: parent.width
-              height: compactProfileText.implicitHeight + Style.space(8)
-              spacing: Style.space(12)
-
-              Text {
-                textFormat: Text.PlainText
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.monitorCount > 1 ? "󰍺" : "󰍹"
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.icon
-              }
-
-              Column {
-                id: compactProfileText
-                width: parent.width - parent.children[0].width - parent.spacing
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Style.space(1)
-
-                Text {
-                  textFormat: Text.PlainText
-                  width: parent.width
-                  text: root.profileStatusTitle
-                  color: root.foreground
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.body
-                  font.bold: true
-                  elide: Text.ElideRight
-                }
-
-                Text {
-                  textFormat: Text.PlainText
-                  width: parent.width
-                  text: root.profileStatusSubtitle
-                  color: root.dim
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.bodySmall
-                  elide: Text.ElideRight
-                }
-              }
+              title: root.profileStatusTitle
+              subtitle: root.profileStatusSubtitle
+              iconText: root.monitorCount > 1 ? "󰍺" : "󰍹"
+              foreground: root.foreground
+              dim: root.dim
+              fontFamily: root.fontFamily
             }
 
             Button {
@@ -2175,9 +2146,7 @@ Panel {
 
             Button {
               width: parent.width
-              visible: root.profileAutomatic && root.documentReady
-                && root.connectedDisplayCount > 0 && !root.exactDisplayProfile
-                && root.previewTransaction === "" && !root.previewPending
+              visible: root.newSetupAvailable
               text: "Create profile"
               selected: true
               bordered: true
@@ -2226,25 +2195,9 @@ Panel {
           }
 
           Row {
-            anchors.left: editorTabsRow.right
-            anchors.leftMargin: Style.space(10)
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(10)
-
-            Text {
-              textFormat: Text.PlainText
-              anchors.verticalCenter: parent.verticalCenter
-              width: Math.max(0, parent.width - identifyAllButton.width - keyboardHelpButton.width - compactButton.width - parent.spacing * 3)
-              horizontalAlignment: Text.AlignRight
-              text: "Current setup · " + root.profileStatusTitle
-                + (!root.managedChecked ? " · read-only"
-                  : (root.profileAutomatic ? " · automatic" : " · pinned"))
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              elide: Text.ElideRight
-            }
 
             Button {
               id: identifyAllButton
@@ -2296,6 +2249,20 @@ Panel {
               }
 
               onClicked: root.keyboardHelpOpen = true
+            }
+
+            Button {
+              id: openTuiButton
+              anchors.verticalCenter: parent.verticalCenter
+              text: "TUI"
+              iconText: "󰆍"
+              iconSize: fontSize
+              implicitHeight: identifyAllButton.implicitHeight
+              bordered: true
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              fontSize: Style.font.caption
+              onClicked: root.launchTui()
             }
 
             Button {
@@ -3687,186 +3654,205 @@ Panel {
           }
         }
 
-        BorderSurface {
+        Item {
           id: editorFooter
           anchors.left: parent.left
           anchors.right: parent.right
           anchors.bottom: parent.bottom
           readonly property real controlHeight: Math.ceil(Math.max(
-            openTuiButton.implicitHeight, profileNameInput.implicitHeight,
+            profileNameInput.implicitHeight,
             currentProfileBadge.implicitHeight, activateFooterButton.implicitHeight,
-            discardDraftButton.implicitHeight, saveDraftButton.implicitHeight))
-          height: Math.max(Style.space(58), controlHeight + Style.space(18))
-          color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.025)
-          borderSpec: Border.controlSpec(root.draftDirty || root.creatingProfile ? "selected" : "normal", root.foreground, Color.accent)
-          radius: Style.cornerRadius
+            discardDraftButton.implicitHeight, saveDraftButton.implicitHeight,
+            createFooterButton.implicitHeight, automaticFooterButton.implicitHeight))
+          height: Math.max(Style.space(58), footerContent.implicitHeight + Style.space(18))
           opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
 
-          Row {
+          BorderSurface {
+            id: profileFooter
             anchors.fill: parent
-            anchors.leftMargin: Style.space(12)
-            anchors.rightMargin: Style.space(12)
-            spacing: Style.space(9)
-
-            Button {
-              id: openTuiButton
-              anchors.verticalCenter: parent.verticalCenter
-              height: editorFooter.controlHeight
-              text: "TUI"
-              iconText: "󰆍"
-              bordered: true
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-              onClicked: root.launchTui()
-            }
+            color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.025)
+            borderSpec: Border.controlSpec(root.draftDirty || root.creatingProfile ? "selected" : "normal", root.foreground, Color.accent)
+            radius: Style.cornerRadius
 
             Column {
-              width: Math.max(0, parent.width
-                - openTuiButton.width
-                - (currentProfileBadge.visible ? currentProfileBadge.width + parent.spacing : 0)
-                - (activateFooterButton.visible ? activateFooterButton.width + parent.spacing : 0)
-                - (discardDraftButton.visible ? discardDraftButton.width + parent.spacing : 0)
-                - (saveDraftButton.visible ? saveDraftButton.width + parent.spacing : 0)
-                - (profileNameInput.visible ? profileNameInput.width + parent.spacing : 0)
-                - parent.spacing)
+              id: footerContent
+              anchors.left: parent.left
+              anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
-              spacing: Style.space(1)
-
-              Text {
-                textFormat: Text.PlainText
-                width: parent.width
-                text: root.lastError !== ""
-                  ? root.lastError
-                  : (root.creatingProfile ? "Creating a profile for this setup"
-                    : (root.draftDirty ? "Unsaved display changes"
-                    : (root.activePage === "profiles"
-                      ? (root.selectedSavedProfileCurrent
-                        ? "This profile is active"
-                        : "Browsing " + root.selectedSavedProfileName)
-                      : "Editing " + root.profileStatusTitle)))
-                color: root.lastError !== "" ? root.urgent : root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.body
-                font.bold: root.draftDirty
-                elide: Text.ElideRight
-              }
-
-              Text {
-                textFormat: Text.PlainText
-                width: parent.width
-                text: root.editPending ? "Checking layout…"
-                  : (root.creatingProfile ? "Name it, arrange the displays, then preview and save."
-                  : (root.activePage === "profiles"
-                    ? "Preview, then keep to use this profile until displays change."
-                    : "Changes are previewed safely before they can be saved."))
-                color: root.dim
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-                elide: Text.ElideRight
-              }
-            }
-
-            TextField {
-              id: profileNameInput
-              visible: root.creatingProfile || (root.draftDirty && root.sourceProfile === "")
-              anchors.verticalCenter: parent.verticalCenter
-              height: editorFooter.controlHeight
-              width: Style.space(190)
-              text: root.saveName
-              placeholderText: root.creatingProfile ? "Name this display setup" : "New profile name"
-              foreground: root.foreground
-              enabled: root.managedChecked
-              onTextEdited: root.saveName = text
-              onAccepted: root.previewDraft()
-            }
-
-            BorderSurface {
-              id: currentProfileBadge
-              anchors.verticalCenter: parent.verticalCenter
-              height: editorFooter.controlHeight
-              visible: root.activePage === "profiles"
-                && root.selectedSavedProfileCurrent
-              implicitWidth: currentProfileBadgeRow.implicitWidth + contentLeftInset + contentRightInset
-              implicitHeight: currentProfileBadgeRow.implicitHeight + contentTopInset + contentBottomInset
-              leftPadding: Style.spacing.controlPaddingX
-              rightPadding: Style.spacing.controlPaddingX
-              topPadding: Style.spacing.controlPaddingY
-              bottomPadding: Style.spacing.controlPaddingY
-              color: Style.selectedFillFor(root.foreground, Color.accent)
-              borderSpec: Border.controlSpec("selected", root.foreground, Color.accent)
-              radius: Style.cornerRadius
+              anchors.leftMargin: Style.space(12)
+              anchors.rightMargin: Style.space(12)
+              spacing: Style.space(9)
 
               Row {
-                id: currentProfileBadgeRow
-                anchors.centerIn: parent
-                spacing: Style.spacing.controlGap
+                width: parent.width
+                height: Math.max(expandedProfileStatus.height, cleanFooterActions.height)
+                spacing: Style.space(9)
 
-                Text {
-                  textFormat: Text.PlainText
-                  text: "󰄬"
-                  color: Style.selectedStateColor(root.foreground, Color.accent)
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.icon
+                ProfileStatus {
+                  id: expandedProfileStatus
                   anchors.verticalCenter: parent.verticalCenter
+                  width: Math.max(0, parent.width - (cleanFooterActions.width > 0
+                    ? cleanFooterActions.width + parent.spacing : 0))
+                  title: root.lastError !== ""
+                    ? root.lastError
+                    : (root.creatingProfile ? "Creating a profile for this setup"
+                      : (root.draftDirty ? "Unsaved display changes"
+                      : (root.activePage === "profiles"
+                        ? (root.selectedSavedProfileCurrent
+                          ? "This profile is active"
+                          : "Browsing " + root.selectedSavedProfileName)
+                        : root.profileStatusTitle)))
+                  subtitle: root.editPending ? "Checking layout…"
+                    : (root.creatingProfile ? "Name it, arrange the displays, then preview and save."
+                    : (root.draftDirty ? "Changes are previewed safely before they can be saved."
+                    : (root.activePage === "profiles"
+                      ? "Preview, then keep to use this profile until displays change."
+                      : root.profileStatusSubtitle)))
+                  iconText: root.monitorCount > 1 ? "󰍺" : "󰍹"
+                  foreground: root.lastError !== "" ? root.urgent : root.foreground
+                  dim: root.dim
+                  fontFamily: root.fontFamily
                 }
 
-                Text {
-                  textFormat: Text.PlainText
-                  text: "Current profile"
-                  color: Style.selectedStateColor(root.foreground, Color.accent)
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.body
-                  font.bold: true
+                Row {
+                  id: cleanFooterActions
                   anchors.verticalCenter: parent.verticalCenter
+                  spacing: Style.space(9)
+
+                  Button {
+                    id: createFooterButton
+                    height: editorFooter.controlHeight
+                    visible: root.newSetupAvailable && !root.draftDirty
+                      && !root.creatingProfile && root.activePage !== "profiles"
+                    text: "Create profile"
+                    selected: true
+                    bordered: true
+                    enabled: root.managedChecked && root.editorReady && !root.editPending
+                    foreground: root.foreground
+                    fontFamily: root.fontFamily
+                    onClicked: root.beginCreateProfile()
+                  }
+
+                  Button {
+                    id: automaticFooterButton
+                    height: editorFooter.controlHeight
+                    visible: !root.profileAutomatic && !root.draftDirty && !root.creatingProfile
+                      && root.activePage !== "profiles" && !root.daemonPreview
+                    text: root.profileModePending ? "Resuming…" : "Resume automatic matching"
+                    bordered: true
+                    enabled: root.managedChecked && !root.profileModePending && !root.previewPending
+                    foreground: root.foreground
+                    fontFamily: root.fontFamily
+                    onClicked: root.setProfileAutomatic(true)
+                  }
+                }
+              }
+
+              Flow {
+                id: footerActions
+                width: parent.width
+                spacing: Style.space(9)
+                visible: root.draftDirty || root.creatingProfile || root.activePage === "profiles"
+
+                TextField {
+                  id: profileNameInput
+                  visible: root.creatingProfile || (root.draftDirty && root.sourceProfile === "")
+                  height: editorFooter.controlHeight
+                  width: Math.min(Style.space(190), parent.width)
+                  text: root.saveName
+                  placeholderText: root.creatingProfile ? "Name this display setup" : "New profile name"
+                  foreground: root.foreground
+                  enabled: root.managedChecked
+                  onTextEdited: root.saveName = text
+                  onAccepted: root.previewDraft()
+                }
+
+                BorderSurface {
+                  id: currentProfileBadge
+                  height: editorFooter.controlHeight
+                  visible: root.activePage === "profiles"
+                    && root.selectedSavedProfileCurrent
+                  implicitWidth: currentProfileBadgeRow.implicitWidth + contentLeftInset + contentRightInset
+                  implicitHeight: currentProfileBadgeRow.implicitHeight + contentTopInset + contentBottomInset
+                  leftPadding: Style.spacing.controlPaddingX
+                  rightPadding: Style.spacing.controlPaddingX
+                  topPadding: Style.spacing.controlPaddingY
+                  bottomPadding: Style.spacing.controlPaddingY
+                  color: Style.selectedFillFor(root.foreground, Color.accent)
+                  borderSpec: Border.controlSpec("selected", root.foreground, Color.accent)
+                  radius: Style.cornerRadius
+
+                  Row {
+                    id: currentProfileBadgeRow
+                    anchors.centerIn: parent
+                    spacing: Style.spacing.controlGap
+
+                    Text {
+                      textFormat: Text.PlainText
+                      text: "󰄬"
+                      color: Style.selectedStateColor(root.foreground, Color.accent)
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.icon
+                      anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Text {
+                      textFormat: Text.PlainText
+                      text: "Current profile"
+                      color: Style.selectedStateColor(root.foreground, Color.accent)
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.body
+                      font.bold: true
+                      anchors.verticalCenter: parent.verticalCenter
+                    }
+                  }
+                }
+
+                Button {
+                  id: activateFooterButton
+                  height: editorFooter.controlHeight
+                  visible: root.activePage === "profiles"
+                    && !root.selectedSavedProfileCurrent
+                  text: "Use this profile"
+                  selected: enabled
+                  bordered: true
+                  enabled: !root.draftDirty && !!root.selectedSavedProfile
+                    && root.managedChecked
+                    && root.previewTransaction === "" && !root.previewPending
+                  foreground: root.foreground
+                  fontFamily: root.fontFamily
+                  onClicked: root.activateSelectedSavedProfile()
+                }
+
+                Button {
+                  id: discardDraftButton
+                  height: editorFooter.controlHeight
+                  visible: root.draftDirty || root.creatingProfile
+                  text: "Discard"
+                  bordered: true
+                  enabled: !root.editorLoading && !root.editPending
+                  foreground: root.foreground
+                  fontFamily: root.fontFamily
+                  onClicked: root.requestEditorState()
+                }
+
+                Button {
+                  id: saveDraftButton
+                  height: editorFooter.controlHeight
+                  visible: root.draftDirty || root.creatingProfile
+                  text: "Preview & save"
+                  selected: true
+                  bordered: true
+                  enabled: root.managedChecked && !root.editPending && !root.previewPending
+                    && (root.sourceProfile !== "" || String(root.saveName || "").trim() !== "")
+                  foreground: root.foreground
+                  fontFamily: root.fontFamily
+                  onClicked: root.previewDraft()
                 }
               }
             }
-
-            Button {
-              id: activateFooterButton
-              anchors.verticalCenter: parent.verticalCenter
-              height: editorFooter.controlHeight
-              visible: root.activePage === "profiles"
-                && !root.selectedSavedProfileCurrent
-              text: "Use this profile"
-              selected: enabled
-              bordered: true
-              enabled: !root.draftDirty && !!root.selectedSavedProfile
-                && root.managedChecked
-                && root.previewTransaction === "" && !root.previewPending
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-              onClicked: root.activateSelectedSavedProfile()
-            }
-
-            Button {
-              id: discardDraftButton
-              anchors.verticalCenter: parent.verticalCenter
-              height: editorFooter.controlHeight
-              visible: root.draftDirty || root.creatingProfile
-              text: "Discard"
-              bordered: true
-              enabled: !root.editorLoading && !root.editPending
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-              onClicked: root.requestEditorState()
-            }
-
-            Button {
-              id: saveDraftButton
-              anchors.verticalCenter: parent.verticalCenter
-              height: editorFooter.controlHeight
-              visible: root.draftDirty || root.creatingProfile
-              text: "Preview & save"
-              selected: true
-              bordered: true
-              enabled: root.managedChecked && !root.editPending && !root.previewPending
-                && (root.sourceProfile !== "" || String(root.saveName || "").trim() !== "")
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-              onClicked: root.previewDraft()
-            }
           }
+
         }
       }
 

@@ -49,8 +49,23 @@ Use **1 Layout · 2 Workspaces · 3 Profiles** in both clients. Main tabs use at
 body text size with clear selection and focus. Preferences, Identify, Keys, and
 Compact are secondary actions. Secondary controls and long setup names may wrap
 or move into an overflow menu.
-Right-align setup status beside the header actions, away from the navigation tabs.
-Use single-spaced separators: `Current setup · Desktop Work · automatic`.
+Keep Identify all, Keys, TUI, and Compact together in the header, with equal
+compact button heights. Do not repeat setup status between the tabs and actions.
+
+Repeat the compact setup status and contextual Create profile action in the
+expanded footer. Use one full-width status/action area, not a separate TUI card.
+Use the same status component in both
+views. Creating a profile retains the draft, exposes naming and Preview & save,
+and keeps these actions outside scrolling content. Dirty, creating, and profile
+browsing states replace live setup text with their relevant state and actions.
+For a saved setup, show its name and display count. Omit redundant "Current setup",
+"Best match", and the normal automatic-mode label; paused matching remains explicit
+and offers Resume automatic matching.
+
+Use the backend's preferred Sequential strategy for new plans. Ambiguous
+single-display imports use groups of three while preserving workspace total and
+persistence. Explicit saved strategies still win; the panel must not independently
+infer or migrate workspace intent.
 
 Use a canvas and one selected-display inspector. Readable model/name and status
 come first; mode and scale are secondary. Show all six hardware fields directly

@@ -1,5 +1,32 @@
 # Implementation status, 2026-09-22
 
+## Follow-up, 2026-09-24 (local review build)
+
+The expanded footer now shares the compact setup-status component and Create
+profile action. TUI is a compact header button alongside Identify all, Keys, and
+Compact; there is no separate TUI card or duplicate Current setup/automatic line.
+Saved setups show their name and display count. Paused matching stays actionable.
+Naming, Discard, and Preview & save remain visible outside the scrolling content.
+
+The companion Go change prefers Sequential/groups of three when importing
+ambiguous single-display workspace rules. Explicit saved strategies, totals, and
+persistence are preserved. The maintainer explicitly authorized updating their
+Desktop Solo profile to Sequential/3/6; this is not a general profile migration.
+
+Validation: 80 Node tests, 21 Qt tests, qmllint, plugin validation, and whitespace
+checks passed. Live before/after compact and expanded captures were inspected
+at 430px and 1120px content widths on a 1.33333-scale desktop. Create profile
+was exercised without applying/saving a layout. Captures remain local; desktop
+backgrounds may contain unrelated private material. No new small-screen/light
+theme check was performed for this change. The maintainer reported successful
+connect/disconnect behavior; no physical projector/lid/suspend test is claimed.
+
+The Omarchy-guided install required a shell restart because plugin rescanning
+retained cached QML. No published release/tag was changed. Physical recovery and
+small-screen acceptance checks remain outstanding. Earlier status below is historical.
+
+## Original release-candidate status
+
 Release candidate 2.4.0-rc.1 across this repository and backend 1.19.0-rc.1.
 This does not complete the accepted design. The release candidates are intended
 for hardware and interaction testing; no marketplace verification is requested

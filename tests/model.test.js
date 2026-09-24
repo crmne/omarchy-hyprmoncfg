@@ -54,19 +54,58 @@ test("profile details end with the command and deletion uses native panel contro
 test("footer controls share their tallest natural height and keep naming beside save", () => {
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
   const footer = qml.slice(qml.indexOf("id: editorFooter"), qml.indexOf("\n      KeyboardHelp {"))
-  const controls = ["openTuiButton", "profileNameInput", "currentProfileBadge", "activateFooterButton", "discardDraftButton", "saveDraftButton"]
+  const controls = ["profileNameInput", "currentProfileBadge", "activateFooterButton", "discardDraftButton", "saveDraftButton", "createFooterButton", "automaticFooterButton"]
   const height = footer.match(/readonly property real controlHeight: ([\s\S]*?)\n          height:/)[1]
   for (const tallest of controls) {
     const sizes = Object.fromEntries(controls.map(id => [id, { implicitHeight: id === tallest ? 43.2 : 30 }]))
     assert.equal(vm.runInNewContext(height, sizes), 44, tallest)
   }
   for (const id of controls)
-    assert.match(footer, new RegExp("id: " + id + "\\s+anchors.verticalCenter: parent.verticalCenter\\s+height: editorFooter.controlHeight|id: " + id + "\\s+visible:[^\\n]+\\s+anchors.verticalCenter: parent.verticalCenter\\s+height: editorFooter.controlHeight"))
-  assert.ok(footer.indexOf("id: openTuiButton") < footer.indexOf("Column {"))
+    assert.match(footer, new RegExp("id: " + id + "[\\s\\S]*?height: editorFooter.controlHeight"))
+  assert.match(footer, /id: profileFooter\s+anchors.fill: parent/)
+  assert.doesNotMatch(footer, /id: openTuiButton/)
+  assert.match(footer, /Flow \{\s+id: footerActions/)
   assert.ok(footer.indexOf("Column {") < footer.indexOf("id: profileNameInput"))
   assert.ok(footer.indexOf("id: profileNameInput") < footer.indexOf("id: discardDraftButton"))
   assert.ok(footer.indexOf("id: discardDraftButton") < footer.indexOf("id: saveDraftButton"))
   assert.doesNotMatch(footer, /Math.max\(Style.space\(180\)/)
+})
+
+test("new setup actions share preview guards and creation retains the draft", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const available = qml.match(/readonly property bool newSetupAvailable: ([\s\S]*?)\n  readonly property/)[1]
+  const root = { profileAutomatic: true, documentReady: true, connectedDisplayCount: 2,
+    exactDisplayProfile: null, daemonPreview: null, previewTransaction: "", previewPending: false,
+    managedChecked: true, editorReady: true, editPending: false,
+    draftProfile: { outputs: [{ key: "a", x: 120 }], workspaces: { strategy: "sequential" } },
+    sourceProfile: "", saveName: "" }
+  assert.equal(vm.runInNewContext(available, { root }), true)
+  for (const [field, value] of [["profileAutomatic", false], ["documentReady", false],
+    ["connectedDisplayCount", 0], ["exactDisplayProfile", { name: "Desk" }],
+    ["daemonPreview", { profile_name: "TUI preview" }], ["previewTransaction", "preview"],
+    ["previewPending", true]]) {
+    const previous = root[field]
+    root[field] = value
+    assert.equal(vm.runInNewContext(available, { root }), false, field)
+    root[field] = previous
+  }
+  let focused = false
+  const create = panelFunction("beginCreateProfile", root, {
+    Qt: { callLater: fn => fn() }, profileNameInput: { forceActiveFocus: () => { focused = true } }
+  })
+  const original = JSON.stringify(root.draftProfile)
+  root.daemonPreview = { profile_name: "TUI preview" }
+  create()
+  assert.equal(focused, false)
+  root.daemonPreview = null
+  create()
+  assert.equal(root.creatingProfile, true)
+  assert.equal(root.expanded, true)
+  assert.equal(root.activePage, "layout")
+  assert.equal(root.saveName, "")
+  assert.equal(focused, true)
+  assert.equal(JSON.stringify(root.draftProfile), original)
+  assert.notEqual(root.profileDefaults, root.draftProfile)
 })
 
 test("Preview & save requires a manually entered name and stays disabled while busy", () => {
@@ -74,7 +113,7 @@ test("Preview & save requires a manually entered name and stays disabled while b
   const save = qml.slice(qml.indexOf("id: saveDraftButton"))
   assert.match(save, /text: "Preview & save"/)
   assert.doesNotMatch(save, /Name & save/)
-  const enabled = save.match(/enabled: ([\s\S]*?)\n              foreground:/)[1]
+  const enabled = save.match(/enabled: ([\s\S]*?)\n\s+foreground:/)[1]
   const root = { managedChecked: true, editPending: false, previewPending: false, sourceProfile: "", saveName: "" }
   const evaluate = () => vm.runInNewContext(enabled, { root })
   assert.equal(evaluate(), false)
@@ -572,10 +611,14 @@ test("brightness follows the selected connected display without becoming profile
   assert.equal(Object.hasOwn(profile.outputs[0], "brightness"), false)
 })
 
-test("expanded setup status is right aligned with single-spaced separators", () => {
+test("expanded header keeps secondary actions together and setup status in the footer", () => {
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
-  assert.match(qml, /horizontalAlignment: Text\.AlignRight\s+text: "Current setup · "/)
-  assert.doesNotMatch(qml, /Current setup  ·  /)
+  const nav = qml.slice(qml.indexOf("id: editorNav"), qml.indexOf("id: previewBanner"))
+  assert.doesNotMatch(nav, /Current setup|profileStatusTitle|profileAutomatic/)
+  assert.match(nav, /id: openTuiButton[\s\S]*?implicitHeight: identifyAllButton.implicitHeight/)
+  assert.match(nav, /id: openTuiButton[\s\S]*?onClicked: root.launchTui\(\)/)
+  assert.match(qml, /id: expandedProfileStatus/)
+  assert.doesNotMatch(qml, /Best match for this setup/)
 })
 
 test("hardware inspector shows every field directly and only Identify is an action", () => {
@@ -1058,8 +1101,8 @@ test("the compact profile is stable status with contextual actions, not a select
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
   assert.match(qml, /text: "PROFILE"/)
   assert.match(qml, /id: compactProfileStatus/)
-  assert.match(qml, /text: root\.profileStatusTitle/)
-  assert.match(qml, /text: root\.profileStatusSubtitle/)
+  assert.match(qml, /title: root\.profileStatusTitle/)
+  assert.match(qml, /subtitle: root\.profileStatusSubtitle/)
   assert.match(qml, /text: root\.profileModePending \? "Resuming automatic matching…" : "Resume automatic matching"/)
   assert.match(qml, /text: "Create profile"/)
   assert.match(qml, /root\.beginCreateProfile\(\)/)
@@ -1263,7 +1306,7 @@ test("unmanaged mode stays inspectable but makes configuration read-only", () =>
   assert.match(qml, /if \(!root\.managedChecked\) return\s+var name = root\.draftName\(\)/)
   assert.match(qml, /enabled: root\.managedChecked && !!root\.selectedOutput/)
   assert.match(qml, /enabled: root\.managedChecked\s+opacity: root\.managedChecked \? 1\.0 : root\.unmanagedOpacity/)
-  assert.match(qml, /!root\.managedChecked \? " · read-only"/)
+  assert.match(qml, /if \(!root.managedChecked\) return "Not managed by hyprmoncfg"/)
 })
 
 test("the profile explains the unmanaged state", () => {
@@ -1279,7 +1322,7 @@ test("profile status distinguishes preview, manual, exact, and new display setup
   assert.match(qml, /if \(root\.profileAutomatic && root\.exactDisplayProfileName !== ""\) return root\.exactDisplayProfileName/)
   assert.match(qml, /return "New display setup"/)
   assert.match(qml, /return "Automatic matching is paused"/)
-  assert.match(qml, /return displays \+ " · Best match for this setup"/)
+  assert.match(qml, /if \(root.exactDisplayProfileName !== ""\) return displays/)
   assert.match(qml, /return "No saved profile matches these displays"/)
 })
 

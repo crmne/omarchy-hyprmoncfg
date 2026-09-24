@@ -40,6 +40,7 @@ A small background service is what watches for this. It catches hotplug, lid and
 - Off and mirrored displays have selectable cards; select an off display to edit its Enabled setting
 - Profile actions are available with right-click, the visible menu button, or `Shift+F10`; deletion asks for confirmation
 - Use a saved profile directly with a 30-second preview; automatic selection need not be disabled first
+- Setup status and Create profile are available in compact and expanded views; the expanded header groups Identify all, Keys, TUI, and Compact without duplicating setup text
 - Canvas and Identify use connector, model with whole-inch size, resolution/refresh, scale/position, and workspaces without display numbering or logical desktop dimensions; the inspector separates Model and Panel size
 - The inspector shows all hardware details directly; live hardware brightness remains in compact mode only
 - The companion TUI review build shares the display-summary conventions; standalone TUI Identify remains pending
