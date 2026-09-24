@@ -4,7 +4,9 @@ An Omarchy bar panel for [hyprmoncfg](https://hyprmoncfg.dev/). Create multi-mon
 
 ![hyprmoncfg for Omarchy](preview.png)
 
-Version 2.0 brings the panel to practical feature parity with the TUI for monitor layouts, profiles, and workspace planning—and then goes further with direct pointer-driven arrangement and per-display brightness. The compact view keeps the everyday controls close; expand it for the complete spatial editor. The TUI remains available for a keyboard-first or standalone workflow.
+Version 2.4 brings a cleaner Layout / Workspaces / Profiles editor, more discoverable display and profile actions, and refreshes that preserve your edits while displays connect. The compact view keeps everyday controls close; expand it for the spatial editor. The companion TUI shares the core operations and display terminology, with native keyboard-first controls. See the [release notes](design/releases/2.4.0.md) for highlights and remaining differences.
+
+Screenshots show the actual panel with synthetic display/profile data in an isolated capture host, not a live hardware test.
 
 <details>
 <summary>See the expanded editor</summary>
@@ -16,6 +18,10 @@ Version 2.0 brings the panel to practical feature parity with the TUI for monito
 ### Saved profiles
 
 ![Expanded saved profile browser](screenshots/profiles.png)
+
+### Workspace planning
+
+![Sequential workspace planning](screenshots/workspaces.png)
 
 </details>
 
@@ -43,7 +49,7 @@ A small background service is what watches for this. It catches hotplug, lid and
 - Setup status and Create profile are available in compact and expanded views; the expanded header groups Identify all, Keys, TUI, and Compact without duplicating setup text
 - Canvas and Identify use connector, model with whole-inch size, resolution/refresh, scale/position, and workspaces without display numbering or logical desktop dimensions; the inspector separates Model and Panel size
 - The inspector shows all hardware details directly; live hardware brightness remains in compact mode only
-- The companion TUI review build shares the display-summary conventions; standalone TUI Identify remains pending
+- The companion TUI shares the display-summary conventions; standalone TUI Identify remains pending
 
 - The expanded panel mirrors the TUI shortcuts: `1`/`2`/`3` switch pages, `a` applies, `s` saves, `r` resets, and `?` shows the contextual key guide.
 - On the layout, arrows move the selected display; `Shift`, `Ctrl`, and `Alt` preserve the TUI's fine movement and nearest-display snapping
@@ -84,8 +90,8 @@ Neutral SDR multipliers are shown as 1, including profiles that omit them. Reset
 
 - One profile per place you work, applied automatically on hotplug, lid and resume
 - Two identical monitors are told apart, and a layout survives moving a cable to another port
-- Changes you make by hand revert on their own unless you confirm them, so a layout you cannot see cannot strand you
-- A machine that boots with every display switched off is recovered rather than left for you to fix from a TTY
+- Previewed changes revert unless you confirm within 30 seconds by default
+- Failed automatic applies retry with bounded backoff; all-displays-off startup and failed-wake rescue are not yet complete
 
 **Workspaces**
 
@@ -95,7 +101,7 @@ Neutral SDR multipliers are shown as 1, including profiles that omit them. Reset
 - Group size appears only for Sequential plans; type an exact workspace count and press `Enter`
 - In manual mode, move each numbered workspace directly between displays with the row arrows or keyboard
 - Per-monitor workspace rules, saved with the profile and applied with it
-- Persistence: First per display or All assigned with the companion development daemon; older daemons show Requires newer daemon. Manual rules retain their individual persistence flags.
+- Persistence: First per display or All assigned with hyprmoncfg 1.19.0. Manual rules retain their individual persistence flags.
 
 ## Safer display refresh and identification
 
@@ -131,7 +137,7 @@ A fresh install takes `hyprmoncfg-bin`, the ready-made build; a machine that alr
 ## Requirements
 
 - Omarchy Quattro with third-party shell plugins
-- hyprmoncfg 1.19.0-rc.1 or newer for this release candidate
+- hyprmoncfg 1.19.0 or newer
 
 ## Staying up to date
 
@@ -178,7 +184,7 @@ planned improvements, not additional capabilities in the current release.
 The confirmation service controls previews it starts itself, and can recover a
 preview when the daemon reports that its original client disconnected. A live
 TUI keeps its own confirmation. This recovery requires the daemon's
-`preview.reclaimable` status field. The required hyprmoncfg 1.19.0-rc.1 backend also keeps
+`preview.reclaimable` status field. The required hyprmoncfg 1.19.0 backend also keeps
 Omarchy's lock/wake handling aligned with the active laptop scale and position.
 
 After changes to preview handling, test position and scale changes, disabling

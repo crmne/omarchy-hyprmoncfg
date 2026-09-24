@@ -1,5 +1,28 @@
 # Implementation status, 2026-09-22
 
+## Stable 2.4.0 release preparation, 2026-09-24
+
+Paired with backend 1.19.0. The release notes summarize shipped capabilities and
+remaining gaps; the older roadmap and review entries below are historical.
+The backend requirement is 1.19.0 in both the manifest and runtime check.
+
+README, marketplace preview, and Layout/Workspaces/Profiles images were refreshed.
+Published images are actual production QML rendered with synthetic profiles and
+displays, using packaged Omarchy controls in an isolated host with a substitute
+window container. Reviewed sizes: compact 430x598 and expanded 1120x808, including
+a synthetic light-palette Layout capture. Final captures use offscreen rendering
+to avoid compositor resizing; the first clipped on-screen capture pass was rejected.
+A separate live-shell compact capture was inspected locally, not published, and
+confirmed current hardware remained usable. No profiles or monitor settings were
+changed to make these images. This is not a layer-surface interaction or physical
+hotplug acceptance test. Earlier live checks are recorded below.
+
+Release validation: 121 Node tests, 21 offscreen Qt tests, qmllint, plugin
+validation, and whitespace checks passed. Full backend tests, vet, command builds,
+and hypr/daemon/IPC/TUI race tests passed; tidy left dependency files unchanged.
+Fresh TUI screenshots are in the companion release. The isolated renderer is
+documentation evidence, not proof of full panel/TUI parity or physical recovery.
+
 ## Reliability integration, 2026-09-24
 
 Extracted the independent reliability fixes from mapleroyal's panel PR #18 and
