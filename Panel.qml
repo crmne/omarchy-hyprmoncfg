@@ -37,6 +37,13 @@ Panel {
   property int requestSequence: 0
   property var pendingMethods: ({})
   property var pendingContexts: ({})
+  property int statusRevision: 0
+  readonly property bool readPending: Object.keys(root.pendingMethods).some(function(id) {
+    return ["status", "subscribe", "editor_state"].indexOf(root.pendingMethods[id]) >= 0
+  })
+  property bool displaysConnecting: false
+  property bool statusRetry: false
+  property bool editorRetry: false
   property int cursorIndex: 0
   property bool cursorActive: false
   property bool keyboardHelpOpen: false
@@ -60,6 +67,23 @@ Panel {
   property var workspacePlan: []
   property bool editorReady: false
   property bool editorLoading: false
+  property bool editorRefreshQueued: false
+  property bool editorResetQueued: false
+  property int monitorTopologyRevision: 0
+  property int editorInteractionRevision: 0
+  // Completed previews also invalidate reads that began before the transition.
+  property int editorPreviewRevision: 0
+  readonly property bool editorPreviewBlocked: root.previewPending || root.previewTransaction !== ""
+    || (!!root.previewCoordinator && (root.previewCoordinator.requestPending === true
+      || root.previewCoordinator.actionPending === true
+      || String(root.previewCoordinator.transactionId || "") !== ""))
+  readonly property bool editorRefreshBlocked: !root.opened || root.draftDirty
+    || root.creatingProfile || root.editPending || root.profileModePending
+    || root.editorPreviewBlocked
+    || keyCatcher.blocked
+  readonly property bool editorSnapshotStale: root.editorRefreshQueued || root.editorRetry
+    || root.statusRetry || root.displaysConnecting
+    || !Model.monitorSnapshotsMatch(root.document, root.editorDocument)
   property bool editPending: false
   property bool draftDirty: false
   property string sourceProfile: ""
@@ -78,6 +102,14 @@ Panel {
   property string previewDeadline: ""
   property int previewSeconds: 0
   property bool previewPending: false
+  onPreviewPendingChanged: { root.statusRevision++; root.editorPreviewRevision++ }
+  onPreviewTransactionChanged: { root.statusRevision++; root.editorPreviewRevision++ }
+  readonly property bool identifyBlockedByPreview: root.previewPending || root.previewTransaction !== ""
+    || !!root.daemonPreview || (!!root.previewCoordinator && root.previewCoordinator.opened === true)
+  onIdentifyBlockedByPreviewChanged: {
+    if (root.identifyBlockedByPreview && root.previewCoordinator
+        && typeof root.previewCoordinator.cancelIdentify === "function") root.previewCoordinator.cancelIdentify()
+  }
   property int brightnessPercent: 1
   property int pendingBrightnessPercent: 1
   property bool brightnessAvailable: false
@@ -87,6 +119,13 @@ Panel {
   property bool brightnessSetQueued: false
   property string brightnessSetConnector: ""
   property string pendingBrightnessConnector: ""
+
+  // Automatic reads must not replace input started after their request. The
+  // existing key catcher also covers text buffers, dropdowns, and exec editing.
+  onEditorRefreshBlockedChanged: root.editorInteractionRevision++
+  onSelectedSavedProfileNameChanged: root.editorInteractionRevision++
+  onSelectedOutputKeyChanged: root.editorInteractionRevision++
+  onProfileChoiceChanged: root.editorInteractionRevision++
 
   readonly property var monitorSummaries: document && document.monitors instanceof Array ? document.monitors : []
   readonly property var layoutDisplays: root.daemonPreview && root.daemonPreview.profile
@@ -101,7 +140,8 @@ Panel {
       ? Model.hiddenProfileDisplays(root.draftProfile)
       : Model.hiddenDisplays(root.backendConnected ? monitorSummaries : []))
   readonly property int monitorCount: {
-    return layoutDisplays.length
+    return root.backendConnected && root.documentReady
+      ? root.monitorSummaries.length : layoutDisplays.length
   }
   readonly property string activeProfile: root.managedChecked
     ? Model.currentProfileName(root.document) : ""
@@ -130,6 +170,7 @@ Panel {
     && !root.daemonPreview && root.previewTransaction === "" && !root.previewPending
   readonly property string profileStatusTitle: {
     if (!root.managedChecked) return "Not managed by hyprmoncfg"
+    if (root.displaysConnecting) return "Displays connecting…"
     if (!root.documentReady) return root.serviceActionPending ? "Starting hyprmoncfg…" : "Loading profile…"
     if (root.pendingProfileName !== "") return root.pendingProfileName
     if (!root.profileAutomatic && root.displayedProfile !== "") return root.displayedProfile
@@ -139,6 +180,7 @@ Panel {
   }
   readonly property string profileStatusSubtitle: {
     if (!root.managedChecked) return "Turn on management for automatic profiles"
+    if (root.displaysConnecting) return "Waiting for display information; keeping the current view"
     if (!root.documentReady) return "Reading the active display layout"
     var displays = root.connectedDisplayCount === 1 ? "1 display" : root.connectedDisplayCount + " displays"
     if (root.pendingProfileName !== "") return displays + " · Awaiting confirmation"
@@ -225,6 +267,7 @@ Panel {
     if (!root.identifyAvailable) return
     if (!root.previewCoordinator.identifyDisplays(key))
       root.lastError = root.previewCoordinator.identifyError
+    else root.lastError = ""
   }
   readonly property var brightnessTarget: Model.brightnessTarget(root.draftProfile,
     root.selectedOutputKey, root.editorDocument.displays)
@@ -315,12 +358,15 @@ Panel {
   }
 
   function open() {
+    var alreadyOpen = root.opened
     root.controller.show()
     root.cursorActive = false
     root.cursorIndex = 0
     root.checkInstallation()
     if (root.compatible) root.checkServiceState()
-    if (root.backendConnected) root.requestEditorState()
+    // onOpenedChanged reloads a newly opened panel. Summoning an open panel
+    // must preserve its draft and must not queue a second destructive read.
+    if (alreadyOpen && root.backendConnected) root.requestEditorState(true)
   }
 
   function openFromHotkey() { root.open() }
@@ -464,6 +510,7 @@ Panel {
       root.previewPending = false
       root.editPending = false
       root.editorLoading = false
+
       root.lastError = "hyprmoncfg is reconnecting. Try again in a moment."
       return ""
     }
@@ -476,7 +523,11 @@ Panel {
       method: method
     }
     if (params !== undefined && params !== null) request.params = params
-    root.pendingMethods[id] = method
+    var methods = Object.assign({}, root.pendingMethods)
+    methods[id] = method
+    root.pendingMethods = methods
+    if (method === "status" || method === "subscribe")
+      context = Object.assign({}, context || {}, { statusRevision: root.statusRevision })
     if (context !== undefined && context !== null) root.pendingContexts[id] = context
     backendSocket.write(JSON.stringify(request) + "\n")
     backendSocket.flush()
@@ -485,13 +536,42 @@ Panel {
 
   function subscribe() { root.send("subscribe", {}) }
 
-  function requestEditorState() {
-    if (!root.backendConnected || root.editorLoading || root.previewTransaction !== "") return
-    root.editorLoading = true
-    root.send("editor_state", {})
+  function retryConnectingDisplays() {
+    if (root.readPending || root.previewPending) return
+    if (root.statusRetry) root.send("status", {})
+    else if (root.editorResetQueued) root.requestEditorState()
+    else if (root.editorRetry && !root.editorRefreshBlocked) root.requestEditorState(true)
   }
 
-  function updateEditor(value) {
+  function queueEditorRefresh(automatic) {
+    root.editorRefreshQueued = true
+    if (automatic !== true) root.editorResetQueued = true
+  }
+
+  function requestEditorState(automatic) {
+    if (!root.backendConnected) return
+    var automaticRefresh = automatic === true && !root.editorResetQueued
+    if (root.editorPreviewBlocked) {
+      root.queueEditorRefresh(automaticRefresh)
+      return
+    }
+    if (automaticRefresh && root.editorRefreshBlocked) return
+    if (root.editorLoading || root.readPending || root.statusRetry) {
+      root.queueEditorRefresh(automaticRefresh)
+      return
+    }
+    root.editorRefreshQueued = false
+    root.editorResetQueued = false
+    root.editorLoading = true
+    root.send("editor_state", {}, {
+      automaticEditorRefresh: automaticRefresh,
+      interactionRevision: root.editorInteractionRevision,
+      previewRevision: root.editorPreviewRevision,
+      topologyRevision: root.monitorTopologyRevision
+    })
+  }
+
+  function updateEditor(value, preserveSelection) {
     if (!Model.validEditorDocument(value)) {
       root.editorLoading = false
       root.lastError = "hyprmoncfg returned an invalid editor state."
@@ -508,17 +588,22 @@ Panel {
     var savedDefaults = root.sourceProfile !== ""
       ? Model.savedProfileByName(value, root.sourceProfile) : null
     root.profileDefaults = Model.clone(savedDefaults || value.profile)
-    root.selectedOutputKey = Model.initialOutputKey(root.draftProfile, value.displays)
-    root.profileChoice = root.activeProfile !== "" ? root.activeProfile : root.suggestedProfile
-    root.selectedSavedProfileName = root.profileChoice !== ""
-      ? root.profileChoice
-      : (value.profiles instanceof Array && value.profiles.length > 0 ? String(value.profiles[0].name || "") : "")
+    if (!preserveSelection || !Model.outputByKey(root.draftProfile, root.selectedOutputKey))
+      root.selectedOutputKey = Model.initialOutputKey(root.draftProfile, value.displays)
+    if (!preserveSelection || !Model.savedProfileByName(value, root.profileChoice))
+      root.profileChoice = root.activeProfile !== "" ? root.activeProfile : root.suggestedProfile
+    if (!preserveSelection || !Model.savedProfileByName(value, root.selectedSavedProfileName))
+      root.selectedSavedProfileName = root.profileChoice !== ""
+        ? root.profileChoice
+        : (value.profiles instanceof Array && value.profiles.length > 0 ? String(value.profiles[0].name || "") : "")
     root.saveName = root.sourceProfile
     root.editorReady = true
     root.editorLoading = false
     root.editPending = false
     root.draftDirty = false
     root.creatingProfile = false
+
+    root.editorRetry = false
     Qt.callLater(function() {
       root.normalizeWorkspaceCursor()
       if (root.activePage === "workspaces") root.ensureManualWorkspaceRules()
@@ -1149,9 +1234,20 @@ Panel {
 
   function updateDocument(value) {
     if (!value || typeof value !== "object") return
+    root.statusRevision++
+    root.statusRetry = false
+    root.displaysConnecting = false
+    if (root.lastError === "Displays are still connecting; try again shortly.") root.lastError = ""
+    var monitorsChanged = Model.monitorStateSignature(root.monitorSummaries)
+      !== Model.monitorStateSignature(value.monitors)
+      || String((root.document || {}).monitor_set_hash || "") !== String(value.monitor_set_hash || "")
     root.document = value
     root.documentReady = true
     root.syncDaemonPreview(value.daemon ? value.daemon.preview : null)
+    if (monitorsChanged) {
+      root.monitorTopologyRevision++
+      root.queueEditorRefresh(true)
+    }
     if (root.serviceActionPending) {
       var unmanaged = !!(value.daemon && value.daemon.unmanaged)
       if (root.serviceTargetManaged === !unmanaged) {
@@ -1203,20 +1299,52 @@ Panel {
     var method = root.pendingMethods[String(envelope.id)] || ""
     var context = root.pendingContexts[String(envelope.id)] || ({})
     delete root.pendingMethods[String(envelope.id)]
+    root.pendingMethods = Object.assign({}, root.pendingMethods)
     delete root.pendingContexts[String(envelope.id)]
+    // Events and preview transitions supersede snapshots from earlier reads.
+    if ((method === "status" || method === "subscribe")
+        && context.statusRevision !== root.statusRevision) {
+      // The snapshot is obsolete, but subscription still completes reconnect.
+      if (method === "subscribe" && root.opened && !root.editorReady && !root.editorLoading)
+        root.requestEditorState()
+      return
+    }
     if (envelope.error) {
       if (method === "editor_state") root.editorLoading = false
       if (method === "edit_profile") root.editPending = false
       if (method === "preview" || method === "commit" || method === "revert") root.previewPending = false
       if (method === "set_profile_auto") root.profileModePending = false
       root.lastError = String(envelope.error.message || "hyprmoncfg request failed")
+      if (envelope.error.code === "compositor_busy") {
+        root.displaysConnecting = true
+        root.statusRetry = true
+        if (method === "editor_state") {
+          root.editorRetry = true
+          root.queueEditorRefresh(context.automaticEditorRefresh === true)
+        }
+      }
       return
+    }
+    if (method === "editor_state") {
+      var snapshotChanged = !Model.monitorSnapshotsMatch(root.document, envelope.result)
+      if (snapshotChanged || context.topologyRevision !== root.monitorTopologyRevision
+          || root.editorPreviewBlocked || context.previewRevision !== root.editorPreviewRevision
+          || (context.automaticEditorRefresh
+            && (root.editorRefreshBlocked
+              || context.interactionRevision !== root.editorInteractionRevision))) {
+        root.editorLoading = false
+        root.queueEditorRefresh(context.automaticEditorRefresh === true)
+        // A newer editor snapshot can arrive before status, or after a lost
+        // status event. Refresh status as well so recovery can make progress.
+        if (snapshotChanged) root.statusRetry = true
+        return
+      }
     }
     if (method === "status" || method === "subscribe") {
       root.updateDocument(envelope.result)
       if (method === "subscribe" && root.opened) root.requestEditorState()
     }
-    else if (method === "editor_state") root.updateEditor(envelope.result)
+    else if (method === "editor_state") root.updateEditor(envelope.result, context.automaticEditorRefresh === true)
     else if (method === "edit_profile") {
       var result = envelope.result || {}
       if (!result.profile || !(result.profile.outputs instanceof Array)) {
@@ -1289,7 +1417,9 @@ Panel {
   Connections {
     target: root.previewCoordinator
     ignoreUnknownSignals: true
-    function onTransactionIdChanged() { root.syncDaemonPreview(root.daemonPreview) }
+    function onTransactionIdChanged() { root.statusRevision++; root.editorPreviewRevision++; root.syncDaemonPreview(root.daemonPreview) }
+    function onRequestPendingChanged() { root.statusRevision++; root.editorPreviewRevision++ }
+    function onActionPendingChanged() { root.statusRevision++; root.editorPreviewRevision++ }
     function onPreviewFinished() { root.clearPreview(true) }
     function onIdentifyErrorChanged() {
       if (root.previewCoordinator.identifyError) root.lastError = root.previewCoordinator.identifyError
@@ -1313,6 +1443,7 @@ Panel {
       brightnessSelectionTimer.restart()
     } else {
       brightnessSetDebounce.stop()
+
       profileActions.close()
       deleteConfirmation.close()
       root.deleteProfileName = ""
@@ -1338,8 +1469,15 @@ Panel {
         root.pendingContexts = ({})
         root.editorReady = false
         root.editorLoading = false
+        root.editorRefreshQueued = false
+        root.editorResetQueued = false
+        root.monitorTopologyRevision++
         root.editPending = false
         root.profileModePending = false
+
+        root.statusRetry = false
+        root.editorRetry = false
+        root.displaysConnecting = false
         root.clearPreview(false)
         if (root.compatible && (root.serviceEnabled || root.serviceActive))
           serviceRefreshTimer.restart()
@@ -1480,6 +1618,25 @@ Panel {
   }
 
   Process { id: tuiProcess }
+
+  // Status events arrive while the panel remains open, including hotplug and
+  // automatic profile changes. Refresh its separate editor snapshot after the
+  // burst settles, preserving edits and waiting for any in-flight read.
+  Timer {
+    interval: 1000
+    repeat: true
+    running: root.opened && root.backendConnected && (root.statusRetry || root.editorRetry)
+    onTriggered: root.retryConnectingDisplays()
+  }
+
+  Timer {
+    id: editorRefreshTimer
+    interval: 200
+    repeat: true
+    running: root.backendConnected && (root.editorResetQueued
+      || (root.editorRefreshQueued && !root.editorRefreshBlocked))
+    onTriggered: root.requestEditorState(!root.editorResetQueued)
+  }
 
   Timer {
     id: brightnessSelectionTimer
@@ -1633,8 +1790,9 @@ Panel {
         stop()
         return
       }
-      if (root.bar && typeof root.bar.summonBarWidget === "function")
-        root.bar.summonBarWidget(root.moduleName)
+      var host = root.bar && root.bar.shell ? root.bar.shell : null
+      if (host && typeof host.summon === "function")
+        host.summon(root.moduleName, "")
       if (attempts >= 20) stop()
     }
   }
@@ -2155,6 +2313,7 @@ Panel {
               fontFamily: root.fontFamily
               onClicked: root.beginCreateProfile()
             }
+
           }
         }
       }
@@ -2182,6 +2341,7 @@ Panel {
 
               Button {
                 required property var modelData
+                focusable: true
                 text: String(modelData.label || "")
                 selected: String(modelData.value || "") === root.activePage
                 foreground: root.foreground

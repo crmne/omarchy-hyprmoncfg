@@ -45,7 +45,7 @@ A small background service is what watches for this. It catches hotplug, lid and
 - The inspector shows all hardware details directly; live hardware brightness remains in compact mode only
 - The companion TUI review build shares the display-summary conventions; standalone TUI Identify remains pending
 
-- The expanded panel mirrors the TUI shortcuts: `1`/`2`/`3` switch pages, `a` applies, `s` saves, `r` resets, and `?` shows the contextual key guide
+- The expanded panel mirrors the TUI shortcuts: `1`/`2`/`3` switch pages, `a` applies, `s` saves, `r` resets, and `?` shows the contextual key guide.
 - On the layout, arrows move the selected display; `Shift`, `Ctrl`, and `Alt` preserve the TUI's fine movement and nearest-display snapping
 - Profile browsing and workspace settings use the same arrow, Enter, load, edit, and delete keys as the TUI
 
@@ -96,6 +96,14 @@ Neutral SDR multipliers are shown as 1, including profiles that omit them. Reset
 - In manual mode, move each numbered workspace directly between displays with the row arrows or keyboard
 - Per-monitor workspace rules, saved with the profile and applied with it
 - Persistence: First per display or All assigned with the companion development daemon; older daemons show Requires newer daemon. Manual rules retain their individual persistence flags.
+
+## Safer display refresh and identification
+
+Choose **Identify** in the hardware inspector or **Identify all** in the header. One persistent service uses a fresh live snapshot, rejects replaced or ambiguous hardware, and cancels obsolete cues on topology changes, backend loss, or preview activity. Identification stays input-transparent and does not apply a layout.
+
+Hotplug refreshes preserve in-progress edits and input. Stale status/editor replies cannot replace a newer topology or preview state; compositor-busy responses retain the last visible snapshot while bounded retries recover.
+
+Editor refreshes wait for an active preview to finish; choosing Discard still resets the draft from a fresh layout.
 
 ## Install
 
@@ -182,7 +190,7 @@ return to their loaded values without discarding other edits, and identical
 saved layouts show the confirmed current profile consistently.
 
 ```sh
-node --test tests/model.test.js
+node --test tests/*.test.js
 qmllint *.qml
 QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -platform offscreen -input tests/qml
 omarchy plugin validate .

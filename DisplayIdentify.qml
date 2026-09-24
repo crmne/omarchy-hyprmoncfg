@@ -8,8 +8,8 @@ import qs.Commons
 Item {
   id: root
   property var targets: []
-  function clear() { expiry.stop(); targets = [] }
-  function show(items) { targets = items; expiry.restart() }
+  function clear() { expiry.stop(); root.targets = [] }
+  function show(items) { root.targets = items; expiry.restart() }
   Timer { id: expiry; interval: 4000; onTriggered: root.clear() }
   Connections {
     target: Quickshell

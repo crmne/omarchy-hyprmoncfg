@@ -209,6 +209,11 @@ dirty draft on automatic refresh or repeated summons. Explicitly document curren
 close/reopen behavior until persisted drafts are implemented. Gate new operations
 on capabilities and maintain older-client support.
 
+The 2026-09-24 reliability split implements status/editor snapshot correlation,
+background draft preservation, and Identify safety independently of reuse. See
+[implementation status](design/implementation-status.md) for tested scope.
+Layout reuse and canvas click-to-identify remain deferred product decisions.
+
 Review existing contributions before overlapping work:
 
 - [Backend #59](https://github.com/crmne/hyprmoncfg/pull/59): wake/startup recovery.

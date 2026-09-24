@@ -1,5 +1,23 @@
 # Implementation status, 2026-09-22
 
+## Reliability integration, 2026-09-24
+
+Extracted the independent reliability fixes from mapleroyal's panel PR #18 and
+companion backend PR #61. Stale reads cannot replace newer topology or preview
+state; automatic refresh preserves draft edits/input; busy reads retain the last
+visible state. Identify uses a fresh live snapshot and cancels obsolete cues.
+Layout reuse and click-to-identify remain deferred on the contributor branches.
+
+Validation: 121 Node tests, 21 offscreen Qt tests, qmllint, plugin validation, and
+whitespace checks passed. Actual before/after panel QML captures used an isolated
+offscreen Quickshell host with a substitute window container and sample data:
+compact 430x730, expanded 1120x812, and 960x720 with a synthetic light palette.
+The reviewed compact/expanded dark layout is unchanged. This is not a native
+light-theme, layer-surface, or physical hotplug acceptance test; no live display
+settings changed. See the companion
+[integration record](https://github.com/crmne/hyprmoncfg/blob/main/docs/reliability-integration-2026-09-24.md)
+for the split, compatibility path, and remaining gaps. No release/tag changed.
+
 ## Follow-up, 2026-09-24 (local review build)
 
 The expanded footer now shares the compact setup-status component and Create
