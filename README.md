@@ -49,9 +49,9 @@ A small background service is what watches for this. It catches hotplug, lid and
 - Setup status and Create profile are available in compact and expanded views; the expanded header groups Identify all, Keys, TUI, and Compact without duplicating setup text
 - Canvas and Identify use connector, model with whole-inch size, resolution/refresh, scale/position, and workspaces without display numbering or logical desktop dimensions; the inspector separates Model and Panel size
 - The inspector shows all hardware details directly; live hardware brightness remains in compact mode only
-- The companion TUI shares the display-summary conventions; standalone TUI Identify remains pending
+- The companion TUI shares the display-summary conventions; standalone TUI Identify and layout reuse remain pending
 
-- The expanded panel mirrors the TUI shortcuts: `1`/`2`/`3` switch pages, `a` applies, `s` saves, `r` resets, and `?` shows the contextual key guide.
+- The expanded panel mirrors the TUI shortcuts: `1`/`2`/`3` switch pages, `a` applies, `s` saves, `r` resets, and `?` shows the contextual key guide. On Profiles, **Reuse layout…** (or `u`) opens the layout-reuse form, which uses Tab, arrow keys, and Enter to move through its selectors and buttons.
 - On the layout, arrows move the selected display; `Shift`, `Ctrl`, and `Alt` preserve the TUI's fine movement and nearest-display snapping
 - Profile browsing and workspace settings use the same arrow, Enter, load, edit, and delete keys as the TUI
 
@@ -103,13 +103,19 @@ Neutral SDR multipliers are shown as 1, including profiles that omit them. Reset
 - Per-monitor workspace rules, saved with the profile and applied with it
 - Persistence: First per display or All assigned with hyprmoncfg 1.19.0. Manual rules retain their individual persistence flags.
 
-## Safer display refresh and identification
+## Identify screens and reuse a layout
 
-Choose **Identify** in the hardware inspector or **Identify all** in the header. One persistent service uses a fresh live snapshot, rejects replaced or ambiguous hardware, and cancels obsolete cues on topology changes, backend loss, or preview activity. Identification stays input-transparent and does not apply a layout.
+Click a monitor in the compact or expanded layout to identify that physical screen, or choose **Identify all**. The labels use a fresh live snapshot and help distinguish identical monitors without moving windows or changing the layout. The cues last up to four seconds, do not take keyboard or mouse input, and dragging a monitor does not trigger them. One persistent service owns identification from the canvas, inspector, and reuse form, so closing or rebuilding a bar panel does not interrupt the cue. Starting a preview, losing the backend connection, or detecting a changed display setup cancels it. Identify again after the display list refreshes. Unavailable screens show an explanation instead.
+
+Choose **Use an existing layout…** in compact view, or select a profile and choose **Reuse layout…** on Profiles, to adapt a saved layout to the monitors currently connected. Similar monitor models appear first, and any saved layout can be used. Assign each saved role to a current screen; **Identify** beside each assignment helps check which screen is which. Choosing an already assigned screen swaps the two roles. You can leave out an absent saved display.
+
+**Create draft for these monitors** uses the current hardware identities and remaps the layout, mirrors, and workspaces. Extra connected displays stay in the draft. Review any adjustments, choose a new name, then use **Preview & save → Keep & save**. The original profiles remain saved, and creating the draft alone does not apply a layout.
 
 Hotplug refreshes preserve in-progress edits and input. Stale status/editor replies cannot replace a newer topology or preview state; compositor-busy responses retain the last visible snapshot while bounded retries recover.
 
 Editor refreshes wait for an active preview to finish; choosing Discard still resets the draft from a fresh layout.
+
+Layout reuse requires a daemon that advertises the `reuse_profile` capability. The panel explains when that support is unavailable; other controls remain usable. Reusing a layout does not change automatic profile selection.
 
 ## Install
 

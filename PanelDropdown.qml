@@ -41,6 +41,7 @@ Item {
   onVisibleChanged: if (!visible) menu.close()
 
   function open() { menu.open() }
+  function focusControl() { trigger.forceActiveFocus() }
   function close() { menu.close() }
   function toggle() { menu.opened ? menu.close() : menu.open() }
   function optionValue(option) {

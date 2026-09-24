@@ -54,7 +54,7 @@ test("profile details end with the command and deletion uses native panel contro
 test("footer controls share their tallest natural height and keep naming beside save", () => {
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
   const footer = qml.slice(qml.indexOf("id: editorFooter"), qml.indexOf("\n      KeyboardHelp {"))
-  const controls = ["profileNameInput", "currentProfileBadge", "activateFooterButton", "discardDraftButton", "saveDraftButton", "createFooterButton", "automaticFooterButton"]
+  const controls = ["profileNameInput", "currentProfileBadge", "activateFooterButton", "discardDraftButton", "saveDraftButton", "createFooterButton", "automaticFooterButton", "reuseFooterButton"]
   const height = footer.match(/readonly property real controlHeight: ([\s\S]*?)\n          height:/)[1]
   for (const tallest of controls) {
     const sizes = Object.fromEntries(controls.map(id => [id, { implicitHeight: id === tallest ? 43.2 : 30 }]))
@@ -1253,6 +1253,19 @@ test("the expanded panel mirrors the TUI's contextual keyboard map", () => {
   assert.match(help, /Apply the current draft or selected profile/)
 })
 
+test("reuse keyboard help describes native controls instead of workspace shortcuts", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "KeyboardHelp.qml"), "utf8")
+  const body = qml.match(/readonly property var groups: \{([\s\S]*?)\n  \}\n\n  Rectangle/)[1]
+  const groups = page => vm.runInNewContext("(function() {" + body + "})()", { root: { page } })
+  const reuse = groups("reuse")
+  assert.equal(reuse.length, 1)
+  assert.equal(reuse[0].title, "Reuse layout")
+  assert.ok(reuse[0].bindings.some(binding => binding.keys === "Tab, Shift+Tab"))
+  assert.ok(reuse[0].bindings.some(binding => binding.keys === "Esc"))
+  for (const page of ["layout", "profiles", "workspaces"])
+    assert.ok(groups(page).some(group => group.bindings.some(binding => binding.keys === "1  2  3")))
+})
+
 test("manual profile choice is explicit and can return to automatic matching", () => {
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
   assert.match(qml, /label: "Automatically use the best profile"/)
@@ -1325,7 +1338,8 @@ test("layout dragging uses stationary canvas coordinates in both panel sizes", (
   assert.match(canvasQml, /dragArea\.mapToItem\(canvas, mouse\.x, mouse\.y\)/)
   assert.match(canvasQml, /property bool selectable: interactive/)
   assert.match(canvasQml, /property bool movable: interactive/)
-  assert.match(canvasQml, /if \(!pressed \|\| !root\.movable\) return/)
+  assert.match(canvasQml, /if \(!pressed\) return/)
+  assert.match(canvasQml, /if \(!root\.movable\) return/)
   assert.match(canvasQml, /property bool dragStarted: false/)
   assert.match(canvasQml, /var threshold = Style\.space\(6\)/)
   assert.match(canvasQml, /if \(!dragStarted\)/)
@@ -1366,7 +1380,7 @@ test("unmanaged mode stays inspectable but makes configuration read-only", () =>
   assert.match(qml, /readonly property real unmanagedOpacity: 0\.45/)
   assert.ok((qml.match(/opacity: root\.managedChecked \? 1\.0 : root\.unmanagedOpacity/g) || []).length >= 8)
   assert.match(qml, /if \(!root\.managedChecked \|\| !root\.editorReady/)
-  assert.match(qml, /if \(!root\.managedChecked\) return\s+var name = root\.draftName\(\)/)
+  assert.match(qml, /if \(!root\.managedChecked \|\| root\.reusePending\) return\s+var name = root\.draftName\(\)/)
   assert.match(qml, /enabled: root\.managedChecked && !!root\.selectedOutput/)
   assert.match(qml, /enabled: root\.managedChecked\s+opacity: root\.managedChecked \? 1\.0 : root\.unmanagedOpacity/)
   assert.match(qml, /if \(!root.managedChecked\) return "Not managed by hyprmoncfg"/)
@@ -1421,6 +1435,7 @@ function editorRefreshPanel() {
     documentReady: true, backendConnected: true, opened: true,
     editorRefreshQueued: false, editorResetQueued: false, editorLoading: false, draftDirty: false,
     statusRevision: 0, monitorTopologyRevision: 0, editorRetry: false, statusRetry: false, displaysConnecting: false,
+    reusePending: false, reuseTopologyChanged: false, reuseGeneration: 0,
     creatingProfile: false, editPending: false, previewTransaction: "",
     previewPending: false, serviceActionPending: false, profileModePending: false,
     execEditing: false, inputBlocked: false, editorInteractionRevision: 0, editorPreviewRevision: 0,
@@ -1466,14 +1481,15 @@ function editorRefreshPanel() {
     get: () => Model.savedProfileByName(root.editorDocument, root.selectedSavedProfileName)
   })
   Object.defineProperty(root, "savedProfiles", { get: () => root.editorDocument.profiles })
-  const globals = { Array, Qt: { callLater() {} },
+  const globals = { Array, Reuse: require('../LayoutReuse.js'), Qt: { callLater() {} },
+    reusePane: { choose() {}, reset() {}, focusFirst() {} },
     backendSocket: { connected: true, flush() {}, write(line) {
       const packet = JSON.parse(line)
       packets.push(packet)
       requests.push(packet.method)
     } }, previewTimer: { start() {}, stop() {} } }
   for (const name of ["send", "updateDocument", "queueEditorRefresh", "requestEditorState", "updateEditor", "handleMessage",
-    "retryConnectingDisplays", "open",
+    "retryConnectingDisplays", "openLayoutReuse", "reuseLayout", "acceptReusedLayout", "open",
     "changeWorkspaceStrategy", "editWorkspaces", "editDraft", "beginCreateProfile", "loadSelectedSavedProfile", "selectSavedProfile", "beginExecEdit"])
     root[name] = panelFunction(name, root, globals)
   return {
@@ -1934,10 +1950,11 @@ test("busy errors retain recovery even when interaction invalidates an automatic
   assert.equal(panel.root.draftDirty, true)
 })
 
-test("automatic replies from before a topology change cannot replace the layout", () => {
-  for (const page of ["layout"]) {
+test("automatic replies from before a topology change cannot replace layout or reuse snapshots", () => {
+  for (const page of ["layout", "reuse"]) {
     const panel = editorRefreshPanel()
     panel.hotplug()
+    if (page === "reuse") panel.root.openLayoutReuse()
     panel.tick()
     const draft = panel.root.draftProfile
     const monitors = Model.clone(panel.root.monitorSummaries)
@@ -1949,11 +1966,33 @@ test("automatic replies from before a topology change cannot replace the layout"
     panel.receive(panel.packets[0].id)
     assert.equal(panel.root.draftProfile, draft, page)
     assert.equal(panel.root.editorRefreshQueued, true, page)
+    if (page === "reuse") assert.equal(panel.root.reuseTopologyChanged, true)
     panel.tick()
     assert.equal(panel.packets.length, 2, page)
     panel.receive(panel.packets[1].id)
     assert.equal(panel.root.editorSnapshotStale, false, page)
+    assert.equal(panel.root.reuseTopologyChanged, false, page)
   }
+})
+
+test("opening reuse after an editor timeout refreshes the editor even when status is unchanged", () => {
+  const panel = editorRefreshPanel()
+  panel.hotplug()
+  panel.tick()
+  panel.fail(panel.packets[0].id)
+  panel.root.openLayoutReuse()
+  assert.equal(panel.root.reuseTopologyChanged, true)
+  assert.equal(panel.root.editorSnapshotStale, true)
+  panel.root.reuseLayout("Current", { laptop: "laptop" })
+  assert.deepEqual(panel.requests, ["editor_state"])
+  panel.root.retryConnectingDisplays()
+  panel.receive(panel.packets[1].id, { monitors: panel.root.monitorSummaries })
+  panel.tick()
+  assert.deepEqual(panel.requests, ["editor_state", "status", "editor_state"])
+  panel.receive(panel.packets[2].id)
+  assert.equal(panel.root.editorSnapshotStale, false)
+  panel.root.reuseLayout("Current", { laptop: "laptop" })
+  assert.equal(panel.packets.at(-1).method, "reuse_profile")
 })
 
 test("newer editor hardware identity refreshes missing status before retrying", () => {
@@ -1975,6 +2014,103 @@ test("newer editor hardware identity refreshes missing status before retrying", 
   panel.receive(panel.packets[2].id, replacement)
   assert.equal(panel.root.editorDocument.monitor_set_hash, "replacement-unit")
   assert.equal(panel.root.editorSnapshotStale, false)
+})
+
+test("reuse rejects a different hardware unit on the same connector and recovers through fresh status", () => {
+  const panel = editorRefreshPanel()
+  panel.root.document.monitor_set_hash = "old-unit"
+  panel.root.editorDocument.monitor_set_hash = "old-unit"
+  panel.root.openLayoutReuse()
+  panel.root.reuseLayout("Current", { laptop: "laptop" })
+  const draft = panel.root.draftProfile
+  panel.receive(panel.packets[0].id, { profile: panel.result.profile, monitor_set_hash: "replacement-unit" })
+  assert.equal(panel.root.draftProfile, draft)
+  assert.equal(panel.root.draftDirty, false)
+  assert.equal(panel.root.statusRetry, true)
+  assert.equal(panel.root.reuseTopologyChanged, true)
+  panel.root.reuseLayout("Current", { laptop: "laptop" })
+  assert.equal(panel.packets.length, 1)
+  panel.root.retryConnectingDisplays()
+  panel.receive(panel.packets[1].id, { monitors: panel.root.monitorSummaries, monitor_set_hash: "replacement-unit" })
+  panel.tick()
+  panel.receive(panel.packets[2].id, { ...panel.result, monitor_set_hash: "replacement-unit" })
+  panel.root.reuseLayout("Current", { laptop: "laptop" })
+  panel.receive(panel.packets[3].id, { profile: panel.result.profile, monitor_set_hash: "replacement-unit" })
+  assert.equal(panel.root.draftDirty, true)
+  assert.equal(panel.root.creatingProfile, true)
+})
+
+test("reuse rejects observed A to B to A topology changes even when hashes and signatures match again", () => {
+  const panel = editorRefreshPanel()
+  panel.root.openLayoutReuse()
+  panel.root.reuseLayout("Current", { laptop: "laptop" })
+  const monitors = Model.clone(panel.root.monitorSummaries)
+  panel.hotplug()
+  panel.root.updateDocument({ monitors })
+  panel.receive(panel.packets[0].id, { profile: panel.result.profile })
+  assert.equal(panel.root.draftDirty, false)
+  assert.equal(panel.root.reuseTopologyChanged, true)
+  assert.equal(panel.root.editorRefreshQueued, true)
+})
+
+test("reuse identification waits for pending requests and complete timeout recovery", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const paneQml = fs.readFileSync(path.join(__dirname, "..", "LayoutReusePane.qml"), "utf8")
+  const busy = qml.slice(qml.indexOf("id: reusePane"))
+    .match(/busy: ([\s\S]*?)\n            statusMessage:/)[1]
+  const enabled = paneQml.slice(paneQml.indexOf("id: identifyButton"))
+    .match(/enabled: ([^\n]+)/)[1]
+  const panel = editorRefreshPanel()
+  const pane = { mapping: { laptop: "laptop" } }
+  Object.defineProperty(pane, "busy", {
+    get: vm.runInNewContext("(function() { return " + busy + " })", { root: panel.root })
+  })
+  const identifyEnabled = vm.runInNewContext("(function() { return " + enabled + " })", {
+    root: pane, parent: { parent: { modelData: { key: "laptop" } } }
+  })
+  panel.root.openLayoutReuse()
+  assert.equal(identifyEnabled(), true)
+  panel.root.reuseLayout("Current", { laptop: "laptop" })
+  assert.equal(identifyEnabled(), false, "an in-flight reuse must disable identification")
+  panel.fail(panel.packets[0].id)
+  assert.equal(panel.root.editorRetry, true)
+  assert.equal(panel.root.reuseTopologyChanged, true)
+  assert.equal(identifyEnabled(), false, "a failed query leaves the assignment stale")
+  panel.root.retryConnectingDisplays()
+  assert.equal(identifyEnabled(), false, "status recovery is still in flight")
+  panel.receive(panel.packets[1].id, { monitors: panel.root.monitorSummaries })
+  assert.equal(identifyEnabled(), false, "status alone cannot refresh the editor assignment")
+  panel.root.reuseLayout("Current", { laptop: "laptop" })
+  assert.equal(panel.packets.length, 2)
+  panel.tick()
+  assert.equal(panel.packets[2].method, "editor_state")
+  assert.equal(identifyEnabled(), false, "editor recovery is still in flight")
+  panel.receive(panel.packets[2].id)
+  assert.equal(identifyEnabled(), true, "a current assignment can be identified again")
+  pane.mapping = { laptop: "" }
+  assert.equal(identifyEnabled(), false, "an omitted saved display cannot be identified")
+})
+
+test("reused generated workspaces materialize assignments when changed to manual", () => {
+  for (const strategy of ["sequential", "interleave"]) {
+    const panel = editorRefreshPanel()
+    const laptopWorkspaces = strategy === "interleave" ? ["1", "3"] : ["1", "2"]
+    const deskWorkspaces = strategy === "interleave" ? ["2", "4"] : ["3", "4"]
+    panel.root.openLayoutReuse()
+    panel.root.reuseLayout("Current", { laptop: "laptop", desk: "desk" })
+    panel.receive(panel.packets[0].id, {
+      profile: { ...panel.result.profile, workspaces: { strategy, max_workspaces: 4, group_size: 2 } },
+      workspace_plan: [{ output_key: "laptop", workspaces: laptopWorkspaces }, { output_key: "desk", workspaces: deskWorkspaces }]
+    })
+    assert.equal(panel.root.manualWorkspaceRulesInitialized, false)
+    panel.root.changeWorkspaceStrategy("manual")
+    const settings = panel.packets[1].params.edit.workspaces
+    assert.equal(settings.strategy, "manual")
+    assert.deepEqual(settings.rules.filter(rule => rule.output_key === "laptop").map(rule => rule.workspace), laptopWorkspaces)
+    assert.deepEqual(settings.rules.filter(rule => rule.output_key === "desk").map(rule => rule.workspace), deskWorkspaces)
+    assert.equal(settings.rules.filter(rule => rule.default).length, 2)
+    assert.equal(settings.rules.filter(rule => rule.default).every(rule => rule.persistent), true)
+  }
 })
 
 test("hardware snapshot checks remain compatible with daemons that omit the additive hash", () => {
@@ -2130,4 +2266,44 @@ test("action rows keep their cursor positions in step with what is on screen", (
   assert.match(qml, /return root\.layoutRowIndex \+ 1/)
   assert.doesNotMatch(qml, /serviceBroken \? 2 : 1/)
   assert.doesNotMatch(qml, /serviceBroken \? 3 : 2/)
+})
+
+test("reuse is a selected-profile action within the three main pages", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const choices = vm.runInNewContext(qml.match(/readonly property var pageOptions: (\[[\s\S]*?\n  \])/)[1])
+  assert.deepEqual(Array.from(choices, choice => choice.value).sort(), ["layout", "profiles", "workspaces"])
+  const panel = editorRefreshPanel()
+  const selected = []
+  let focused = false
+  const globals = { Qt: { callLater: fn => fn() },
+    reusePane: { choose: name => selected.push(name), reset() {}, focusFirst() {} },
+    keyCatcher: { forceActiveFocus: () => { focused = true } } }
+  panel.root.openLayoutReuse = panelFunction("openLayoutReuse", panel.root, globals)
+  panel.root.leaveLayoutReuse = panelFunction("leaveLayoutReuse", panel.root, globals)
+  const key = panelFunction("handleExpandedText", panel.root, globals)
+  for (let index = 0; index < choices.length; index++) {
+    key(String(index + 1))
+    assert.equal(panel.root.activePage, choices[index].value)
+  }
+  panel.root.activePage = "layout"
+  key("4")
+  key("u")
+  assert.equal(panel.root.activePage, "layout", "reuse is contextual, not a fourth page")
+  panel.root.activePage = "profiles"
+  panel.root.selectedSavedProfileName = "Other"
+  panel.root.draftDirty = true
+  key("u")
+  assert.equal(panel.root.activePage, "profiles", "reuse cannot discard an existing draft")
+  panel.root.draftDirty = false
+  key("u")
+  assert.equal(panel.root.activePage, "reuse")
+  assert.deepEqual(selected, ["Other"], "reuse starts with the selected saved profile")
+  panel.root.reusePending = true
+  panel.root.leaveLayoutReuse()
+  assert.equal(panel.root.activePage, "reuse", "wait for an in-flight draft request")
+  panel.root.reusePending = false
+  panel.root.leaveLayoutReuse()
+  assert.equal(panel.root.activePage, "profiles")
+  assert.equal(focused, true, "return restores keyboard control of the profiles page")
+  assert.equal(panel.root.selectedSavedProfileName, "Other")
 })

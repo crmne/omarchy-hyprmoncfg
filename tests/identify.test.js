@@ -131,6 +131,30 @@ test("selected and all-screen identification use fresh snapshots through one exp
   assert.equal(f.expiry.running, false)
 })
 
+test("canvas and reuse identification request a live service snapshot instead of using a cached profile", () => {
+  const f = serviceFixture()
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const root = { backendConnected: true, editorReady: true, editorLoading: false,
+    editorSnapshotStale: false, identifyAvailable: true, previewCoordinator: f.root,
+    lastError: "An earlier identification failed" }
+  const context = vm.createContext({ root })
+  for (const name of ["identifyDisplays", "identifyOutput"]) {
+    const source = qml.match(new RegExp("^  function " + name + "\\([\\s\\S]*?^  }", "m"))[0]
+    root[name] = vm.runInContext("(" + source + ")", context)
+  }
+  root.identifyOutput(f.output.key)
+  assert.equal(root.lastError, "")
+  assert.equal(f.packets.at(-1).method, "editor_state")
+  assert.equal(f.overlay.targets.length, 0)
+  f.receive(f.packets.at(-1).id, f.editor)
+  assert.equal(f.overlay.targets[0].screen, f.screen)
+  root.editorSnapshotStale = true
+  const count = f.packets.length
+  root.identifyOutput(f.output.key)
+  assert.equal(f.packets.length, count)
+  assert.match(root.lastError, /Refresh/)
+})
+
 test("the service rejects disconnected, ambiguous, and replaced selected identities", () => {
   for (const mutate of [
     f => { f.editor.profile = { outputs: [] } },
@@ -226,7 +250,7 @@ test("closing a panel leaves its cue with the persistent service until expiry", 
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
   const close = qml.match(/^  function close\([\s\S]*?^  }/m)[0]
   let hidden = false
-  const root = { previewTransaction: "", previewCoordinator: f.root,
+  const root = { reuseGeneration: 0, previewTransaction: "", previewCoordinator: f.root,
     controller: { hide() { hidden = true } } }
   vm.runInNewContext("(" + close + ")", { root })()
   assert.equal(hidden, true)
@@ -260,4 +284,55 @@ test("previews clear existing and pending identification and require a fresh req
   f.root.updateDocument(f.status)
   f.receive(pending, f.editor)
   assert.equal(f.overlay.targets.length, 0, "ending a preview must not resurrect a pre-preview request")
+})
+
+function canvasPointer(movable) {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "DisplayCanvas.qml"), "utf8")
+  const pointer = qml.slice(qml.indexOf("id: dragArea"))
+  const identified = [], selected = [], moved = []
+  const context = vm.createContext({
+    root: { movable, metrics: { scale: 1 }, outputSelected: key => selected.push(key),
+      outputIdentifyRequested: key => identified.push(key), outputMoved: (...args) => moved.push(args) },
+    card: { modelData: { key: "desk", x: 0, y: 0 }, dragOffsetX: 0, dragOffsetY: 0 },
+    dragArea: { mapToItem: (canvas, x, y) => ({ x, y }) }, canvas: {},
+    Style: { space: value => value }, pressed: true,
+    pointerStartX: 0, pointerStartY: 0, dragStarted: false, identifyClickPending: false
+  })
+  const handlers = {}
+  for (const name of ["Pressed", "PositionChanged", "Released"]) {
+    const source = pointer.match(new RegExp("on" + name + ": (function\\(mouse\\) \\{[\\s\\S]*?\\n          })"))[1]
+    handlers[name] = vm.runInContext("(" + source + ")", context)
+  }
+  for (const name of ["Clicked", "Canceled"]) {
+    const body = pointer.match(new RegExp("on" + name + ": \\{([\\s\\S]*?)\\n          }"))[1]
+    handlers[name] = vm.runInContext("(function() {" + body + "})", context)
+  }
+  return { handlers, identified, selected, moved }
+}
+
+test("canvas identification fires on an actual click, never on press, drag, or cancellation", () => {
+  for (const movable of [true, false]) {
+    const click = canvasPointer(movable)
+    click.handlers.Pressed({ x: 5, y: 5 })
+    assert.deepEqual(click.selected, ["desk"])
+    assert.deepEqual(click.identified, [])
+    click.handlers.Released({ x: 5, y: 5 })
+    click.handlers.Clicked()
+    assert.deepEqual(click.identified, ["desk"])
+    assert.deepEqual(click.moved, [])
+
+    const drag = canvasPointer(movable)
+    drag.handlers.Pressed({ x: 5, y: 5 })
+    drag.handlers.PositionChanged({ x: 45, y: 5 })
+    drag.handlers.Released({ x: 45, y: 5 })
+    drag.handlers.Clicked()
+    assert.deepEqual(drag.identified, [])
+    assert.equal(drag.moved.length, movable ? 1 : 0)
+
+    const canceled = canvasPointer(movable)
+    canceled.handlers.Pressed({ x: 5, y: 5 })
+    canceled.handlers.Canceled()
+    canceled.handlers.Clicked()
+    assert.deepEqual(canceled.identified, [])
+  }
 })

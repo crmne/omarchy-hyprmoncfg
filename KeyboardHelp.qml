@@ -45,10 +45,22 @@ Item {
           { keys: "↑  ↓", action: "Browse profiles and their saved setup" },
           { keys: "Enter, a", action: "Preview this profile" },
           { keys: "l", action: "Load it into the layout editor" },
+          { keys: "u", action: "Reuse its layout on these displays" },
           { keys: "e", action: "Edit post-apply command" },
           { keys: "d", action: "Delete with confirmation" },
           { keys: "Shift+F10", action: "Open profile actions" },
           { keys: "Space", action: "Toggle automatic profile selection" }
+        ]
+      }]
+    } else if (root.page === "reuse") {
+      contextual = [{
+        title: "Reuse layout",
+        bindings: [
+          { keys: "Tab, Shift+Tab", action: "Move between selectors and buttons" },
+          { keys: "Enter, Space", action: "Open a selector or activate a button" },
+          { keys: "↑  ↓", action: "Choose an option in an open menu" },
+          { keys: "Enter", action: "Confirm the menu choice" },
+          { keys: "Esc", action: "Close the menu or return to profiles" }
         ]
       }]
     } else {
@@ -61,7 +73,7 @@ Item {
         ]
       }]
     }
-    contextual.push({
+    if (root.page !== "reuse") contextual.push({
       title: "Anywhere",
       bindings: [
         { keys: "1  2  3", action: "Switch tabs" },
@@ -163,7 +175,7 @@ Item {
 
       Text {
         textFormat: Text.PlainText
-        text: "Any key closes this."
+        text: root.page === "reuse" ? "Click outside this card to close." : "Any key closes this."
         color: Qt.darker(root.foreground, 1.5)
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption

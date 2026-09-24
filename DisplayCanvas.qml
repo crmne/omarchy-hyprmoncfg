@@ -25,6 +25,7 @@ BorderSurface {
   property string fontFamily: Style.font.family
 
   signal outputSelected(string key)
+  signal outputIdentifyRequested(string key)
   signal outputMoved(string key, int x, int y, int snapDistance)
 
   readonly property var displays: Model.profileLayoutDisplays(profile, editorDisplays)
@@ -225,6 +226,7 @@ BorderSurface {
           property real pointerStartX: 0
           property real pointerStartY: 0
           property bool dragStarted: false
+          property bool identifyClickPending: false
 
           onPressed: function(mouse) {
             root.outputSelected(String(card.modelData.key || ""))
@@ -232,16 +234,20 @@ BorderSurface {
             pointerStartX = point.x
             pointerStartY = point.y
             dragStarted = false
+            identifyClickPending = true
             card.dragOffsetX = 0
             card.dragOffsetY = 0
           }
           onPositionChanged: function(mouse) {
-            if (!pressed || !root.movable) return
+            if (!pressed) return
             var point = dragArea.mapToItem(canvas, mouse.x, mouse.y)
             var deltaX = point.x - pointerStartX
             var deltaY = point.y - pointerStartY
+            var threshold = Style.space(6)
+            if (deltaX * deltaX + deltaY * deltaY >= threshold * threshold)
+              identifyClickPending = false
+            if (!root.movable) return
             if (!dragStarted) {
-              var threshold = Style.space(6)
               if (deltaX * deltaX + deltaY * deltaY < threshold * threshold) return
               dragStarted = true
             }
@@ -263,8 +269,14 @@ BorderSurface {
             dragStarted = false
             root.outputMoved(String(card.modelData.key || ""), nextX, nextY, snap)
           }
+          onClicked: {
+            if (identifyClickPending)
+              root.outputIdentifyRequested(String(card.modelData.key || ""))
+            identifyClickPending = false
+          }
           onCanceled: {
             dragStarted = false
+            identifyClickPending = false
             card.dragOffsetX = 0
             card.dragOffsetY = 0
           }
