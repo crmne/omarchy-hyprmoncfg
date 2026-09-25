@@ -890,7 +890,7 @@ Panel {
   }
 
   function openLayoutReuse(name) {
-    if (!root.backendConnected || !root.editorReady || root.editorLoading || root.draftDirty || root.creatingProfile || root.reusePending
+    if (!root.managedChecked || !root.backendConnected || !root.editorReady || root.editorLoading || root.draftDirty || root.creatingProfile || root.reusePending
         || root.identifyBlockedByPreview) return
     root.expanded = true
     root.activePage = "reuse"

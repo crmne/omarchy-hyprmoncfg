@@ -2364,6 +2364,28 @@ test("action rows keep their cursor positions in step with what is on screen", (
   assert.doesNotMatch(qml, /serviceBroken \? 3 : 2/)
 })
 
+test("reuse entry points respect unmanaged mode and recover when management resumes", () => {
+  for (const entry of ["keyboard", "selected profile", "compact"]) {
+    const panel = editorRefreshPanel()
+    panel.root.activePage = entry === "compact" ? "layout" : "profiles"
+    panel.root.expanded = entry !== "compact"
+    panel.root.managedChecked = false
+    const page = panel.root.activePage
+    const expanded = panel.root.expanded
+    const enter = entry === "keyboard"
+      ? () => panelFunction("handleExpandedText", panel.root)("u")
+      : () => panel.root.openLayoutReuse(entry === "compact" ? undefined : "Current")
+    enter()
+    assert.equal(panel.root.activePage, page, entry)
+    assert.equal(panel.root.expanded, expanded, entry)
+    assert.deepEqual(panel.requests, [], "unmanaged entry cannot start a request")
+    panel.root.managedChecked = true
+    enter()
+    assert.equal(panel.root.activePage, "reuse", entry)
+    assert.equal(panel.root.expanded, true, entry)
+  }
+})
+
 test("reuse is a selected-profile action within the three main pages", () => {
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
   const choices = vm.runInNewContext(qml.match(/readonly property var pageOptions: (\[[\s\S]*?\n  \])/)[1])
