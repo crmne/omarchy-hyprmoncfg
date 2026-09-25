@@ -290,12 +290,17 @@ Panel {
   readonly property var manualWorkspaceRows: Model.manualWorkspaceRows(root.draftProfile)
   readonly property int manualWorkspaceTargetCount: Model.manualWorkspaceTargetKeys(root.draftProfile).length
   readonly property string workspaceStrategy: String(((root.draftProfile || {}).workspaces || {}).strategy || "manual")
-  readonly property bool workspaceGroupSizeApplicable: root.workspaceStrategy === "sequential"
-  readonly property int workspacePersistenceKeyboardIndex: root.workspaceGroupSizeApplicable ? 4 : 3
-  readonly property int workspaceListKeyboardStart: root.workspacePersistenceKeyboardIndex + 1
+  readonly property string workspaceStrategyChoice: Model.workspaceStrategyChoice((root.draftProfile || {}).workspaces)
+  readonly property bool workspacesOff: root.workspaceStrategyChoice === "off"
+  readonly property bool workspaceGroupSizeApplicable: !root.workspacesOff && root.workspaceStrategy === "sequential"
+  // Off leaves only Strategy editable, so the inert rows are not keyboard stops.
+  readonly property int workspacePersistenceKeyboardIndex: root.workspacesOff ? -1
+    : root.workspaceGroupSizeApplicable ? 3 : 2
+  readonly property int workspaceListKeyboardStart: root.workspacesOff ? 1
+    : root.workspacePersistenceKeyboardIndex + 1
   readonly property string selectedWorkspaceDisplayKey: {
     var index = root.workspaceKeyboardIndex - root.workspaceListKeyboardStart
-    if (index < 0) return ""
+    if (index < 0 || root.workspacesOff) return ""
     var settings = (root.draftProfile || {}).workspaces || {}
     if (String(settings.strategy || "") === "manual") {
       if (index >= root.manualWorkspaceRows.length) return ""
@@ -654,7 +659,11 @@ Panel {
     var settings = Model.clone((root.draftProfile || {}).workspaces || {}) || {}
     var current = String(settings.strategy || "manual")
     var next = String(value || "manual")
-    var changes = { strategy: next }
+    var changes = Model.workspaceStrategyChanges(settings, next)
+    if (next === "off") {
+      root.editWorkspaces(changes)
+      return
+    }
     if (next === "manual" && current !== "manual" && !root.manualWorkspaceRulesInitialized) {
       changes.rules = Model.manualWorkspaceRulesFromPlan(root.workspacePlan, root.draftProfile)
       root.manualWorkspaceRulesInitialized = changes.rules.length > 0
@@ -689,7 +698,8 @@ Panel {
     if (!root.managedChecked || !root.editorReady || root.editPending
         || root.previewTransaction !== "") return
     var settings = Model.clone((root.draftProfile || {}).workspaces || {}) || {}
-    if (String(settings.strategy || "") !== "manual"
+    // Opening an Off plan must not edit the draft it is only displaying.
+    if (!settings.enabled || String(settings.strategy || "") !== "manual"
         || (settings.rules instanceof Array && settings.rules.length > 0)) return
     var rules = Model.manualWorkspaceRulesFromPlan(root.workspacePlan, root.draftProfile)
     if (rules.length === 0) return
@@ -900,6 +910,7 @@ Panel {
 
   function workspaceKeyboardCount() {
     var settings = ((root.draftProfile || {}).workspaces || {})
+    if (root.workspacesOff) return root.workspaceListKeyboardStart
     if (root.workspaceStrategy === "manual")
       return root.workspaceListKeyboardStart + root.manualWorkspaceRows.length
     var order = settings.monitor_order || []
@@ -928,15 +939,15 @@ Panel {
     if (!root.managedChecked || root.editPending || root.previewTransaction !== "") return
     var settings = Model.clone((root.draftProfile || {}).workspaces || {}) || {}
     var index = root.workspaceKeyboardIndex
-    if (index === 0) root.editWorkspaces({ enabled: !settings.enabled })
-    else if (index === 1) root.changeWorkspaceStrategy(
-      Model.cycleOptionValue(["manual", "sequential", "interleave"],
-        String(settings.strategy || "manual"), delta))
-    else if (index === 2) root.setWorkspaceCount(
+    if (index === 0) root.changeWorkspaceStrategy(
+      Model.cycleOptionValue(Model.workspaceStrategyOptions(),
+        Model.workspaceStrategyChoice(settings), delta))
+    else if (root.workspacesOff) return
+    else if (index === 1) root.setWorkspaceCount(
       (String(settings.strategy || "") === "manual"
         ? Model.manualWorkspaceCount(settings)
         : Number(settings.max_workspaces || 9)) + delta)
-    else if (index === 3 && root.workspaceGroupSizeApplicable) {
+    else if (index === 2 && root.workspaceGroupSizeApplicable) {
       root.editWorkspaces({
         group_size: Math.floor(root.bounded(Number(settings.group_size || 3) + delta,
           1, root.workspaceValueMaximum))
@@ -3471,41 +3482,42 @@ Panel {
                 anchors.fill: parent
                 spacing: Style.space(12)
 
-                Toggle {
-                  id: workspaceEnabledToggle
-                  width: parent.width
-                  label: "Enabled"
-                  description: checked ? "Place workspaces with this profile" : "Leave placement unchanged"
-                  checked: !!((root.draftProfile || {}).workspaces || {}).enabled
-                  enabled: root.editorReady && !root.editPending
-                  hasCursor: root.expanded && root.activePage === "workspaces"
-                    && root.workspaceKeyboardIndex === 0
-                  foreground: root.foreground
-                  fontFamily: root.fontFamily
-                  onClicked: root.editWorkspaces({ enabled: !checked })
-                }
-
                 PanelDropdown {
                   id: workspaceStrategyDropdown
                   popupParent: keyCatcher
                   ownerOpen: root.opened && root.expanded
                   width: parent.width
                   label: "STRATEGY"
-                  options: [
-                    { value: "manual", label: "Manual" },
-                    { value: "sequential", label: "Sequential" },
-                    { value: "interleave", label: "Interleaved" }
-                  ]
-                  value: String(((root.draftProfile || {}).workspaces || {}).strategy || "manual")
+                  options: Model.workspaceStrategyOptions()
+                  value: root.workspaceStrategyChoice
                   enabled: root.editorReady && !root.editPending
                   hasCursor: root.expanded && root.activePage === "workspaces"
-                    && root.workspaceKeyboardIndex === 1
+                    && root.workspaceKeyboardIndex === 0
                   foreground: root.foreground
                   fontFamily: root.fontFamily
                   onChanged: function(value) { root.changeWorkspaceStrategy(value) }
                 }
 
+                // Off keeps the stored plan but none of it applies, so its
+                // values are shown as inert placeholders rather than controls.
+                InfoRow {
+                  id: workspaceCountOffRow
+                  visible: root.workspacesOff
+                  width: parent.width
+                  label: "Workspaces"
+                  value: "—"
+                }
+
+                InfoRow {
+                  id: workspacePersistenceOffRow
+                  visible: root.workspacesOff
+                  width: parent.width
+                  label: "Persistence"
+                  value: "—"
+                }
+
                 Row {
+                  visible: !root.workspacesOff
                   width: parent.width
                   spacing: Style.space(10)
 
@@ -3522,7 +3534,7 @@ Panel {
                       : Number(((root.draftProfile || {}).workspaces || {}).max_workspaces || 9)
                     enabled: !root.editPending
                     hasCursor: root.expanded && root.activePage === "workspaces"
-                      && root.workspaceKeyboardIndex === 2
+                      && root.workspaceKeyboardIndex === 1
                     foreground: root.foreground
                     fontFamily: root.fontFamily
                     onModified: function(value) {
@@ -3545,7 +3557,7 @@ Panel {
                     enabled: !root.editPending
                       && String(((root.draftProfile || {}).workspaces || {}).strategy || "") === "sequential"
                     hasCursor: root.expanded && root.activePage === "workspaces"
-                      && root.workspaceKeyboardIndex === 3
+                      && root.workspaceKeyboardIndex === 2
                     foreground: root.foreground
                     fontFamily: root.fontFamily
                     onModified: function(value) {
@@ -3558,6 +3570,7 @@ Panel {
 
                 PanelDropdown {
                   id: workspacePersistenceDropdown
+                  visible: !root.workspacesOff
                   popupParent: keyCatcher
                   ownerOpen: root.opened && root.expanded
                   width: parent.width
@@ -3579,9 +3592,10 @@ Panel {
                   onChanged: function(value) { root.editWorkspaces({ persist_all: value === "all" }) }
                 }
 
-                PanelSeparator { foreground: root.foreground }
+                PanelSeparator { visible: !root.workspacesOff; foreground: root.foreground }
 
                 PanelSectionHeader {
+                  visible: !root.workspacesOff
                   text: String(((root.draftProfile || {}).workspaces || {}).strategy || "") === "manual"
                     ? "WORKSPACE → DISPLAY" : "MONITOR ORDER"
                   foreground: root.foreground
@@ -3589,7 +3603,8 @@ Panel {
                 }
 
                 Repeater {
-                  model: String(((root.draftProfile || {}).workspaces || {}).strategy || "") === "manual"
+                  model: root.workspacesOff
+                    || String(((root.draftProfile || {}).workspaces || {}).strategy || "") === "manual"
                     ? [] : (((root.draftProfile || {}).workspaces || {}).monitor_order || [])
 
                   BorderSurface {
@@ -3652,7 +3667,8 @@ Panel {
 
                 ListView {
                   id: manualAssignmentList
-                  visible: String(((root.draftProfile || {}).workspaces || {}).strategy || "") === "manual"
+                  visible: !root.workspacesOff
+                    && String(((root.draftProfile || {}).workspaces || {}).strategy || "") === "manual"
                   width: parent.width
                   height: visible ? Math.max(Style.space(90), parent.height - y) : 0
                   clip: true
@@ -3753,7 +3769,6 @@ Panel {
                 width: parent.width
                 height: Style.space(145)
                 title: "Workspace Plan"
-                meta: ((root.draftProfile || {}).workspaces || {}).enabled ? "" : "preview only"
                 foreground: root.foreground
                 dim: root.dim
                 accent: Color.accent
@@ -3764,7 +3779,7 @@ Panel {
                   spacing: Style.space(5)
 
                   Repeater {
-                    model: root.workspaceRows
+                    model: root.workspacesOff ? [] : root.workspaceRows
 
                     InfoRow {
                       required property var modelData
@@ -3776,8 +3791,10 @@ Panel {
 
                   Text {
                     textFormat: Text.PlainText
-                    visible: root.workspaceRows.length === 0
-                    text: "No workspace rules configured"
+                    visible: root.workspacesOff || root.workspaceRows.length === 0
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    text: root.workspacesOff ? Model.workspaceOffMessage() : "No workspace rules configured"
                     color: root.dim
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.body
@@ -3798,7 +3815,7 @@ Panel {
                   anchors.fill: parent
                   profile: root.draftProfile
                   editorDisplays: root.editorDocument.displays
-                  workspacePlan: root.workspacePlan
+                  workspacePlan: root.workspacesOff ? [] : root.workspacePlan
                   emphasis: "workspaces"
                   selectedKey: root.selectedWorkspaceDisplayKey
                   interactive: false

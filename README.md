@@ -96,6 +96,7 @@ Neutral SDR multipliers are shown as 1, including profiles that omit them. Reset
 **Workspaces**
 
 - A workspace planner that lays your workspaces out across the displays in a profile: manual, sequential, or interleaved
+- Choose Off when another tool, such as hyprsplit, manages your workspaces: hyprmoncfg then writes no workspace rules for that profile and keeps the plan for when you choose a strategy again
 - Set how many workspaces there are, how they group, and the monitor order they follow
 - Workspace and group counts have no fixed product cap; type an exact large value directly
 - Group size appears only for Sequential plans; type an exact workspace count and press `Enter`

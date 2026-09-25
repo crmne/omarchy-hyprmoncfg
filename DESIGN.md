@@ -124,8 +124,10 @@ strategy, group size, workspace count, monitor order, assignments, and persisten
 Group size appears only for Sequential; large values retain direct entry. Manual
 mode exposes per-workspace assignment. Persistence offers First per display and
 All assigned when `workspace_persistence_supported` is true; otherwise it shows
-Requires newer daemon. Manual mode retains per-rule flags. Keep planner-off
-available for user-managed rules.
+Requires newer daemon. Manual mode retains per-rule flags. Strategy offers Off,
+Manual, Sequential, and Interleaved; Off is the stored `enabled: false`, keeps the
+saved strategy and plan, writes no workspace rules, and suits user-managed rules
+or tools such as hyprsplit. While Off, the other plan values are inert.
 
 ### Profiles
 

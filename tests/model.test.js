@@ -25,8 +25,8 @@ test("generated to manual conversion retains all-workspace persistence", () => {
 test("persistence keyboard action respects old daemon capability and manual rules", () => {
   const edits = []
   const root = { managedChecked: true, editPending: false, previewTransaction: "",
-    draftProfile: { workspaces: { strategy: "sequential", persist_all: false } },
-    workspaceKeyboardIndex: 4, workspaceGroupSizeApplicable: true, workspacePersistenceKeyboardIndex: 4,
+    draftProfile: { workspaces: { enabled: true, strategy: "sequential", persist_all: false } },
+    workspaceKeyboardIndex: 3, workspaceGroupSizeApplicable: true, workspacePersistenceKeyboardIndex: 3,
     workspaceStrategy: "sequential", editorDocument: {}, editWorkspaces: value => edits.push(value) }
   const adjust = panelFunction("adjustWorkspaceKeyboard", root)
   adjust(1)
@@ -1150,12 +1150,12 @@ test("Identify cannot start while another client owns a preview", () => {
 test("the workspace form hides irrelevant group size and adapts keyboard navigation", () => {
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
 
-  assert.match(qml, /readonly property bool workspaceGroupSizeApplicable: root\.workspaceStrategy === "sequential"/)
+  assert.match(qml, /readonly property bool workspaceGroupSizeApplicable: !root\.workspacesOff && root\.workspaceStrategy === "sequential"/)
   assert.match(qml, /id: workspaceGroupSizeField\s+visible: root\.workspaceGroupSizeApplicable/)
   assert.match(qml, /width: root\.workspaceGroupSizeApplicable\s+\? \(parent\.width - parent\.spacing\) \/ 2 : parent\.width/)
   // Hiding Group Size also removes its keyboard stop; assignment rows move up.
-  assert.match(qml, /readonly property int workspacePersistenceKeyboardIndex: root\.workspaceGroupSizeApplicable \? 4 : 3/)
-  assert.match(qml, /readonly property int workspaceListKeyboardStart: root\.workspacePersistenceKeyboardIndex \+ 1/)
+  assert.match(qml, /readonly property int workspacePersistenceKeyboardIndex: root\.workspacesOff \? -1\s+: root\.workspaceGroupSizeApplicable \? 3 : 2/)
+  assert.match(qml, /readonly property int workspaceListKeyboardStart: root\.workspacesOff \? 1\s+: root\.workspacePersistenceKeyboardIndex \+ 1/)
   assert.match(qml, /root\.workspaceKeyboardIndex === root\.workspaceListKeyboardStart \+ index/)
   assert.doesNotMatch(qml, /root\.workspaceKeyboardIndex === 4 \+ index/)
 })
@@ -2130,4 +2130,95 @@ test("action rows keep their cursor positions in step with what is on screen", (
   assert.match(qml, /return root\.layoutRowIndex \+ 1/)
   assert.doesNotMatch(qml, /serviceBroken \? 2 : 1/)
   assert.doesNotMatch(qml, /serviceBroken \? 3 : 2/)
+})
+
+test("Off is the strategy shown for a disabled planner and keeps the stored plan", () => {
+  assert.deepEqual(Model.workspaceStrategyOptions().map(option => option.value),
+    ["off", "manual", "sequential", "interleave"])
+  assert.deepEqual(Model.workspaceStrategyOptions().map(option => option.label),
+    ["Off", "Manual", "Sequential", "Interleaved"])
+  assert.equal(Model.workspaceStrategyChoice({ enabled: false, strategy: "sequential" }), "off")
+  assert.equal(Model.workspaceStrategyChoice({ strategy: "interleave" }), "off")
+  assert.equal(Model.workspaceStrategyChoice({ enabled: true, strategy: "interleave" }), "interleave")
+  assert.equal(Model.workspaceStrategyChoice({ enabled: true }), "manual")
+  assert.equal(Model.workspaceOffMessage(), "Off: hyprmoncfg writes no workspace rules.")
+
+  assert.deepEqual(Model.workspaceStrategyChanges({ enabled: true, strategy: "sequential" }, "off"), { enabled: false })
+  assert.deepEqual(Model.workspaceStrategyChanges({ enabled: false, strategy: "sequential" }, "sequential"),
+    { strategy: "sequential", enabled: true })
+  assert.deepEqual(Model.workspaceStrategyChanges({ enabled: true, strategy: "manual" }, "sequential"),
+    { strategy: "sequential" })
+})
+
+test("choosing Off edits only enabled and choosing a strategy from Off re-enables", () => {
+  const edits = []
+  const settings = { enabled: true, strategy: "manual", group_size: 4, max_workspaces: 8,
+    monitor_order: ["a", "b"], persist_all: true, rules: [{ workspace: "1", output_key: "a" }] }
+  const root = { draftProfile: { workspaces: settings }, workspacePlan: [],
+    manualWorkspaceRulesInitialized: false, editWorkspaces: value => edits.push(value) }
+  const change = panelFunction("changeWorkspaceStrategy", root)
+
+  change("off")
+  assert.deepEqual(edits.pop(), { enabled: false })
+
+  root.draftProfile = { workspaces: { ...settings, enabled: false, strategy: "sequential" } }
+  change("sequential")
+  assert.deepEqual(edits.pop(), { strategy: "sequential", enabled: true })
+
+  // Leaving Off for Manual still seeds assignments from the plan.
+  root.draftProfile = { outputs: [{ key: "a", name: "DP-1", enabled: true }],
+    workspaces: { enabled: false, strategy: "sequential", max_workspaces: 2, monitor_order: ["a"] } }
+  change("manual")
+  const manual = edits.pop()
+  assert.equal(manual.enabled, true)
+  assert.equal(manual.strategy, "manual")
+  assert.equal(manual.rules.length, 2)
+})
+
+test("workspace keyboard cycles Off first and Off leaves only Strategy", () => {
+  const choices = []
+  const edits = []
+  const root = { managedChecked: true, editPending: false, previewTransaction: "",
+    draftProfile: { workspaces: { enabled: false, strategy: "sequential", max_workspaces: 9 } },
+    workspaceKeyboardIndex: 0, workspacesOff: true, workspaceGroupSizeApplicable: false,
+    workspacePersistenceKeyboardIndex: -1, workspaceListKeyboardStart: 1, workspaceValueMaximum: 100,
+    editorDocument: { workspace_persistence_supported: true },
+    changeWorkspaceStrategy: value => choices.push(value), editWorkspaces: value => edits.push(value),
+    setWorkspaceCount: value => edits.push({ count: value }), bounded: (v, lo, hi) => Math.min(hi, Math.max(lo, v)) }
+  const adjust = panelFunction("adjustWorkspaceKeyboard", root)
+  adjust(1)
+  adjust(-1)
+  assert.deepEqual(choices, ["manual", "interleave"])
+  root.draftProfile.workspaces.enabled = true
+  root.draftProfile.workspaces.strategy = "interleave"
+  adjust(1)
+  assert.equal(choices.pop(), "off")
+
+  // While Off, rows after Strategy are inert even if a cursor lands on them.
+  root.draftProfile.workspaces.enabled = false
+  for (const index of [1, 2, 3]) {
+    root.workspaceKeyboardIndex = index
+    adjust(1)
+  }
+  assert.deepEqual(edits, [])
+  const count = panelFunction("workspaceKeyboardCount", root)
+  assert.equal(count(), 1)
+})
+
+test("Off replaces the Enabled toggle, hides plan controls, and explains the empty plan", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const planner = qml.slice(qml.indexOf('title: "Workspace Planner"'), qml.indexOf('title: "Monitor Layout"', qml.indexOf('title: "Workspace Plan"')))
+  assert.doesNotMatch(qml, /workspaceEnabledToggle/)
+  assert.doesNotMatch(planner, /label: "Enabled"/)
+  assert.doesNotMatch(qml, /"preview only"/)
+  assert.match(planner, /options: Model\.workspaceStrategyOptions\(\)\s+value: root\.workspaceStrategyChoice/)
+  assert.match(planner, /label: "Workspaces"\s+value: "—"/)
+  assert.match(planner, /label: "Persistence"\s+value: "—"/)
+  assert.match(planner, /Row \{\s+visible: !root\.workspacesOff/)
+  assert.match(planner, /id: workspacePersistenceDropdown\s+visible: !root\.workspacesOff/)
+  assert.match(planner, /id: manualAssignmentList\s+visible: !root\.workspacesOff/)
+  assert.match(planner, /model: root\.workspacesOff \? \[\] : root\.workspaceRows/)
+  assert.match(planner, /text: root\.workspacesOff \? Model\.workspaceOffMessage\(\) : "No workspace rules configured"/)
+  assert.match(qml, /workspacePlan: root\.workspacesOff \? \[\] : root\.workspacePlan\s+emphasis: "workspaces"/)
+  assert.match(qml, /if \(!settings\.enabled \|\| String\(settings\.strategy \|\| ""\) !== "manual"/)
 })

@@ -975,6 +975,35 @@ function cycleManualWorkspaceRule(rules, profile, rowIndex, delta) {
   return normalizeManualWorkspaceDefaults(items)
 }
 
+// Off is a presentation of `enabled: false`, not a stored strategy: the saved
+// strategy and plan stay intact so choosing a strategy again restores them.
+function workspaceStrategyOptions() {
+  return [
+    { value: "off", label: "Off" },
+    { value: "manual", label: "Manual" },
+    { value: "sequential", label: "Sequential" },
+    { value: "interleave", label: "Interleaved" }
+  ]
+}
+
+function workspaceOffMessage() {
+  return "Off: hyprmoncfg writes no workspace rules."
+}
+
+function workspaceStrategyChoice(settings) {
+  var workspaces = settings || {}
+  if (!workspaces.enabled) return "off"
+  return String(workspaces.strategy || "manual")
+}
+
+function workspaceStrategyChanges(settings, choice) {
+  var next = String(choice || "manual")
+  if (next === "off") return { enabled: false }
+  var changes = { strategy: next }
+  if (!(settings || {}).enabled) changes.enabled = true
+  return changes
+}
+
 function workspacePlanRows(plan, profile) {
   var rows = plan instanceof Array ? plan : []
   return rows.map(function(row) {
@@ -1138,6 +1167,10 @@ if (typeof module !== "undefined") {
     manualWorkspaceCount: manualWorkspaceCount,
     resizeManualWorkspaceRules: resizeManualWorkspaceRules,
     cycleManualWorkspaceRule: cycleManualWorkspaceRule,
+    workspaceStrategyOptions: workspaceStrategyOptions,
+    workspaceOffMessage: workspaceOffMessage,
+    workspaceStrategyChoice: workspaceStrategyChoice,
+    workspaceStrategyChanges: workspaceStrategyChanges,
     workspacePlanRows: workspacePlanRows,
     enabledOutputCount: enabledOutputCount,
     layoutMetrics: layoutMetrics,
