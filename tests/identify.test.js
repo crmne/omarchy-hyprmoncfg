@@ -155,6 +155,56 @@ test("canvas and reuse identification request a live service snapshot instead of
   assert.match(root.lastError, /Refresh/)
 })
 
+test("Identify availability recovers without blocking reuse assignments or draft creation", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const paneQml = fs.readFileSync(path.join(__dirname, "..", "LayoutReusePane.qml"), "utf8")
+  const available = qml.match(/readonly property bool identifyAvailable: ([\s\S]*?)\n\n  function identifyDisplays/)[1]
+  const paneAvailable = qml.slice(qml.indexOf("id: reusePane")).match(/identifyAvailable: ([^\n]+)/)[1]
+  const identifyEnabled = paneQml.slice(paneQml.indexOf("id: identifyButton")).match(/enabled: ([^\n]+)/)[1]
+  const createEnabled = paneQml.slice(paneQml.indexOf("id: reuseAction")).match(/enabled: ([^\n]+)/)[1]
+  const mappingEnabled = paneQml.slice(paneQml.indexOf("value: String(root.mapping")).match(/enabled: ([^\n]+)/)[1]
+  for (const unavailable of ["absent", "old service", "disconnected", "busy"]) {
+    const f = serviceFixture()
+    const root = { backendConnected: true, editorReady: true, editorLoading: false,
+      editorSnapshotStale: false, previewCoordinator: f.root, lastError: "" }
+    const context = vm.createContext({ root })
+    Object.defineProperty(root, "identifyAvailable", {
+      get: vm.runInContext("(function() { return " + available + " })", context)
+    })
+    for (const name of ["identifyDisplays", "identifyOutput"]) {
+      const source = qml.match(new RegExp("^  function " + name + "\\([\\s\\S]*?^  }", "m"))[0]
+      root[name] = vm.runInContext("(" + source + ")", context)
+    }
+    const pane = { available: true, busy: false, hasMapping: true, mapping: { role: f.output.key } }
+    Object.defineProperty(pane, "identifyAvailable", {
+      get: vm.runInContext("(function() { return " + paneAvailable + " })", context)
+    })
+    const controls = vm.createContext({ root: pane, parent: { parent: { modelData: { key: "role" } } } })
+    if (unavailable === "absent") root.previewCoordinator = null
+    else if (unavailable === "old service") root.previewCoordinator = { connected: true }
+    else if (unavailable === "disconnected") f.root.connected = false
+    else f.root.identifyPending = true
+    root.identifyOutput(f.output.key)
+    assert.equal(f.packets.length, 0, unavailable)
+    assert.match(root.lastError, /temporarily unavailable/, unavailable)
+    assert.equal(vm.runInContext(identifyEnabled, controls), false, unavailable)
+    assert.equal(vm.runInContext(mappingEnabled, controls), true, unavailable)
+    assert.equal(vm.runInContext(createEnabled, controls), true, unavailable)
+    root.previewCoordinator = f.root
+    f.root.connected = true
+    f.root.identifyPending = false
+    assert.equal(vm.runInContext(identifyEnabled, controls), true, "service recovery enables Identify")
+    root.identifyOutput(f.output.key)
+    assert.equal(root.lastError, "")
+    assert.equal(f.packets.at(-1).method, "editor_state")
+    assert.equal(vm.runInContext(identifyEnabled, controls), false, "wait for the current identification read")
+    f.receive(f.packets.at(-1).id, f.editor)
+    assert.equal(f.overlay.targets[0].screen, f.screen)
+    assert.equal(vm.runInContext(identifyEnabled, controls), true)
+    assert.deepEqual(pane.mapping, { role: f.output.key })
+  }
+})
+
 test("the service rejects disconnected, ambiguous, and replaced selected identities", () => {
   for (const mutate of [
     f => { f.editor.profile = { outputs: [] } },

@@ -2071,7 +2071,7 @@ test("reuse identification waits for pending requests and complete timeout recov
   const enabled = paneQml.slice(paneQml.indexOf("id: identifyButton"))
     .match(/enabled: ([^\n]+)/)[1]
   const panel = editorRefreshPanel()
-  const pane = { mapping: { laptop: "laptop" } }
+  const pane = { identifyAvailable: true, mapping: { laptop: "laptop" } }
   Object.defineProperty(pane, "busy", {
     get: vm.runInNewContext("(function() { return " + busy + " })", { root: panel.root })
   })

@@ -277,7 +277,10 @@ Panel {
     && !root.previewCoordinator.identifyPending && !root.daemonPreview && !root.previewPending
 
   function identifyDisplays(key) {
-    if (!root.identifyAvailable) return
+    if (!root.identifyAvailable) {
+      root.lastError = "Identify is temporarily unavailable while its service is busy or reconnecting."
+      return
+    }
     if (!root.previewCoordinator.identifyDisplays(key))
       root.lastError = root.previewCoordinator.identifyError
     else root.lastError = ""
@@ -2698,6 +2701,7 @@ Panel {
             liveProfile: root.editorDocument.profile
             editorDisplays: root.editorDocument.displays
             available: root.managedChecked && (root.editorDocument.capabilities || []).indexOf("reuse_profile") >= 0
+            identifyAvailable: root.identifyAvailable
             busy: !root.backendConnected || !root.editorReady || root.reusePending || root.editorLoading || root.readPending
               || root.editorSnapshotStale || root.reuseTopologyChanged || root.identifyBlockedByPreview
             statusMessage: root.reuseStatus

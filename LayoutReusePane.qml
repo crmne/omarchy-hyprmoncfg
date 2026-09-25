@@ -11,6 +11,7 @@ Item {
   property var liveProfile: ({ outputs: [] })
   property var editorDisplays: []
   property bool available: false
+  property bool identifyAvailable: false
   property bool busy: false
   property string statusMessage: ""
   property bool ownerOpen: false
@@ -184,7 +185,7 @@ Item {
                   focusable: true
                   text: "Identify"
                   bordered: true
-                  enabled: !root.busy && !!root.mapping[parent.parent.modelData.key]
+                  enabled: root.identifyAvailable && !root.busy && !!root.mapping[parent.parent.modelData.key]
                   foreground: root.foreground
                   fontFamily: root.fontFamily
                   onClicked: root.identifyRequested(root.mapping[parent.parent.modelData.key])
