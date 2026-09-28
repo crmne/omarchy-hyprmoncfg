@@ -110,14 +110,34 @@ in the keyboard field order, and Hyprland's terminology.
   equivalent of Alt+arrows. It calls the same snapping function and names the
   same nearest display, so there is one placement engine; the exact X/Y above
   it show where the display landed.
-- Small closed sets are segmented rows of the shell's own buttons, showing every
-  choice: VRR (Off, On, Fullscreen), colour depth (8-bit, 10-bit), SDR EOTF,
-  and WCG/HDR capability (Force off, Auto-detect, Force on). A value the panel
-  does not recognise is shown as an extra choice and is never rewritten.
+- Scale follows Omarchy's own Display panel (decided 2026-09-28, Carmine): one
+  row of bordered preset pills, the current one active and its label
+  right-aligned in the SCALE header, then a More dropdown with every sharp
+  scale hyprmoncfg reports for the display (`editor_state` `scale_options`, from
+  the backend's `internal/scaling`), so no sharp scale is out of reach.
+  - Preset rule: presets 1, 1.25, 1.5, 1.6, 2 and 3, plus 4 when the backend
+    list contains 4 and the mode is at least 5120 pixels wide. As in Omarchy's
+    `cleanScale`/`availableScales`, each preset becomes the smallest sharp scale
+    at or above it; presets that land on the same scale collapse to the closest
+    one; preset order is kept; a preset above the largest sharp scale is
+    dropped. A current scale that is not a pill, sharp or not, is added in
+    value order as its own active pill and is never rewritten.
+  - Label rule: two decimals with trailing zeros trimmed and an `x` suffix
+    (`1.33x`, `1.07x`, `2x`); if two scales in the same list would share a
+    label, both show the exact value. Labels are display only: the stored and
+    applied value is always the exact sharp scale.
+  - Keyboard: arrows step through the full sharp list, as the TUI does; Enter
+    opens More. The TUI mirrors the parity vectors in `tests/scale.test.js`.
+- Small closed sets use the shell's `ButtonGroup`, so spacing, hover, focus and
+  keys are Omarchy's: VRR (Off, On, Fullscreen), colour depth (8-bit, 10-bit),
+  SDR EOTF, and WCG/HDR capability (Force off, Auto-detect, Force on). A value
+  the panel does not recognise is shown as an extra choice and is never
+  rewritten. Headers are uppercase with an optional right-aligned detail:
+  PLACE BESIDE names the display it snaps to.
 - Rotation is Normal, 90°, 180° and 270° with a separate Flipped toggle. Both edit
   the one Hyprland transform and preserve each other; an unknown transform is
-  shown and left alone.
-- Kept as they were: Enabled (toggle), Mode, Scale, Mirror and colour space
+  shown and left alone; the ROTATION header shows the raw transform.
+- Kept as they were: Enabled (toggle), Mode, Mirror and colour space
   (dropdowns: long or open lists), SDR and display luminance values (exact
   decimal entry with units; the underlying multipliers and nits are not bounded
   ranges, so sliders would imply limits that do not exist), and the ICC path.

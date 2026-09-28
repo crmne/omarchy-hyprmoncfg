@@ -856,7 +856,7 @@ test("editor options stay compact and only offer applicable profiles", () => {
   const scales = Model.scaleOptions([{ key: "panel", scale_options: [1, 1.33333, 2] }], "panel", 1.5)
   assert.deepEqual(scales, [
     { value: "1", label: "1x" },
-    { value: "1.33333", label: "1.33333x" },
+    { value: "1.33333", label: "1.33x" },
     { value: "1.5", label: "1.5x" },
     { value: "2", label: "2x" }
   ])
@@ -1324,7 +1324,7 @@ test("profile details and workspace labels mirror the TUI semantics", () => {
   assert.match(panelQml, /Number\(root\.selectedSavedSummary\.connected_outputs \|\| 0\) \+ " connected"/)
   assert.match(panelQml, /model: root\.selectedSavedWorkspaceRows/)
   assert.match(panelQml, /Model\.outputDisplayLabel\(root\.draftProfile, String\(modelData\)\)/)
-  assert.match(panelQml, /label: Model\.transformKnown\(transformValue\) \? "ROTATION"/)
+  assert.match(panelQml, /label: "ROTATION"\s+detail: Model\.transformKnown\(transformValue\) \? "" : "transform " \+ transformValue/)
   assert.doesNotMatch(panelQml, /label: "TRANSFORM"/)
 })
 

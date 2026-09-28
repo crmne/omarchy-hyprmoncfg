@@ -848,7 +848,13 @@ Panel {
     return Math.max(minimum, Math.min(maximum, value))
   }
 
-  function adjustInspectorField(delta) {
+  // Arrows stop at the ends of pill rows, like Omarchy's ButtonGroup; Enter
+  // (wrap) keeps advancing through them, as in the TUI.
+  function pillStep(options, value, delta, wrap) {
+    return wrap ? Model.cycleOptionValue(options, value, delta) : Model.stepOptionValue(options, value, delta)
+  }
+
+  function adjustInspectorField(delta, wrap) {
     var output = root.selectedOutput
     if (!output || !root.managedChecked || root.editPending || root.previewTransaction !== "") return
     var field = root.keyboardInspectorField
@@ -856,18 +862,20 @@ Panel {
     if (field === 0) edit.enabled = output.enabled === false
     else if (field === 1) edit.mode = Model.cycleOptionValue(
       Model.modeOptions(root.editorDocument.displays, root.selectedOutputKey), Model.outputMode(output), delta)
-    else if (field === 2) edit.scale = root.bounded(Number(output.scale || 1) + delta * 0.05, 0.25, 4)
-    else if (field === 3) edit.bitdepth = Number(Model.cycleOptionValue(root.bitdepthOptions,
-      String(output.bitdepth || 8), delta))
+    else if (field === 2) edit.scale = Number(Model.stepScaleOption(
+      Model.scaleOptions(root.editorDocument.displays, root.selectedOutputKey, output.scale),
+      Model.formatScale(output.scale), delta))
+    else if (field === 3) edit.bitdepth = Number(root.pillStep(root.bitdepthOptions,
+      String(output.bitdepth || 8), delta, wrap))
     else if (field === 4) edit.cm = Model.cycleOptionValue(root.colorManagementOptions,
       String(output.cm || "srgb"), delta)
-    else if (field === 5) edit.vrr = Number(Model.cycleOptionValue(root.vrrOptions,
-      String(output.vrr || 0), delta))
+    else if (field === 5) edit.vrr = Number(root.pillStep(root.vrrOptions,
+      String(output.vrr || 0), delta, wrap))
     else if (field === 6) {
       var transform = Number(output.transform || 0)
       if (!Model.transformKnown(transform)) return
-      edit.transform = Model.transformWith(transform, Number(Model.cycleOptionValue(Model.rotationOptions,
-        String(Model.transformRotation(transform)), delta)), null)
+      edit.transform = Model.transformWith(transform, Number(root.pillStep(Model.rotationOptions,
+        String(Model.transformRotation(transform)), delta, wrap)), null)
     }
     else if (field === 7) edit.x = Number(output.x || 0) + delta * 10
     else if (field === 8) edit.y = Number(output.y || 0) + delta * 10
@@ -877,15 +885,15 @@ Panel {
     else if (field === 11) edit.sdr_saturation = root.bounded(Number(output.sdr_saturation || 1) + delta * 0.05, 0, 3)
     else if (field === 12) edit.sdr_min_luminance = root.bounded(Number(output.sdr_min_luminance || 0) + delta * 0.005, 0, 1)
     else if (field === 13) edit.sdr_max_luminance = root.bounded(Number(output.sdr_max_luminance || 0) + delta * 10, 0, 1000)
-    else if (field === 14) edit.sdr_eotf = Model.cycleOptionValue(root.sdrEotfOptions,
-      String(output.sdr_eotf || "default"), delta)
+    else if (field === 14) edit.sdr_eotf = root.pillStep(root.sdrEotfOptions,
+      String(output.sdr_eotf || "default"), delta, wrap)
     else if (field === 15) edit.min_luminance = root.bounded(Number(output.min_luminance || 0) + delta * 0.001, 0, 1000)
     else if (field === 16) edit.max_luminance = root.bounded(Number(output.max_luminance || 0) + delta * 10, 0, 2000)
     else if (field === 17) edit.max_avg_luminance = root.bounded(Number(output.max_avg_luminance || 0) + delta * 10, 0, 2000)
-    else if (field === 18) edit.supports_wide_color = Number(Model.cycleOptionValue(root.triStateOptions,
-      String(output.supports_wide_color || 0), delta))
-    else if (field === 19) edit.supports_hdr = Number(Model.cycleOptionValue(root.triStateOptions,
-      String(output.supports_hdr || 0), delta))
+    else if (field === 18) edit.supports_wide_color = Number(root.pillStep(root.triStateOptions,
+      String(output.supports_wide_color || 0), delta, wrap))
+    else if (field === 19) edit.supports_hdr = Number(root.pillStep(root.triStateOptions,
+      String(output.supports_hdr || 0), delta, wrap))
     else if (field === 21) {
       // Arrows walk the four placement choices; Enter applies the one under the cursor.
       root.placementCursor = root.bounded(root.placementCursor + delta, 0, Model.placementOptions.length - 1)
@@ -902,11 +910,11 @@ Panel {
   function activateInspectorField() {
     if (!root.selectedOutput || !root.managedChecked || root.editPending) return
     var field = root.keyboardInspectorField
-    if (field === 0) root.adjustInspectorField(1)
+    if (field === 0) root.adjustInspectorField(1, true)
     else if (field === 1) modeDropdown.open()
-    else if (field === 2) scaleDropdown.open()
+    else if (field === 2) scaleField.more.open()
     else if (field === 3 || field === 5 || field === 6 || field === 14
-        || field === 18 || field === 19 || field === 22) root.adjustInspectorField(1)
+        || field === 18 || field === 19 || field === 22) root.adjustInspectorField(1, true)
     else if (field === 21) root.snapSelectedOutput(Model.placementOptions[root.placementCursor].value)
     else if (field === 4) colorManagementDropdown.open()
     else if (field === 7) positionXField.input.forceActiveFocus()
@@ -2006,7 +2014,7 @@ Panel {
         || sdrMinLuminanceField.input.activeFocus || sdrMaxLuminanceField.input.activeFocus
         || minLuminanceField.input.activeFocus || maxLuminanceField.input.activeFocus
         || maxAvgLuminanceField.input.activeFocus || iccProfileInput.activeFocus
-        || modeDropdown.popupOpen || scaleDropdown.popupOpen
+        || modeDropdown.popupOpen || scaleField.more.popupOpen
         || mirrorDropdown.popupOpen || colorManagementDropdown.popupOpen
         || workspaceStrategyDropdown.popupOpen || workspacePersistenceDropdown.popupOpen
       onMoveRequested: function(dx, dy) {
@@ -2727,7 +2735,7 @@ Panel {
                   property string page: root.inspectorPage
                   onPageChanged: contentY = 0
                   currentField: root.keyboardLayoutPane === root.inspectorPage
-                    ? [displayEnabledToggle, modeDropdown, scaleDropdown, bitdepthField,
+                    ? [displayEnabledToggle, modeDropdown, scaleField, bitdepthField,
                        colorManagementDropdown, vrrField, rotationField, positionXField,
                        positionYField, mirrorDropdown, sdrBrightnessField, sdrSaturationField,
                        sdrMinLuminanceField, sdrMaxLuminanceField, sdrCurveField,
@@ -2779,7 +2787,7 @@ Panel {
 
                     Grid {
                       width: parent.width
-                      columns: 2
+                      columns: 1
                       spacing: Style.space(8)
                       enabled: root.managedChecked
                       opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
@@ -2789,7 +2797,7 @@ Panel {
                         id: modeDropdown
                         popupParent: keyCatcher
                         ownerOpen: root.opened && root.expanded && !inspectorViewport.moving
-                        width: parent.cellWidth
+                        width: parent.width
                         label: "MODE"
                         options: Model.modeOptions(root.editorDocument.displays, root.selectedOutputKey)
                         value: root.selectedOutput ? Model.outputMode(root.selectedOutput) : ""
@@ -2803,25 +2811,31 @@ Panel {
                         onResetRequested: root.resetOutputField("mode")
                       }
 
-                      PanelDropdown {
-                        id: scaleDropdown
-                        popupParent: keyCatcher
-                        ownerOpen: root.opened && root.expanded && !inspectorViewport.moving
-                        width: parent.cellWidth
-                        label: "SCALE"
-                        options: Model.scaleOptions(root.editorDocument.displays, root.selectedOutputKey,
-                          root.selectedOutput ? root.selectedOutput.scale : 1)
-                        value: root.selectedOutput ? Model.formatScale(root.selectedOutput.scale) : "1"
-                        enabled: !!root.selectedOutput && !root.editPending
-                        hasCursor: root.inspectorHasCursor(2)
-                        foreground: root.foreground
-                        fontFamily: root.fontFamily
-                        resetVisible: root.outputFieldChanged("scale")
-                        resetTooltip: root.outputFieldResetTooltip("display scale")
-                        onChanged: function(value) { root.editOutput({ scale: Number(value) }) }
-                        onResetRequested: root.resetOutputField("scale")
-                      }
 
+                    }
+
+                    // Omarchy's Display panel shows scale as preset pills; More lists every
+                    // sharp scale hyprmoncfg reports for this display.
+                    ScaleField {
+                      id: scaleField
+                      width: parent.width
+                      enabled: root.managedChecked && !!root.selectedOutput && !root.editPending
+                      opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
+                      presets: Model.scalePresets(root.editorDocument.displays, root.selectedOutputKey,
+                        root.selectedOutput ? root.selectedOutput.scale : 1,
+                        root.selectedOutput ? root.selectedOutput.width : 0)
+                      allOptions: Model.scaleOptions(root.editorDocument.displays, root.selectedOutputKey,
+                        root.selectedOutput ? root.selectedOutput.scale : 1)
+                      value: root.selectedOutput ? Model.formatScale(root.selectedOutput.scale) : "1"
+                      popupParent: keyCatcher
+                      ownerOpen: root.opened && root.expanded && !inspectorViewport.moving
+                      hasCursor: root.inspectorHasCursor(2)
+                      foreground: root.foreground
+                      fontFamily: root.fontFamily
+                      resetVisible: root.outputFieldChanged("scale")
+                      resetTooltip: root.outputFieldResetTooltip("display scale")
+                      onChanged: function(value) { root.editOutput({ scale: Number(value) }) }
+                      onResetRequested: root.resetOutputField("scale")
                     }
 
                     // Small closed sets are shown whole: one click, value always visible.
@@ -2851,7 +2865,8 @@ Panel {
                       enabled: root.managedChecked && !!root.selectedOutput && !root.editPending
                         && Model.transformKnown(transformValue)
                       opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
-                      label: Model.transformKnown(transformValue) ? "ROTATION" : "ROTATION (transform " + transformValue + ")"
+                      label: "ROTATION"
+                      detail: Model.transformKnown(transformValue) ? "" : "transform " + transformValue
                       options: Model.rotationOptions
                       value: String(Model.transformRotation(transformValue))
                       hasCursor: root.inspectorHasCursor(6)
@@ -2927,7 +2942,8 @@ Panel {
                       width: parent.width
                       enabled: root.managedChecked && !!root.selectedOutput && !root.editPending
                       opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
-                      label: "PLACE BESIDE " + anchorName
+                      label: "PLACE BESIDE"
+                      detail: anchorName
                       tooltipText: "Snap next to the nearest display, centred on it"
                       actions: true
                       options: Model.placementOptions

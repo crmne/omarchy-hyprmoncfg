@@ -25,6 +25,8 @@ Item {
   property int rowHeight: Style.spacing.controlHeight
   property int popupRowHeight: Style.spacing.popupRowHeight
   property bool showLabel: true
+  // Fixed trigger text (e.g. "More"); empty shows the current option's label.
+  property string triggerText: ""
   property bool hasCursor: false
   property bool resetVisible: false
   property string resetTooltip: "Reset to loaded profile value"
@@ -127,7 +129,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         anchors.leftMargin: trigger.borderLeft + Style.spacing.controlPaddingX
         anchors.rightMargin: trigger.borderRight + Style.spacing.md
-        text: root.currentLabel()
+        text: root.triggerText !== "" ? root.triggerText : root.currentLabel()
         color: root.foreground
         font.family: root.fontFamily
         font.pixelSize: Style.font.body

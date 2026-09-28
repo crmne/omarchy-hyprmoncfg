@@ -28,6 +28,7 @@ function inspectorRoot(output, field, extra = {}) {
     snapSelectedOutput: direction => snaps.push(direction),
     bounded: (value, low, high) => Math.max(low, Math.min(high, value))
   }, extra)
+  root.pillStep = panelFunction("pillStep", root)
   root.adjustInspectorField = panelFunction("adjustInspectorField", root)
   root.activateInspectorField = panelFunction("activateInspectorField", root, {
     colorManagementDropdown: { open() {} }, modeDropdown: { open() {} }, scaleDropdown: { open() {} },
@@ -85,7 +86,11 @@ test("keyboard: Rotation cycles angles keeping Flipped, and Flipped toggles alon
 
   t = inspectorRoot({ transform: 3 }, 6)
   t.root.adjustInspectorField(1)
-  assert.deepEqual(t.edits, [{ transform: 0 }], "wraps within the four angles")
+  assert.deepEqual(t.edits, [{ transform: 3 }], "arrows stop at 270 like Omarchy's ButtonGroup")
+
+  t = inspectorRoot({ transform: 3 }, 6)
+  t.root.adjustInspectorField(1, true)
+  assert.deepEqual(t.edits, [{ transform: 0 }], "Enter wraps within the four angles")
 
   t = inspectorRoot({ transform: 2 }, 22)
   t.root.activateInspectorField()
@@ -136,6 +141,7 @@ test("the inspector wires every field into keyboard order and scroll-into-view",
   assert.equal(list.length, 23)
   assert.equal(list[21], "placementField")
   assert.equal(list[22], "rotationField")
+  assert.equal(list[2], "scaleField")
   assert.equal(list[7], "positionXField")
   for (const id of ["vrrField", "rotationField", "bitdepthField", "sdrCurveField", "forceWideField", "forceHdrField"])
     assert.match(qml, new RegExp("SegmentedField \\{\\s+id: " + id))
@@ -145,7 +151,7 @@ test("the inspector wires every field into keyboard order and scroll-into-view",
   assert.doesNotMatch(qml, /vrrDropdown|rotationDropdown|bitdepthDropdown|sdrCurveDropdown|forceWideDropdown|forceHdrDropdown/)
   assert.match(qml, /options: Model\.optionsWithCurrent\(root\.vrrOptions,/)
   assert.match(qml, /onChanged: function\(value\) \{ root\.snapSelectedOutput\(value\) \}/)
-  assert.match(qml, /label: "PLACE BESIDE " \+ anchorName/)
+  assert.match(qml, /label: "PLACE BESIDE"\s+detail: anchorName/)
 })
 
 test("dropdowns report their real height so content-sized panels never clip them", () => {
@@ -173,6 +179,6 @@ test("form grid columns land on whole pixels inside the inspector's clip edge", 
   assert.ok(cells.length >= 5)
   for (const cell of cells) assert.match(cell, /Model\.gridCellWidth\(width, spacing, 2\)/)
   assert.match(monitorInfo, /cellWidth: Model\.gridCellWidth\(width, columnSpacing, columns\)/)
-  const chips = fs.readFileSync(path.join(__dirname, "..", "SegmentedField.qml"), "utf8")
-  assert.match(chips, /chipWidth: count > 0 \? Math\.floor\(/)
+  const pills = fs.readFileSync(path.join(__dirname, "..", "ScaleField.qml"), "utf8")
+  assert.match(pills, /Math\.floor\(\(width - moreWidth - spacing \* count\) \/ count\)/, "pill cells are whole pixels")
 })

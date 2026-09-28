@@ -454,6 +454,25 @@ function adjacentProfileName(profiles, selectedName, delta) {
   return String((items[wrapIndex(current + Number(delta || 0), items.length)] || {}).name || "")
 }
 
+// Pill rows follow Omarchy's ButtonGroup: arrows stop at the first and last
+// choice instead of wrapping. Dropdown fields keep cycleOptionValue.
+function stepOptionValue(options, currentValue, delta) {
+  var items = options instanceof Array ? options : []
+  if (items.length === 0) return String(currentValue || "")
+  var current = -1
+  for (var i = 0; i < items.length; i++) {
+    var value = items[i] && typeof items[i] === "object" ? items[i].value : items[i]
+    if (String(value) === String(currentValue || "")) {
+      current = i
+      break
+    }
+  }
+  if (current < 0) return String(currentValue || "")
+  var next = Math.max(0, Math.min(items.length - 1, current + Number(delta || 0)))
+  var selected = items[next]
+  return String(selected && typeof selected === "object" ? selected.value : selected)
+}
+
 function cycleOptionValue(options, currentValue, delta) {
   var items = options instanceof Array ? options : []
   if (items.length === 0) return String(currentValue || "")
@@ -670,6 +689,27 @@ function formatScale(value) {
   return String(Math.round(number * 100000) / 100000)
 }
 
+// Compact scale labels: at most two decimals, trailing zeros trimmed
+// ("1.33", "1.07", "2"). When two scales in the same list would share a
+// label, both keep their exact form so no two choices read alike. The value
+// stored and applied is always the exact scale; only the label is compact.
+function compactScaleLabels(values) {
+  var exact = [], compact = [], counts = {}
+  for (var i = 0; i < values.length; i++) {
+    exact.push(formatScale(values[i]))
+    var c = String(Math.round(Number(values[i]) * 100) / 100)
+    compact.push(c)
+    counts[c] = (counts[c] || 0) + 1
+  }
+  var labels = {}
+  for (var j = 0; j < values.length; j++)
+    labels[exact[j]] = (counts[compact[j]] > 1 ? exact[j] : compact[j]) + "x"
+  return labels
+}
+
+// Every sharp scale hyprmoncfg reports for the display (editor_state
+// scale_options), plus the current scale if it is not one of them; exact
+// values in ascending order, compact labels.
 function scaleOptions(editorDisplays, key, current) {
   var metadata = editorMetadata(editorDisplays, key)
   var values = metadata.scale_options instanceof Array ? metadata.scale_options.slice() : []
@@ -680,10 +720,55 @@ function scaleOptions(editorDisplays, key, current) {
   }
   if (!found) values.push(Number(current || 1))
   values.sort(function(a, b) { return Number(a) - Number(b) })
+  var labels = compactScaleLabels(values)
   return values.map(function(value) {
     var formatted = formatScale(value)
-    return { value: formatted, label: formatted + "x" }
+    return { value: formatted, label: labels[formatted] }
   })
+}
+
+// Omarchy's Display panel presets plus 1.5; 4 joins only on 5K-class modes
+// where hyprmoncfg reports it as sharp.
+var scalePresetValues = [1, 1.25, 1.5, 1.6, 2, 3]
+
+// The preset pills, mapped the way Omarchy's availableScales/cleanScale map
+// them: each preset becomes the smallest sharp scale at or above it (from the
+// backend's list), presets landing on the same sharp scale collapse to the one
+// closest to it, and preset order is kept. The current scale, if it is not
+// one of the pills, is added in value order as its own pill.
+function scalePresets(editorDisplays, key, current, modeWidth) {
+  var metadata = editorMetadata(editorDisplays, key)
+  var sharp = (metadata.scale_options instanceof Array ? metadata.scale_options : [])
+    .map(Number).filter(function(v) { return isFinite(v) && v > 0 })
+    .sort(function(a, b) { return a - b })
+  var presets = scalePresetValues.slice()
+  var hasFour = sharp.some(function(v) { return formatScale(v) === "4" })
+  if (hasFour && Number(modeWidth || 0) >= 5120) presets.push(4)
+
+  var byEffective = {}
+  for (var i = 0; i < presets.length; i++) {
+    var effective = null
+    for (var j = 0; j < sharp.length; j++) {
+      if (sharp[j] >= presets[i] - 1e-9) { effective = sharp[j]; break }
+    }
+    if (effective === null) continue
+    var keyText = formatScale(effective)
+    var distance = Math.abs(presets[i] - effective)
+    if (!byEffective[keyText] || distance < byEffective[keyText].distance)
+      byEffective[keyText] = { value: keyText, index: i, distance: distance }
+  }
+  var pills = Object.keys(byEffective).map(function(k) { return byEffective[k] })
+    .sort(function(a, b) { return a.index - b.index })
+    .map(function(c) { return c.value })
+
+  var currentText = formatScale(current)
+  if (pills.indexOf(currentText) < 0) {
+    var at = 0
+    while (at < pills.length && Number(pills[at]) < Number(currentText)) at++
+    pills.splice(at, 0, currentText)
+  }
+  var labels = compactScaleLabels(scaleOptions(editorDisplays, key, current).map(function(o) { return o.value }))
+  return pills.map(function(value) { return { value: value, label: labels[value] || value + "x" } })
 }
 
 function mirrorOptions(profile, selectedKey) {
@@ -1407,6 +1492,23 @@ function gridCellWidth(width, spacing, columns) {
   return Math.max(0, Math.floor((Math.max(0, Number(width) || 0) - gap * (n - 1)) / n))
 }
 
+// Keyboard stepping through the sharp scales, like the TUI's nextSharpScale:
+// the neighbouring option in value order, stopping at the ends. A current
+// value between options steps to the nearest one in that direction.
+function stepScaleOption(options, current, delta) {
+  var items = options instanceof Array ? options : []
+  if (items.length === 0 || !delta) return String(current)
+  var value = Number(current)
+  if (delta > 0) {
+    for (var i = 0; i < items.length; i++)
+      if (Number(items[i].value) > value + 1e-9) return String(items[i].value)
+    return String(items[items.length - 1].value)
+  }
+  for (var j = items.length - 1; j >= 0; j--)
+    if (Number(items[j].value) < value - 1e-9) return String(items[j].value)
+  return String(items[0].value)
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     layoutInspectorSpan: layoutInspectorSpan,
@@ -1442,6 +1544,7 @@ if (typeof module !== "undefined") {
     adjacentOutputKey: adjacentOutputKey,
     adjacentProfileName: adjacentProfileName,
     cycleOptionValue: cycleOptionValue,
+    stepOptionValue: stepOptionValue,
     snapOutputPosition: snapOutputPosition,
     nearestSnapAnchor: nearestSnapAnchor,
     snapAnchorName: snapAnchorName,
@@ -1454,6 +1557,10 @@ if (typeof module !== "undefined") {
     optionsWithCurrent: optionsWithCurrent,
     parseCoordinate: parseCoordinate,
     gridCellWidth: gridCellWidth,
+    stepScaleOption: stepScaleOption,
+    compactScaleLabels: compactScaleLabels,
+    scalePresetValues: scalePresetValues,
+    scalePresets: scalePresets,
     outputName: outputName,
     outputDisplayLabel: outputDisplayLabel,
     outputFieldValue: outputFieldValue,
