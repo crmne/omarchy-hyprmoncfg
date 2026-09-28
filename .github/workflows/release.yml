@@ -48,23 +48,14 @@ jobs:
             exit 0
           fi
 
-          previous="$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)"
-          range="$TAG"
-          if [ -n "$previous" ]; then
-            range="$previous..$TAG"
+          notes="design/releases/$version.md"
+          if [ ! -s "$notes" ]; then
+            echo "::error::Commit the release notes at $notes before tagging"
+            exit 1
           fi
-
-          {
-            git log --no-merges --reverse --format='- %s' "$range" \
-              | grep -v '^- Release [0-9]' || true
-            if [ -n "$previous" ]; then
-              printf '\n**Full changelog**: %s/compare/%s...%s\n' \
-                "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "$previous" "$TAG"
-            fi
-          } > notes.md
 
           release_args=()
           if [[ "$version" == *-* ]]; then
             release_args+=(--prerelease)
           fi
-          gh release create "$TAG" --title "$title" --notes-file notes.md "${release_args[@]}"
+          gh release create "$TAG" --title "$title" --notes-file "$notes" "${release_args[@]}"
