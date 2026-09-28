@@ -19,6 +19,9 @@ BorderSurface {
   property bool detailed: true
   property bool framed: true
   property bool markDisconnected: false
+  // Output key to a short note from the daemon's display health, such as
+  // "No usable signal" or "Running without VRR". See Model.displayNotes.
+  property var notes: ({})
   property color foreground: Color.foreground
   property color dim: Qt.darker(foreground, 1.5)
   property color accent: Color.accent
@@ -27,10 +30,10 @@ BorderSurface {
   signal outputSelected(string key)
   signal outputMoved(string key, int x, int y, int snapDistance)
 
-  readonly property var displays: Model.profileLayoutDisplays(profile, editorDisplays)
+  readonly property var displays: Model.profileLayoutDisplays(profile, editorDisplays, notes)
   readonly property var bounds: Model.layoutBounds(displays)
   readonly property var metrics: Model.layoutMetrics(bounds, canvas.width, canvas.height, Style.space(8))
-  readonly property var nonSpatialDisplays: Model.nonSpatialDisplays(profile, editorDisplays, markDisconnected)
+  readonly property var nonSpatialDisplays: Model.nonSpatialDisplays(profile, editorDisplays, markDisconnected, notes)
 
   implicitHeight: Style.space(205)
   color: framed ? Qt.rgba(foreground.r, foreground.g, foreground.b, 0.025) : "transparent"
@@ -110,9 +113,9 @@ BorderSurface {
         readonly property var summary: Model.displaySummary(modelData,
           Model.editorMetadata(root.editorDisplays, modelData.key), root.workspacePlan)
         readonly property bool disconnected: root.markDisconnected && modelData.connected === false
-        readonly property int fullDetailHeight: Style.space(workspaceText !== ""
-          ? (disconnected ? 110 : 98)
-          : (disconnected ? 98 : 86))
+        readonly property string note: disconnected ? "" : String(root.notes[String(modelData.key || "")] || "")
+        readonly property int fullDetailHeight: Style.space((workspaceText !== "" ? 98 : 86)
+          + (disconnected || note !== "" ? 12 : 0))
         readonly property bool compact: width < Style.space(155) || height < fullDetailHeight
         readonly property bool hasModelRoom: root.detailed && height >= Style.space(56)
 
@@ -154,6 +157,19 @@ BorderSurface {
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
+            horizontalAlignment: Text.AlignHCenter
+            elide: Text.ElideRight
+          }
+
+          Text {
+            textFormat: Text.PlainText
+            visible: card.note !== ""
+            width: parent.width
+            text: card.note
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            font.italic: true
             horizontalAlignment: Text.AlignHCenter
             elide: Text.ElideRight
           }

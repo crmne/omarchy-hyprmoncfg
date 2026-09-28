@@ -2222,3 +2222,37 @@ test("Off replaces the Enabled toggle, hides plan controls, and explains the emp
   assert.match(qml, /workspacePlan: root\.workspacesOff \? \[\] : root\.workspacePlan\s+emphasis: "workspaces"/)
   assert.match(qml, /if \(!settings\.enabled \|\| String\(settings\.strategy \|\| ""\) !== "manual"/)
 })
+
+test("display notes name a display without a mode and one the daemon stepped down", () => {
+  const monitors = [
+    { key: "desk", name: "DP-1", enabled: true, width: 2560, height: 1440, health: "usable" },
+    { key: "msi", name: "DP-2", enabled: true, width: 3840, height: 2160, health: "usable",
+      fallback: { reason: "dropping", running: "at 120 Hz without VRR" } },
+    { key: "hdmi", name: "HDMI-A-1", enabled: true, width: 0, height: 0, health: "no_signal" },
+    { key: "asleep", name: "DP-3", enabled: true, width: 0, height: 0, health: "sleeping" },
+    { key: "off", name: "eDP-1", enabled: false, width: 0, height: 0, health: "off" },
+  ]
+  assert.deepEqual(Model.displayNotes(monitors), {
+    msi: "Running at 120 Hz without VRR",
+    hdmi: "No usable signal",
+  })
+  // Older daemons send no health: a zero-size mode stands in for no signal.
+  assert.deepEqual(Model.displayNotes([{ key: "old", name: "DP-9", enabled: true, width: 0, height: 0 }]),
+    { old: "No usable signal" })
+  assert.equal(Model.hiddenDisplays(monitors), "No usable signal: HDMI-A-1   Off: eDP-1")
+})
+
+test("a display without a mode gets a named row instead of a card", () => {
+  const profile = { outputs: [
+    { key: "desk", name: "DP-1", enabled: true, width: 2560, height: 1440, scale: 1 },
+    { key: "hdmi", name: "HDMI-A-1", enabled: true, width: 2560, height: 1440, scale: 1, x: 2560 },
+  ] }
+  const notes = { hdmi: "No usable signal" }
+  const editor = [{ key: "desk" }, { key: "hdmi" }]
+  assert.deepEqual(Model.profileLayoutDisplays(profile, editor, notes).map(d => d.key), ["desk"])
+  assert.deepEqual(Model.nonSpatialDisplays(profile, editor, false, notes),
+    [{ key: "hdmi", name: "HDMI-A-1", state: "No usable signal" }])
+  // Without notes nothing changes, so older callers keep their canvas.
+  assert.deepEqual(Model.profileLayoutDisplays(profile, editor).map(d => d.key), ["desk", "hdmi"])
+  assert.deepEqual(Model.nonSpatialDisplays(profile, editor, false), [])
+})

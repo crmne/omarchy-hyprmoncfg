@@ -134,6 +134,7 @@ Panel {
       ? Model.profileLayoutDisplays(root.draftProfile, root.editorDocument.displays)
       : Model.layoutDisplays(root.backendConnected ? monitorSummaries : [], Quickshell.screens || []))
   readonly property var layoutBounds: Model.layoutBounds(layoutDisplays)
+  readonly property var displayNotes: Model.displayNotes(root.backendConnected ? monitorSummaries : [])
   readonly property string hiddenDisplays: root.daemonPreview && root.daemonPreview.profile
     ? Model.hiddenProfileDisplays(root.daemonPreview.profile)
     : (root.editorReady
@@ -2168,6 +2169,7 @@ Panel {
               anchors.fill: parent
               profile: root.draftProfile
               editorDisplays: root.editorDocument.displays
+              notes: root.displayNotes
               workspacePlan: root.workspacePlan
               emphasis: "layout"
               selectedKey: root.selectedOutputKey
@@ -2560,6 +2562,7 @@ Panel {
                 anchors.fill: parent
                 profile: root.draftProfile
                 editorDisplays: root.editorDocument.displays
+                notes: root.displayNotes
                 workspacePlan: root.workspacePlan
                 emphasis: "layout"
                 selectedKey: root.selectedOutputKey
@@ -3443,6 +3446,7 @@ Panel {
                   anchors.fill: parent
                   profile: root.selectedSavedProfile || ({ outputs: [] })
                   editorDisplays: root.editorDocument.displays
+                  notes: root.displayNotes
                   workspacePlan: root.selectedSavedWorkspacePlan
                   emphasis: "profile"
                   selectedKey: ""
@@ -3815,6 +3819,7 @@ Panel {
                   anchors.fill: parent
                   profile: root.draftProfile
                   editorDisplays: root.editorDocument.displays
+                  notes: root.displayNotes
                   workspacePlan: root.workspacesOff ? [] : root.workspacePlan
                   emphasis: "workspaces"
                   selectedKey: root.selectedWorkspaceDisplayKey

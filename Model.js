@@ -77,6 +77,8 @@ function hiddenDisplays(monitors) {
   var summaries = monitors instanceof Array ? monitors : []
   var off = []
   var mirrored = []
+  var noSignal = []
+  var notes = displayNotes(summaries)
 
   for (var i = 0; i < summaries.length; i++) {
     var monitor = summaries[i] || {}
@@ -85,13 +87,42 @@ function hiddenDisplays(monitors) {
       off.push(name)
     } else if (mirrorTarget(monitor) !== "") {
       mirrored.push(name + " → " + mirrorTarget(monitor))
+    } else if (notes[String(monitor.key || "")] === noUsableSignal) {
+      noSignal.push(name)
     }
   }
 
   var parts = []
+  if (noSignal.length > 0) parts.push(noUsableSignal + ": " + noSignal.join(", "))
   if (off.length > 0) parts.push("Off: " + off.join(", "))
   if (mirrored.length > 0) parts.push("Mirrored: " + mirrored.join(", "))
   return parts.join("   ")
+}
+
+// displayNotes turns the daemon's per-display health into short notes, keyed
+// by output key, for states a card cannot show by itself: a display that is on
+// but has no mode, and one the daemon runs below its saved settings. Older
+// daemons send no health, so a zero-size mode stands in for no_signal there.
+// Mirrors: the TUI card note.
+var noUsableSignal = "No usable signal"
+
+function displayNotes(monitors) {
+  var notes = {}
+  var summaries = monitors instanceof Array ? monitors : []
+  for (var i = 0; i < summaries.length; i++) {
+    var monitor = summaries[i] || {}
+    var key = String(monitor.key || "")
+    if (key === "" || monitor.enabled === false || mirrorTarget(monitor) !== "") continue
+    var modeless = monitor.health !== undefined
+      ? monitor.health === "no_signal"
+      : !(Number(monitor.width || 0) > 0 && Number(monitor.height || 0) > 0)
+    if (modeless) {
+      notes[key] = noUsableSignal
+    } else if (monitor.fallback && String(monitor.fallback.running || "") !== "") {
+      notes[key] = "Running " + String(monitor.fallback.running)
+    }
+  }
+  return notes
 }
 
 function layoutDisplays(monitors, screens) {
@@ -240,12 +271,15 @@ function outputMode(output) {
   return width + "x" + height + (refresh > 0 ? "@" + refresh.toFixed(2) + "Hz" : "")
 }
 
-function profileLayoutDisplays(profile, editorDisplays) {
+function profileLayoutDisplays(profile, editorDisplays, notes) {
   var outputs = profile && profile.outputs instanceof Array ? profile.outputs : []
+  var health = notes || {}
   var result = []
   for (var i = 0; i < outputs.length; i++) {
     var output = outputs[i] || {}
     if (output.enabled === false || mirrorTarget(output) !== "") continue
+    // A display that is on but shows nothing gets a named row, not a card.
+    if (health[String(output.key || "")] === noUsableSignal) continue
     var logical = outputLogicalSize(output)
     var metadata = editorMetadata(editorDisplays, output.key)
     var connected = Object.keys(metadata).length > 0
@@ -270,16 +304,19 @@ function profileLayoutDisplays(profile, editorDisplays) {
   return result
 }
 
-function nonSpatialDisplays(profile, editorDisplays, markDisconnected) {
+function nonSpatialDisplays(profile, editorDisplays, markDisconnected, notes) {
   var outputs = profile && profile.outputs instanceof Array ? profile.outputs : []
+  var health = notes || {}
   var result = []
   for (var i = 0; i < outputs.length; i++) {
     var output = outputs[i] || {}
     var mirror = mirrorTarget(output)
-    if (output.enabled !== false && mirror === "") continue
+    var modeless = health[String(output.key || "")] === noUsableSignal
+    if (output.enabled !== false && mirror === "" && !modeless) continue
     var connected = Object.keys(editorMetadata(editorDisplays, output.key)).length > 0
     var state = markDisconnected && !connected ? "Not connected"
-      : (output.enabled === false ? "Off" : "Mirrors " + outputName(profile, mirror))
+      : (output.enabled === false ? "Off"
+        : (mirror !== "" ? "Mirrors " + outputName(profile, mirror) : noUsableSignal))
     result.push({ key: String(output.key || ""), name: String(output.name || "Display"), state: state })
   }
   return result
@@ -1111,6 +1148,7 @@ if (typeof module !== "undefined") {
     monitorStateSignature: monitorStateSignature,
     monitorSnapshotsMatch: monitorSnapshotsMatch,
     hiddenDisplays: hiddenDisplays,
+    displayNotes: displayNotes,
     layoutDisplays: layoutDisplays,
     displayModelLabel: displayModelLabel,
     displayDetailLabel: displayDetailLabel,
