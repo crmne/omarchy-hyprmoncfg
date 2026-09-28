@@ -134,6 +134,76 @@ Panel {
       ? Model.profileLayoutDisplays(root.draftProfile, root.editorDocument.displays)
       : Model.layoutDisplays(root.backendConnected ? monitorSummaries : [], Quickshell.screens || []))
   readonly property var layoutBounds: Model.layoutBounds(layoutDisplays)
+
+  // ---- Content-sized panel. The math lives in Model.js; QML only feeds it
+  // measured content heights and binds to the result.
+  readonly property real sizingUnit: Style.spaceReal(1)
+  readonly property bool layoutOffRow: Model.nonSpatialDisplays(root.daemonPreview && root.daemonPreview.profile
+    ? root.daemonPreview.profile : root.draftProfile, root.editorDocument.displays, false, root.displayNotes).length > 0
+  readonly property var profileBounds: Model.layoutBounds(Model.profileLayoutDisplays(
+    root.selectedSavedProfile || ({ outputs: [] }), root.editorDocument.displays))
+  readonly property bool profileOffRow: Model.nonSpatialDisplays(root.selectedSavedProfile || ({ outputs: [] }),
+    root.editorDocument.displays, true, root.displayNotes).length > 0
+  readonly property real panelHorizontalInset: panel.padding * 2
+    + Border.left(panel.borderSpec) + Border.right(panel.borderSpec)
+  readonly property var panelLayout: Model.expandedPanelLayout({
+    unit: root.sizingUnit,
+    page: root.activePage,
+    bounds: root.layoutBounds,
+    offRow: root.layoutOffRow,
+    chromeHeight: editorNav.height + Style.space(20) + editorFooter.height
+      + (previewBanner.visible ? previewBanner.height + Style.space(8) : 0),
+    inspectorHeight: inspectorTabs.implicitHeight + Style.space(8) + displayControls.implicitHeight,
+    hardwareHeight: inspectorPane.implicitHeight,
+    profileBounds: root.profileBounds,
+    profileOffRow: root.profileOffRow,
+    profileCount: profileEntries.count,
+    profileListHeaderHeight: Style.space(30) + profileListTop.implicitHeight + Style.space(6),
+    profileDetailsHeight: Style.space(30) + profileDetailsContent.implicitHeight,
+    // Fixed settings plus Monitor order rows; the manual list is counted as rows.
+    workspaceSettingsHeight: Style.space(30) + workspaceSettingsColumn.implicitHeight
+      - (manualAssignmentList.visible ? manualAssignmentList.height + workspaceSettingsColumn.spacing : 0),
+    workspaceRowCount: manualAssignmentList.visible ? root.manualWorkspaceRows.length : 0,
+    workspacePlanHeight: workspacePlanPane.height,
+    availableWidth: panel.availableCardWidth - root.panelHorizontalInset,
+    availableHeight: panel.availableCardHeight - panel.verticalContentInset
+  })
+  readonly property real profileStageHeight: Model.stageHeightForWidth(root.profileBounds,
+    root.panelLayout.width - root.panelLayout.sideWidth - root.panelLayout.columnGap,
+    root.sizingUnit, { offRow: root.profileOffRow })
+  readonly property bool canvasDragging: layoutCanvas.dragging || compactCanvas.dragging
+  property real appliedPanelWidth: 0
+  property real appliedPanelHeight: 0
+  property bool panelSizeAnimated: false
+  Behavior on appliedPanelWidth {
+    enabled: root.panelSizeAnimated
+    NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+  }
+  Behavior on appliedPanelHeight {
+    enabled: root.panelSizeAnimated
+    NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+  }
+
+  function applyPanelSize(modeChanged) {
+    var target = root.panelLayout
+    var first = root.appliedPanelWidth <= 0
+    if (!first && !Model.panelResizeAllowed({
+        open: root.opened && root.expanded,
+        modeChanged: modeChanged === true,
+        dragging: root.canvasDragging,
+        pointerInside: panelPointer.hovered,
+        barPosition: root.bar ? String(root.bar.position || "top") : "top",
+        widthChanged: Math.round(target.width) !== Math.round(root.appliedPanelWidth)
+      })) return
+    // Mode switches and first layout jump; everything else eases.
+    root.panelSizeAnimated = !first && modeChanged !== true && root.opened && root.expanded
+    root.appliedPanelWidth = target.width
+    root.appliedPanelHeight = target.height
+  }
+
+  onPanelLayoutChanged: root.applyPanelSize(false)
+  onCanvasDraggingChanged: root.applyPanelSize(false)
+  onExpandedChanged: root.applyPanelSize(true)
   readonly property var displayNotes: Model.displayNotes(root.backendConnected ? monitorSummaries : [])
   readonly property string hiddenDisplays: root.daemonPreview && root.daemonPreview.profile
     ? Model.hiddenProfileDisplays(root.daemonPreview.profile)
@@ -1823,9 +1893,11 @@ Panel {
     open: root.opened
     centerOnBar: false
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(root.expanded ? 1120 : 430))
+    contentWidth: root.expanded
+      ? panel.fittedContentWidth(root.appliedPanelWidth + root.panelHorizontalInset)
+      : panel.fittedContentWidth(Style.space(430))
     contentHeight: root.expanded
-      ? panel.fittedContentHeight(Style.space(780))
+      ? panel.fittedContentHeight(root.appliedPanelHeight)
       : panel.fittedContentHeight(compactColumn.implicitHeight)
 
     Item {
@@ -1950,6 +2022,9 @@ Panel {
       }
       onTextKey: function(text) { if (root.expanded) root.handleExpandedText(text) }
 
+      // Pointer presence for the resize policy; passive, takes no input.
+      HoverHandler { id: panelPointer; onHoveredChanged: root.applyPanelSize(false) }
+
       Column {
         id: compactColumn
         visible: !root.expanded
@@ -2016,10 +2091,12 @@ Panel {
               textFormat: Text.PlainText
               width: parent.width
               text: "hyprmoncfg"
+              font.capitalization: Font.AllUppercase
               color: root.dim
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
               font.bold: true
+              font.letterSpacing: 1.2
               elide: Text.ElideRight
             }
           }
@@ -2093,77 +2170,12 @@ Panel {
 
           PanelSeparator { foreground: root.foreground }
 
-          BrightnessControl {
-            visible: root.brightnessConnector !== ""
-            width: parent.width
-            bar: root.bar
-            connector: root.brightnessConnector
-            displayLabel: root.brightnessDisplayLabel
-            value: root.brightnessPercent
-            available: root.brightnessAvailable
-            loading: root.brightnessLoading
-            foreground: root.foreground
-            dim: root.dim
-            accent: Color.accent
-            fontFamily: root.fontFamily
-            onPreviewed: function(value) { root.previewBrightness(value) }
-            onCommitted: function(value) {
-              brightnessSetDebounce.stop()
-              root.setBrightness(value)
-            }
-          }
-
-          Column {
-            width: parent.width
-            spacing: Style.space(6)
-
-            PanelSectionHeader {
-              text: "MONITOR MANAGEMENT"
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-            }
-
-            Toggle {
-              width: parent.width
-              label: "Managed by hyprmoncfg"
-              description: {
-                if (root.serviceActionPending)
-                  return root.serviceTargetManaged ? "Taking control of display configuration…" : "Handing display control back…"
-                if (root.serviceBroken) return "The background service could not start"
-                if (root.managedChecked && root.profileAutomatic)
-                  return "Switch layouts on monitor, lid, and resume events"
-                if (root.managedChecked) return "Owns and applies monitor configuration"
-                return "Read-only — display configuration is controlled elsewhere"
-              }
-              checked: root.managedChecked
-              enabled: !root.serviceActionPending
-              hasCursor: root.cursorActive && root.cursorIndex === 0
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-              onClicked: root.setManaged(!root.managedChecked)
-            }
-          }
-
-          Repeater {
-            model: root.actionRows
-
-            ActionRow {
-              required property var modelData
-              required property int index
-              width: parent.width
-              rowIndex: 1 + index
-              icon: String(modelData.icon)
-              title: String(modelData.title)
-              subtitle: String(modelData.subtitle)
-              onActivated: root.activateRow(String(modelData.id))
-            }
-          }
-
           EditorPane {
             width: parent.width
-            height: Style.space(250)
-            title: "Monitor Layout"
-            meta: root.monitorCount + (root.monitorCount === 1 ? " display" : " displays")
+            // Fit the arrangement's aspect within the compact clamps.
+            height: Model.compactStageHeight(root.layoutBounds, width, root.sizingUnit, root.layoutOffRow)
+            title: ""
+            meta: ""
             active: true
             foreground: root.foreground
             dim: root.dim
@@ -2172,6 +2184,7 @@ Panel {
             opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
 
             DisplayCanvas {
+              id: compactCanvas
               anchors.fill: parent
               profile: root.draftProfile
               editorDisplays: root.editorDocument.displays
@@ -2183,7 +2196,7 @@ Panel {
               selectable: root.editorReady
               movable: root.managedChecked && root.editorReady && !root.editPending && root.previewTransaction === ""
               detailed: true
-              framed: false
+              framed: true
               foreground: root.foreground
               dim: root.dim
               accent: Color.accent
@@ -2284,6 +2297,76 @@ Panel {
             }
           }
 
+          PanelSeparator { visible: root.brightnessConnector !== ""; foreground: root.foreground }
+
+          BrightnessControl {
+            visible: root.brightnessConnector !== ""
+            width: parent.width
+            bar: root.bar
+            connector: root.brightnessConnector
+            displayLabel: root.brightnessDisplayLabel
+            value: root.brightnessPercent
+            available: root.brightnessAvailable
+            loading: root.brightnessLoading
+            foreground: root.foreground
+            dim: root.dim
+            accent: Color.accent
+            fontFamily: root.fontFamily
+            onPreviewed: function(value) { root.previewBrightness(value) }
+            onCommitted: function(value) {
+              brightnessSetDebounce.stop()
+              root.setBrightness(value)
+            }
+          }
+
+          PanelSeparator { foreground: root.foreground }
+
+          Column {
+            width: parent.width
+            spacing: Style.space(6)
+
+            PanelSectionHeader {
+              text: "MONITOR MANAGEMENT"
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+            }
+
+            Toggle {
+              width: parent.width
+              label: "Managed by hyprmoncfg"
+              description: {
+                if (root.serviceActionPending)
+                  return root.serviceTargetManaged ? "Taking control of display configuration…" : "Handing display control back…"
+                if (root.serviceBroken) return "The background service could not start"
+                if (root.managedChecked && root.profileAutomatic)
+                  return "Switch layouts on monitor, lid, and resume events"
+                if (root.managedChecked) return "Owns and applies monitor configuration"
+                return "Read-only — display configuration is controlled elsewhere"
+              }
+              checked: root.managedChecked
+              enabled: !root.serviceActionPending
+              hasCursor: root.cursorActive && root.cursorIndex === 0
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              onClicked: root.setManaged(!root.managedChecked)
+            }
+          }
+
+          Repeater {
+            model: root.actionRows
+
+            ActionRow {
+              required property var modelData
+              required property int index
+              width: parent.width
+              rowIndex: 1 + index
+              icon: String(modelData.icon)
+              title: String(modelData.title)
+              subtitle: String(modelData.subtitle)
+              onActivated: root.activateRow(String(modelData.id))
+            }
+          }
+
           PanelSeparator { foreground: root.foreground }
 
           Column {
@@ -2376,7 +2459,7 @@ Panel {
           Row {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            spacing: Style.space(10)
+            spacing: Style.space(6)
 
             Button {
               id: identifyAllButton
@@ -2393,40 +2476,12 @@ Panel {
             Button {
               id: keyboardHelpButton
               anchors.verticalCenter: parent.verticalCenter
-              text: ""
+              text: "Keys"
               bordered: true
               foreground: root.foreground
               fontFamily: root.fontFamily
               fontSize: Style.font.caption
-              implicitWidth: keyboardHelpButtonContent.implicitWidth
-                + horizontalPadding * 2 + Style.normalBorderWidth * 2
               implicitHeight: identifyAllButton.implicitHeight
-
-              Row {
-                id: keyboardHelpButtonContent
-                anchors.centerIn: parent
-                spacing: Style.space(4)
-
-                Text {
-                  textFormat: Text.PlainText
-                  anchors.verticalCenter: parent.verticalCenter
-                  anchors.verticalCenterOffset: 1
-                  text: "?"
-                  color: root.foreground
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.caption
-                }
-
-                Text {
-                  textFormat: Text.PlainText
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: "Keys"
-                  color: root.foreground
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.caption
-                }
-              }
-
               onClicked: root.keyboardHelpOpen = true
             }
 
@@ -2434,8 +2489,6 @@ Panel {
               id: openTuiButton
               anchors.verticalCenter: parent.verticalCenter
               text: "TUI"
-              iconText: "󰆍"
-              iconSize: fontSize
               implicitHeight: identifyAllButton.implicitHeight
               bordered: true
               foreground: root.foreground
@@ -2448,8 +2501,6 @@ Panel {
               id: compactButton
               anchors.verticalCenter: parent.verticalCenter
               text: "Compact"
-              iconText: "󰊔"
-              iconSize: fontSize
               implicitHeight: identifyAllButton.implicitHeight
               bordered: true
               foreground: root.foreground
@@ -2553,10 +2604,12 @@ Panel {
               id: layoutPane
               anchors.left: parent.left
               anchors.top: parent.top
-              anchors.bottom: parent.bottom
-              width: Math.round(parent.width * 0.65)
-              title: "Monitor Layout"
-              meta: root.hiddenDisplays
+              width: parent.width - root.panelLayout.inspectorWidth - root.panelLayout.columnGap
+              // The stage takes what the hardware facts leave; the panel height
+              // itself comes from Model.expandedPanelLayout.
+              height: Math.max(Style.space(160), parent.height - inspectorPane.height - Style.space(10))
+              title: ""
+              meta: ""
               active: root.keyboardLayoutPane === "canvas"
               foreground: root.foreground
               dim: root.dim
@@ -2565,7 +2618,9 @@ Panel {
               opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
 
               DisplayCanvas {
+                id: layoutCanvas
                 anchors.fill: parent
+                focusOutline: root.keyboardLayoutPane === "canvas"
                 profile: root.draftProfile
                 editorDisplays: root.editorDocument.displays
                 notes: root.displayNotes
@@ -2576,7 +2631,7 @@ Panel {
                 selectable: root.editorReady
                 movable: root.managedChecked && root.editorReady && !root.editPending && root.previewTransaction === ""
                 detailed: true
-                framed: false
+                framed: true
                 foreground: root.foreground
                 dim: root.dim
                 accent: Color.accent
@@ -2588,31 +2643,45 @@ Panel {
               }
             }
 
+            // Hardware facts describe the screen pictured above them, and stay
+            // apart from the editable controls in the right column.
+            MonitorInfo {
+              id: inspectorPane
+              anchors.left: layoutPane.left
+              anchors.right: layoutPane.right
+              anchors.bottom: parent.bottom
+              height: implicitHeight
+              columns: width >= Style.space(520) ? 2 : 1
+              output: root.selectedOutput
+              metadata: root.selectedOutputMetadata
+              foreground: root.foreground
+              dim: root.dim
+              accent: Color.accent
+              fontFamily: root.fontFamily
+              canIdentify: root.identifyAvailable && !!root.selectedOutput
+              onIdentifyRequested: root.identifyDisplays(root.selectedOutputKey)
+            }
+
+            Rectangle {
+              anchors.left: layoutPane.right
+              anchors.leftMargin: Style.space(12)
+              anchors.top: parent.top
+              anchors.bottom: parent.bottom
+              width: 1
+              color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.14)
+            }
+
             Column {
               anchors.left: layoutPane.right
-              anchors.leftMargin: Style.space(10)
+              anchors.leftMargin: root.panelLayout.columnGap
               anchors.right: parent.right
               anchors.top: parent.top
               anchors.bottom: parent.bottom
-              spacing: Style.space(10)
-
-              MonitorInfo {
-                id: inspectorPane
-                width: parent.width
-                height: implicitHeight
-                output: root.selectedOutput
-                metadata: root.selectedOutputMetadata
-                foreground: root.foreground
-                dim: root.dim
-                accent: Color.accent
-                fontFamily: root.fontFamily
-                canIdentify: root.identifyAvailable && !!root.selectedOutput
-                onIdentifyRequested: root.identifyDisplays(root.selectedOutputKey)
-              }
+              spacing: Style.space(16)
 
               EditorPane {
                 width: parent.width
-                height: parent.height - inspectorPane.height - Style.space(10)
+                height: parent.height
                 active: root.keyboardLayoutPane !== "canvas"
                 foreground: root.foreground
                 dim: root.dim
@@ -3161,7 +3230,7 @@ Panel {
               anchors.left: parent.left
               anchors.top: parent.top
               anchors.bottom: parent.bottom
-              width: Math.round(parent.width * 0.34)
+              width: root.panelLayout.sideWidth
               title: "Saved Profiles"
               meta: root.savedProfiles.length + " saved"
               active: true
@@ -3171,7 +3240,8 @@ Panel {
               fontFamily: root.fontFamily
 
               Column {
-                anchors.fill: parent
+                id: profileListTop
+                width: parent.width
                 spacing: Style.space(6)
 
                 Toggle {
@@ -3218,80 +3288,155 @@ Panel {
                   }
                 }
 
-                Repeater {
-                  id: profileEntries
-                  model: root.document && root.document.profiles instanceof Array ? root.document.profiles : []
+              }
 
-                  BorderSurface {
-                    id: savedEntry
-                    function openActions() { profileActions.openAt(profileMenuButton) }
-                    required property var modelData
-                    width: parent.width
-                    height: Style.space(32)
-                    readonly property bool selected: String(modelData.name || "") === root.selectedSavedProfileName
-                    readonly property bool current: Model.profileIsCurrent(modelData, root.document)
-                    color: selected
-                      ? Style.selectedFillFor(root.foreground, Color.accent)
-                      : "transparent"
-                    borderSpec: selected ? Border.controlSpec("selected", root.foreground, Color.accent) : Border.none()
-                    radius: Style.cornerRadius
+              // Rows scroll once more than a handful exist; the panel height
+              // counts only the visible rows (Model.expandedPanelLayout).
+              Flickable {
+                id: profileRowsView
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: profileListTop.bottom
+                anchors.topMargin: Style.space(6)
+                anchors.bottom: parent.bottom
+                clip: true
+                contentHeight: profileRowsColumn.implicitHeight
+                boundsBehavior: Flickable.StopAtBounds
+                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
-                    Row {
-                      anchors.fill: parent
-                      anchors.leftMargin: Style.space(7)
-                      anchors.rightMargin: Style.space(39)
-                      spacing: Style.space(8)
+                function ensureSelectedVisible() {
+                  for (var i = 0; i < profileEntries.count; i++) {
+                    var row = profileEntries.itemAt(i)
+                    if (!row || !row.selected) continue
+                    if (row.y < contentY) contentY = row.y
+                    else if (row.y + row.height > contentY + height)
+                      contentY = Math.max(0, row.y + row.height - height)
+                    return
+                  }
+                }
 
-                      Text {
-                        textFormat: Text.PlainText
+                Connections {
+                  target: root
+                  function onSelectedSavedProfileNameChanged() { Qt.callLater(profileRowsView.ensureSelectedVisible) }
+                }
+
+                Column {
+                  id: profileRowsColumn
+                  width: profileRowsView.width
+                  spacing: Style.space(6)
+
+                  Repeater {
+                    id: profileEntries
+                    model: root.document && root.document.profiles instanceof Array ? root.document.profiles : []
+
+                    BorderSurface {
+                      id: savedEntry
+                      function openActions() { profileActions.openAt(profileMenuButton) }
+                      required property var modelData
+                      width: parent.width
+                      height: Style.space(58)
+                      readonly property bool selected: String(modelData.name || "") === root.selectedSavedProfileName
+                      readonly property bool current: Model.profileIsCurrent(modelData, root.document)
+                      color: selected
+                        ? Style.selectedFillFor(root.foreground, Color.accent)
+                        : "transparent"
+                      borderSpec: selected ? Border.controlSpec("selected", root.foreground, Color.accent) : Border.none()
+                      radius: Style.cornerRadius
+
+                      Row {
+                        anchors.fill: parent
+                        anchors.leftMargin: Style.space(7)
+                        anchors.rightMargin: Style.space(39)
+                        spacing: Style.space(10)
+
+                        // The layout itself identifies a profile faster than its name.
+                        DisplayCanvas {
+                          id: profileThumb
+                          anchors.verticalCenter: parent.verticalCenter
+                          width: Style.space(74)
+                          height: Style.space(44)
+                          profile: Model.savedProfileByName(root.editorDocument, String(savedEntry.modelData.name || "")) || ({ outputs: [] })
+                          editorDisplays: root.editorDocument.displays
+                          interactive: false
+                          detailed: false
+                          framed: true
+                          dotted: false
+                          markDisconnected: true
+                          foreground: root.foreground
+                          dim: root.dim
+                          accent: Color.accent
+                          fontFamily: root.fontFamily
+                        }
+
+                        Column {
+                          anchors.verticalCenter: parent.verticalCenter
+                          width: parent.width - profileThumb.width - profileMatchText.width - parent.spacing * 2
+                          spacing: Style.space(2)
+
+                          Text {
+                            textFormat: Text.PlainText
+                            width: parent.width
+                            text: String(savedEntry.modelData.name || "Profile")
+                            color: savedEntry.current || savedEntry.selected ? root.foreground : Qt.lighter(root.dim, 1.25)
+                            font.family: root.fontFamily
+                            font.pixelSize: Style.font.body
+                            font.bold: true
+                            elide: Text.ElideRight
+                          }
+
+                          Text {
+                            textFormat: Text.PlainText
+                            width: parent.width
+                            text: savedEntry.current
+                              ? "Current · " + Number(savedEntry.modelData.output_count || 0)
+                                + (Number(savedEntry.modelData.output_count || 0) === 1 ? " display" : " displays")
+                              : (savedEntry.modelData.exact_display_match ? "Matches these displays" : "Other setup")
+                            color: root.dim
+                            font.family: root.fontFamily
+                            font.pixelSize: Style.font.caption
+                            elide: Text.ElideRight
+                          }
+                        }
+
+                        Text {
+                          textFormat: Text.PlainText
+                          id: profileMatchText
+                          width: Style.space(58)
+                          horizontalAlignment: Text.AlignRight
+                          anchors.verticalCenter: parent.verticalCenter
+                          text: Number(modelData.match_score || 0) > 0 ? String(modelData.match_score) : "—"
+                          color: modelData.recommended ? Color.accent : root.dim
+                          font.family: root.fontFamily
+                          font.pixelSize: Style.font.bodySmall
+                          font.bold: modelData.recommended
+                        }
+                      }
+
+                      MouseArea {
+                        id: profileRowMouse
+                        anchors.fill: parent
+                        anchors.rightMargin: Style.space(36)
+                        hoverEnabled: true
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        enabled: String(parent.modelData.name || "") !== ""
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: function(mouse) {
+                          var selected = String(parent.modelData.name || "")
+                          root.selectedSavedProfileName = selected
+                          if (mouse.button === Qt.RightButton) profileActions.openAt(profileRowMouse, mouse.x, mouse.y)
+                        }
+                      }
+                      Button {
+                        id: profileMenuButton
+                        anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width - profileMatchText.width - Style.space(8)
-                        text: String(modelData.name || "Profile")
-                        color: savedEntry.current || savedEntry.selected ? root.foreground : root.dim
-                        font.family: root.fontFamily
-                        font.pixelSize: Style.font.bodySmall
-                        font.bold: savedEntry.current
-                        elide: Text.ElideRight
-                      }
-
-                      Text {
-                        textFormat: Text.PlainText
-                        id: profileMatchText
-                        width: Style.space(58)
-                        horizontalAlignment: Text.AlignRight
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: Number(modelData.match_score || 0) > 0 ? String(modelData.match_score) : "—"
-                        color: modelData.recommended ? Color.accent : root.dim
-                        font.family: root.fontFamily
-                        font.pixelSize: Style.font.bodySmall
-                        font.bold: modelData.recommended
-                      }
-                    }
-
-                    MouseArea {
-                      id: profileRowMouse
-                      anchors.fill: parent
-                      anchors.rightMargin: Style.space(36)
-                      hoverEnabled: true
-                      acceptedButtons: Qt.LeftButton | Qt.RightButton
-                      enabled: String(parent.modelData.name || "") !== ""
-                      cursorShape: Qt.PointingHandCursor
-                      onClicked: function(mouse) {
-                        var selected = String(parent.modelData.name || "")
-                        root.selectedSavedProfileName = selected
-                        if (mouse.button === Qt.RightButton) profileActions.openAt(profileRowMouse, mouse.x, mouse.y)
-                      }
-                    }
-                    Button {
-                      id: profileMenuButton
-                      anchors.right: parent.right
-                      anchors.verticalCenter: parent.verticalCenter
-                      text: "⋮"
-                      tooltipText: "Profile actions"
-                      focusable: true
-                      onClicked: {
-                        root.selectedSavedProfileName = String(savedEntry.modelData.name || "")
-                        profileActions.openAt(profileMenuButton)
+                        text: "⋮"
+                        tooltipText: "Profile actions"
+                        focusable: true
+                        onClicked: {
+                          root.selectedSavedProfileName = String(savedEntry.modelData.name || "")
+                          profileActions.openAt(profileMenuButton)
+                        }
                       }
                     }
                   }
@@ -3299,19 +3444,57 @@ Panel {
               }
             }
 
+            Rectangle {
+              anchors.left: profileListPane.right
+              anchors.leftMargin: Style.space(12)
+              anchors.top: parent.top
+              anchors.bottom: parent.bottom
+              width: 1
+              color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.14)
+            }
+
             Column {
               anchors.left: profileListPane.right
-              anchors.leftMargin: Style.space(10)
+              anchors.leftMargin: root.panelLayout.columnGap
               anchors.right: parent.right
               anchors.top: parent.top
               anchors.bottom: parent.bottom
               spacing: Style.space(10)
 
               EditorPane {
+                id: profileStagePane
+                width: parent.width
+                height: Math.max(Style.space(140), Math.min(root.profileStageHeight,
+                  parent.height - parent.spacing - Style.space(120)))
+                title: ""
+                meta: ""
+                foreground: root.foreground
+                dim: root.dim
+                accent: Color.accent
+                fontFamily: root.fontFamily
+
+                DisplayCanvas {
+                  anchors.fill: parent
+                  profile: root.selectedSavedProfile || ({ outputs: [] })
+                  editorDisplays: root.editorDocument.displays
+                  notes: root.displayNotes
+                  workspacePlan: root.selectedSavedWorkspacePlan
+                  emphasis: "profile"
+                  selectedKey: ""
+                  interactive: false
+                  detailed: true
+                  framed: true
+                  markDisconnected: true
+                  foreground: root.foreground
+                  dim: root.dim
+                  accent: Color.accent
+                  fontFamily: root.fontFamily
+                }
+              }
+              EditorPane {
                 id: profileDetailsPane
                 width: parent.width
-                height: Math.min(parent.height - Style.space(180),
-                  Math.max(Style.space(190), profileDetailsContent.implicitHeight + Style.space(38)))
+                height: parent.height - profileStagePane.height - parent.spacing
                 title: "Profile Details"
                 meta: root.selectedSavedProfileCurrent ? "Active" : ""
                 foreground: root.foreground
@@ -3436,34 +3619,6 @@ Panel {
                 }
               }
 
-              EditorPane {
-                width: parent.width
-                height: parent.height - profileDetailsPane.height - parent.spacing
-                title: "Monitor Layout"
-                meta: root.selectedSavedProfileName
-                foreground: root.foreground
-                dim: root.dim
-                accent: Color.accent
-                fontFamily: root.fontFamily
-
-                DisplayCanvas {
-                  anchors.fill: parent
-                  profile: root.selectedSavedProfile || ({ outputs: [] })
-                  editorDisplays: root.editorDocument.displays
-                  notes: root.displayNotes
-                  workspacePlan: root.selectedSavedWorkspacePlan
-                  emphasis: "profile"
-                  selectedKey: ""
-                  interactive: false
-                  detailed: true
-                  framed: false
-                  markDisconnected: true
-                  foreground: root.foreground
-                  dim: root.dim
-                  accent: Color.accent
-                  fontFamily: root.fontFamily
-                }
-              }
             }
           }
 
@@ -3478,7 +3633,7 @@ Panel {
               anchors.left: parent.left
               anchors.top: parent.top
               anchors.bottom: parent.bottom
-              width: Math.round(parent.width * 0.34)
+              width: root.panelLayout.sideWidth
               title: "Workspace Planner"
               active: true
               foreground: root.foreground
@@ -3487,6 +3642,7 @@ Panel {
               fontFamily: root.fontFamily
 
               Column {
+                id: workspaceSettingsColumn
                 anchors.fill: parent
                 spacing: Style.space(12)
 
@@ -3765,9 +3921,18 @@ Panel {
               }
             }
 
+            Rectangle {
+              anchors.left: workspaceSettingsPane.right
+              anchors.leftMargin: Style.space(12)
+              anchors.top: parent.top
+              anchors.bottom: parent.bottom
+              width: 1
+              color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.14)
+            }
+
             Column {
               anchors.left: workspaceSettingsPane.right
-              anchors.leftMargin: Style.space(10)
+              anchors.leftMargin: root.panelLayout.columnGap
               anchors.right: parent.right
               anchors.top: parent.top
               anchors.bottom: parent.bottom
@@ -3775,7 +3940,34 @@ Panel {
 
               EditorPane {
                 width: parent.width
-                height: Style.space(145)
+                height: parent.height - workspacePlanPane.height - parent.spacing
+                title: ""
+                foreground: root.foreground
+                dim: root.dim
+                accent: Color.accent
+                fontFamily: root.fontFamily
+
+                DisplayCanvas {
+                  anchors.fill: parent
+                  profile: root.draftProfile
+                  editorDisplays: root.editorDocument.displays
+                  notes: root.displayNotes
+                  workspacePlan: root.workspacesOff ? [] : root.workspacePlan
+                  emphasis: "workspaces"
+                  selectedKey: root.selectedWorkspaceDisplayKey
+                  interactive: false
+                  detailed: true
+                  framed: true
+                  foreground: root.foreground
+                  dim: root.dim
+                  accent: Color.accent
+                  fontFamily: root.fontFamily
+                }
+              }
+              EditorPane {
+                id: workspacePlanPane
+                width: parent.width
+                height: Style.space(40) + Math.max(1, root.workspacesOff ? 2 : root.workspaceRows.length) * Style.space(20)
                 title: "Workspace Plan"
                 foreground: root.foreground
                 dim: root.dim
@@ -3791,6 +3983,7 @@ Panel {
 
                     InfoRow {
                       required property var modelData
+                      labelWidth: Math.min(width * 0.5, Style.space(220))
                       label: String(modelData.name || "Display")
                       value: String(modelData.workspaces || "—")
                       valueAccent: true
@@ -3810,32 +4003,6 @@ Panel {
                 }
               }
 
-              EditorPane {
-                width: parent.width
-                height: parent.height - Style.space(155)
-                title: "Monitor Layout"
-                foreground: root.foreground
-                dim: root.dim
-                accent: Color.accent
-                fontFamily: root.fontFamily
-
-                DisplayCanvas {
-                  anchors.fill: parent
-                  profile: root.draftProfile
-                  editorDisplays: root.editorDocument.displays
-                  notes: root.displayNotes
-                  workspacePlan: root.workspacesOff ? [] : root.workspacePlan
-                  emphasis: "workspaces"
-                  selectedKey: root.selectedWorkspaceDisplayKey
-                  interactive: false
-                  detailed: true
-                  framed: false
-                  foreground: root.foreground
-                  dim: root.dim
-                  accent: Color.accent
-                  fontFamily: root.fontFamily
-                }
-              }
             }
           }
         }
@@ -3853,32 +4020,41 @@ Panel {
           height: Math.max(Style.space(58), footerContent.implicitHeight + Style.space(18))
           opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
 
-          BorderSurface {
+          Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: root.draftDirty || root.creatingProfile ? 2 : 1
+            color: root.draftDirty || root.creatingProfile
+              ? Color.accent
+              : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.18)
+          }
+
+          Item {
             id: profileFooter
             anchors.fill: parent
-            color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.025)
-            borderSpec: Border.controlSpec(root.draftDirty || root.creatingProfile ? "selected" : "normal", root.foreground, Color.accent)
-            radius: Style.cornerRadius
+            anchors.topMargin: Style.space(2)
 
             Column {
               id: footerContent
               anchors.left: parent.left
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
-              anchors.leftMargin: Style.space(12)
-              anchors.rightMargin: Style.space(12)
+              anchors.leftMargin: Style.space(2)
+              anchors.rightMargin: 0
               spacing: Style.space(9)
 
               Row {
                 width: parent.width
-                height: Math.max(expandedProfileStatus.height, cleanFooterActions.height)
+                height: Math.max(expandedProfileStatus.height, cleanFooterActions.height, footerActions.height)
                 spacing: Style.space(9)
 
                 ProfileStatus {
                   id: expandedProfileStatus
                   anchors.verticalCenter: parent.verticalCenter
-                  width: Math.max(0, parent.width - (cleanFooterActions.width > 0
-                    ? cleanFooterActions.width + parent.spacing : 0))
+                  width: Math.max(0, parent.width
+                    - (cleanFooterActions.width > 0 ? cleanFooterActions.width + parent.spacing : 0)
+                    - (footerActions.visible ? footerActions.width + parent.spacing : 0))
                   title: root.lastError !== ""
                     ? root.lastError
                     : (root.creatingProfile ? "Creating a profile for this setup"
@@ -3932,11 +4108,10 @@ Panel {
                     onClicked: root.setProfileAutomatic(true)
                   }
                 }
-              }
 
-              Flow {
+                Row {
                 id: footerActions
-                width: parent.width
+                anchors.verticalCenter: parent.verticalCenter
                 spacing: Style.space(9)
                 visible: root.draftDirty || root.creatingProfile || root.activePage === "profiles"
 
@@ -4036,6 +4211,8 @@ Panel {
                   onClicked: root.previewDraft()
                 }
               }
+              }
+
             }
           }
 
@@ -4248,6 +4425,7 @@ Panel {
     property string value: ""
     property bool valueAccent: false
     property bool valueBold: false
+    property real labelWidth: Math.min(width * 0.34, Style.space(105))
 
     width: parent ? parent.width : 0
     implicitHeight: Math.max(infoLabel.implicitHeight, infoValue.implicitHeight)
@@ -4257,7 +4435,7 @@ Panel {
       id: infoLabel
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
-      width: Math.min(parent.width * 0.34, Style.space(105))
+      width: infoRow.labelWidth
       text: infoRow.label
       color: root.dim
       font.family: root.fontFamily

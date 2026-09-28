@@ -1160,6 +1160,161 @@ function versionAtLeast(output, minimum) {
   return true
 }
 
+// ---------------------------------------------------------------------------
+// Content-sized panel. Pure geometry so it can be tested without Qt. All
+// design constants are in 12px-font "design pixels" and multiplied by `unit`
+// (Style.spaceReal(1)), so themes that scale spacing scale the panel too.
+
+var panelSizing = {
+  // Layout stage: preferred height, clamps, and the canvas's own padding
+  // (DisplayCanvas margin plus stage padding, per side).
+  stage: { preferredHeight: 320, minWidth: 520, maxWidth: 780, minHeight: 260, maxHeight: 520, padding: 22 },
+  // Stage beside a fixed side column on Workspaces and Profiles.
+  sideStage: { minHeight: 200, maxHeight: 380, padding: 22 },
+  // Compact canvas: the panel is 430 wide, so only height adapts.
+  compactStage: { minHeight: 150, maxHeight: 260, padding: 22 },
+  offRowHeight: 32,
+  inspectorWidth: 340,
+  sideColumnWidth: 360,
+  columnGap: 25,
+  sectionGap: 10,
+  bodyMinHeight: 220,
+  minWidth: 905,
+  // Rows visible before a list scrolls.
+  profileRowHeight: 58,
+  profileRowSpacing: 6,
+  profileRowsVisible: 6,
+  workspaceRowHeight: 42,
+  workspaceRowSpacing: 6,
+  workspaceRowsVisible: 8
+}
+
+function clampNumber(value, low, high) {
+  return Math.max(low, Math.min(high, value))
+}
+
+function arrangementAspect(bounds) {
+  var width = Number((bounds || {}).width || 0)
+  var height = Number((bounds || {}).height || 0)
+  if (!(width > 0) || !(height > 0)) return 16 / 9
+  return clampNumber(width / height, 0.25, 8)
+}
+
+// Size of a stage that shows the arrangement at its own aspect: start from
+// the preferred height, clamp the width, derive the height from the width,
+// clamp it, and for tall arrangements derive the width back from the
+// clamped height. An Off/mirrored/disconnected row adds a fixed strip.
+function stageSize(bounds, unit, options) {
+  var u = Number(unit || 1)
+  var o = Object.assign({}, panelSizing.stage, options || {})
+  var aspect = arrangementAspect(bounds)
+  var pad = o.padding * 2
+  var width = clampNumber((o.preferredHeight - pad) * aspect + pad, o.minWidth, o.maxWidth)
+  var height = clampNumber((width - pad) / aspect + pad, o.minHeight, o.maxHeight)
+  if (height >= o.maxHeight)
+    width = clampNumber((height - pad) * aspect + pad, o.minWidth, o.maxWidth)
+  var extra = o.offRow ? panelSizing.offRowHeight : 0
+  return { width: Math.round(width * u), height: Math.round((height + extra) * u), aspect: aspect }
+}
+
+// Height of a stage whose width is already decided by its column.
+function stageHeightForWidth(bounds, width, unit, options) {
+  var u = Number(unit || 1)
+  var o = Object.assign({}, panelSizing.sideStage, options || {})
+  var aspect = arrangementAspect(bounds)
+  var pad = o.padding * 2
+  var designWidth = Math.max(pad + 1, Number(width || 0) / u)
+  var height = clampNumber((designWidth - pad) / aspect + pad, o.minHeight, o.maxHeight)
+  var extra = o.offRow ? panelSizing.offRowHeight : 0
+  return Math.round((height + extra) * u)
+}
+
+function compactStageHeight(bounds, width, unit, offRow) {
+  return stageHeightForWidth(bounds, width, unit,
+    Object.assign({}, panelSizing.compactStage, { offRow: offRow === true }))
+}
+
+function visibleRowsHeight(count, rowHeight, spacing, visible, unit) {
+  var rows = Math.max(1, Math.min(Math.max(0, Math.floor(Number(count) || 0)), visible))
+  return Math.round((rows * rowHeight + (rows - 1) * spacing) * Number(unit || 1))
+}
+
+// Expanded panel content size. The width is the Layout page's natural width
+// (stage + gap + fixed inspector) and is shared by every page, so switching
+// pages never moves the tabs or header. Heights are per page:
+//   layout      max(stage + hardware facts, Display controls)
+//   workspaces  max(settings + visible rows, stage + plan)
+//   profiles    max(list header + visible rows, stage + details)
+// plus the fixed chrome (header, gaps, footer). Both axes are clamped to the
+// available screen area; the stage and lists absorb any shortfall and scroll.
+function expandedPanelLayout(input) {
+  var i = input || {}
+  var u = Number(i.unit || 1)
+  var s = panelSizing
+  var inspectorWidth = Math.round(s.inspectorWidth * u)
+  var sideWidth = Math.round(s.sideColumnWidth * u)
+  var gap = Math.round(s.columnGap * u)
+  var sectionGap = Math.round(s.sectionGap * u)
+  var availableWidth = Number(i.availableWidth || 0) > 0 ? Number(i.availableWidth) : Infinity
+  var availableHeight = Number(i.availableHeight || 0) > 0 ? Number(i.availableHeight) : Infinity
+
+  var stage = stageSize(i.bounds, u, { offRow: i.offRow === true })
+  var naturalWidth = Math.max(Math.round(s.minWidth * u), stage.width + gap + inspectorWidth)
+  var width = Math.min(naturalWidth, availableWidth)
+  var layoutStageWidth = Math.max(Math.round(200 * u), width - gap - inspectorWidth)
+  var sideStageWidth = Math.max(Math.round(200 * u), width - gap - sideWidth)
+
+  var page = String(i.page || "layout")
+  var body
+  if (page === "profiles") {
+    var profileStage = stageHeightForWidth(i.profileBounds || i.bounds, sideStageWidth, u,
+      { offRow: i.profileOffRow === true })
+    var list = Number(i.profileListHeaderHeight || 0)
+      + visibleRowsHeight(i.profileCount, s.profileRowHeight, s.profileRowSpacing, s.profileRowsVisible, u)
+    body = Math.max(list, profileStage + sectionGap + Number(i.profileDetailsHeight || 0))
+  } else if (page === "workspaces") {
+    var workspaceStage = stageHeightForWidth(i.bounds, sideStageWidth, u, { offRow: i.offRow === true })
+    var settings = Number(i.workspaceSettingsHeight || 0)
+      + (Number(i.workspaceRowCount || 0) > 0
+        ? visibleRowsHeight(i.workspaceRowCount, s.workspaceRowHeight, s.workspaceRowSpacing, s.workspaceRowsVisible, u)
+        : 0)
+    body = Math.max(settings, workspaceStage + sectionGap + Number(i.workspacePlanHeight || 0))
+  } else {
+    // The selected display's hardware facts sit under the stage; the
+    // inspector column holds only the editable Display controls (Color
+    // scrolls inside it rather than resizing the panel).
+    var hardware = Number(i.hardwareHeight || 0)
+    body = Math.max(stage.height + (hardware > 0 ? sectionGap + hardware : 0), Number(i.inspectorHeight || 0))
+  }
+  body = Math.max(Math.round(s.bodyMinHeight * u), Math.round(body))
+  var chrome = Number(i.chromeHeight || 0)
+  var height = Math.min(chrome + body, availableHeight)
+  return {
+    width: Math.round(width),
+    height: Math.round(height),
+    bodyHeight: Math.round(height - chrome),
+    layoutStageWidth: Math.round(layoutStageWidth),
+    inspectorWidth: inspectorWidth,
+    sideWidth: sideWidth,
+    columnGap: gap,
+    clamped: height < chrome + body || width < naturalWidth
+  }
+}
+
+// Resize policy. A new size is applied at once when the panel is closed, the
+// view mode just changed, or nothing moves under the pointer: a top bar keeps
+// the card's top edge fixed, so a height-only change leaves the header, tabs
+// and every row above the change where they were. Width changes recenter the
+// card on its bar icon, and other bar positions move the card's top edge, so
+// those wait until the pointer leaves the panel. Nothing resizes mid-drag.
+function panelResizeAllowed(state) {
+  var s = state || {}
+  if (s.dragging === true) return false
+  if (s.open !== true || s.modeChanged === true) return true
+  if (s.pointerInside !== true) return true
+  return String(s.barPosition || "top") === "top" && s.widthChanged !== true
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     installCommand: installCommand,
@@ -1239,6 +1394,14 @@ if (typeof module !== "undefined") {
     namedProfile: namedProfile,
     releaseVersion: releaseVersion,
     daemonNeedsRestart: daemonNeedsRestart,
-    versionAtLeast: versionAtLeast
+    versionAtLeast: versionAtLeast,
+    panelSizing: panelSizing,
+    arrangementAspect: arrangementAspect,
+    stageSize: stageSize,
+    stageHeightForWidth: stageHeightForWidth,
+    compactStageHeight: compactStageHeight,
+    visibleRowsHeight: visibleRowsHeight,
+    expandedPanelLayout: expandedPanelLayout,
+    panelResizeAllowed: panelResizeAllowed
   }
 }

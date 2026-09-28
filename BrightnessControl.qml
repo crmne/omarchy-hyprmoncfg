@@ -32,6 +32,7 @@ Column {
       anchors.rightMargin: Style.space(8)
       anchors.verticalCenter: parent.verticalCenter
       text: "Brightness"
+      font.capitalization: Font.AllUppercase
       elide: Text.ElideRight
       foreground: root.foreground
       fontFamily: root.fontFamily
@@ -66,7 +67,7 @@ Column {
       brightnessStatus.implicitHeight + Style.space(12))
     enabled: root.available
     opacity: root.loading ? 0.6 : 1.0
-    outline: true
+    outline: !root.available
     foreground: root.foreground
     accent: root.accent
 
@@ -75,8 +76,8 @@ Column {
       visible: root.available
       bar: root.bar
       anchors.fill: parent
-      anchors.leftMargin: Style.space(6)
-      anchors.rightMargin: Style.space(6)
+      anchors.leftMargin: Style.space(2)
+      anchors.rightMargin: Style.space(2)
       minimum: 1
       maximum: 100
       step: 1

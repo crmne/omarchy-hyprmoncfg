@@ -49,6 +49,7 @@ A small background service is what watches for this. It catches hotplug, lid and
 - Setup status and Create profile are available in compact and expanded views; the expanded header groups Identify all, Keys, TUI, and Compact without duplicating setup text
 - Canvas and Identify use connector, model with whole-inch size, resolution/refresh, scale/position, and workspaces without display numbering or logical desktop dimensions; the inspector separates Model and Panel size
 - The inspector shows all hardware details directly; live hardware brightness remains in compact mode only
+- The compact view leads with the layout canvas, drawn as lit screens with workspace chips; the expanded panel sizes itself to the displays and rows it shows, with the hardware details under the canvas
 - The companion TUI shares the display-summary conventions; standalone TUI Identify remains pending
 
 - The expanded panel mirrors the TUI shortcuts: `1`/`2`/`3` switch pages, `a` applies, `s` saves, `r` resets, and `?` shows the contextual key guide.

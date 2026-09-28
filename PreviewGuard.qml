@@ -27,6 +27,10 @@ Item {
   property string profileName: ""
   property string deadline: ""
   property int seconds: 0
+  // Largest remaining time seen for this transaction; the card draws the
+  // authoritative deadline as a fraction of it.
+  property int totalSeconds: 30
+  property var previewProfile: null
   property bool saveOnCommit: false
   property bool draftApply: false
   property bool requestPending: false
@@ -241,13 +245,18 @@ Item {
     var at = Date.parse(root.deadline)
     if (!isFinite(at)) return
     root.seconds = Math.max(0, Math.ceil((at - Date.now()) / 1000))
+    if (root.seconds > root.totalSeconds) root.totalSeconds = root.seconds
   }
 
   function syncPreview(pending) {
     var id = pending ? String(pending.transaction_id || "") : ""
     if (id !== "") {
       if (!Model.canConfirmPreview(pending, root.transactionId)) return
-      if (root.transactionId !== id) root.actionError = ""
+      if (root.transactionId !== id) {
+        root.actionError = ""
+        root.totalSeconds = 30
+      }
+      root.previewProfile = pending.profile || root.previewProfile
       root.transactionId = id
       root.profileName = String(pending.profile_name
         || (pending.profile ? pending.profile.name : "")
@@ -451,123 +460,48 @@ Item {
         onClicked: function(mouse) { mouse.accepted = true }
       }
 
-      BorderSurface {
-        id: dialog
-        visible: guardWindow.ownsDialog
-        width: Math.min(parent.width - Style.space(32), Style.space(460))
-        height: Style.space(188)
-        anchors.centerIn: parent
-        color: Color.background
-        borderSpec: Border.surfaceSpec("popups", "border", Color.accent, Math.max(1, Style.space(2)))
-        radius: Style.cornerRadius
-        padding: Style.space(20)
+      // Key handling stays in the guard; the card only draws and emits.
+      Item {
+        id: keyCatcher
+        focus: guardWindow.ownsDialog
 
-        MouseArea { anchors.fill: parent; onClicked: function(mouse) { mouse.accepted = true } }
-
-        Item {
-          id: keyCatcher
-          anchors.fill: parent
-          anchors.topMargin: dialog.contentTopInset
-          anchors.rightMargin: dialog.contentRightInset
-          anchors.bottomMargin: dialog.contentBottomInset
-          anchors.leftMargin: dialog.contentLeftInset
-          focus: guardWindow.ownsDialog
-
-          Keys.priority: Keys.BeforeItem
-          Keys.onPressed: function(event) {
-            if (root.stage === "confirm"
-                && (event.key === Qt.Key_Escape || event.text === "n"
-                  || event.text === "N" || event.text === "q" || event.text === "Q")) {
-              root.revert()
-              event.accepted = true
-            } else if (root.stage === "confirm"
-                && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
-                  || event.text === "y" || event.text === "Y")) {
-              root.keep()
-              event.accepted = true
-            } else if (root.stage === "error" && event.key === Qt.Key_Escape) {
-              root.clear()
-              event.accepted = true
-            }
-          }
-
-          Column {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            spacing: Style.space(7)
-
-            Text {
-              textFormat: Text.PlainText
-              width: parent.width
-              text: root.stage === "applying"
-                ? "Applying display preview…"
-                : (root.stage === "error"
-                  ? "Couldn’t preview this layout"
-                  : (root.saveOnCommit ? "Keep and save this layout?"
-                    : (root.draftApply ? "Keep this layout?" : "Keep this profile?")))
-              color: root.stage === "error" ? Color.urgent : Color.foreground
-              font.family: Style.font.family
-              font.pixelSize: Style.font.heading
-              font.bold: true
-              wrapMode: Text.WordWrap
-            }
-
-            Text {
-              textFormat: Text.PlainText
-              width: parent.width
-              text: root.stage === "applying"
-                ? "This confirmation stays open while your displays reconfigure."
-                : (root.stage === "error"
-                  ? root.errorMessage
-                  : (root.actionError !== ""
-                    ? root.actionError
-                    : root.profileName + " · " + root.seconds + " seconds before the previous layout returns"))
-              color: root.stage === "error" || root.actionError !== "" ? Color.urgent : Color.foreground
-              opacity: 0.68
-              font.family: Style.font.family
-              font.pixelSize: Style.font.body
-              wrapMode: Text.WordWrap
-            }
-          }
-
-          Row {
-            visible: root.stage === "confirm"
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            spacing: Style.space(10)
-
-            Button {
-              text: root.actionPending ? "Working…" : "Revert"
-              bordered: true
-              enabled: !root.actionPending
-              foreground: Color.foreground
-              fontFamily: Style.font.family
-              onClicked: root.revert()
-            }
-
-            Button {
-              text: root.saveOnCommit ? "Keep & save" : "Keep"
-              selected: true
-              bordered: true
-              enabled: !root.actionPending
-              foreground: Color.foreground
-              fontFamily: Style.font.family
-              onClicked: root.keep()
-            }
-          }
-
-          Button {
-            visible: root.stage === "error"
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            text: "Close"
-            bordered: true
-            foreground: Color.foreground
-            fontFamily: Style.font.family
-            onClicked: root.clear()
+        Keys.priority: Keys.BeforeItem
+        Keys.onPressed: function(event) {
+          if (root.stage === "confirm"
+              && (event.key === Qt.Key_Escape || event.text === "n"
+                || event.text === "N" || event.text === "q" || event.text === "Q")) {
+            root.revert()
+            event.accepted = true
+          } else if (root.stage === "confirm"
+              && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
+                || event.text === "y" || event.text === "Y")) {
+            root.keep()
+            event.accepted = true
+          } else if (root.stage === "error" && event.key === Qt.Key_Escape) {
+            root.clear()
+            event.accepted = true
           }
         }
+      }
+
+      PreviewConfirmCard {
+        id: dialog
+        visible: guardWindow.ownsDialog
+        anchors.centerIn: parent
+        width: Math.min(parent.width - Style.space(32), Style.space(480))
+        stage: root.stage
+        profileName: root.profileName
+        seconds: root.seconds
+        totalSeconds: root.totalSeconds
+        saveOnCommit: root.saveOnCommit
+        draftApply: root.draftApply
+        actionPending: root.actionPending
+        actionError: root.actionError
+        errorMessage: root.errorMessage
+        layoutProfile: root.previewProfile
+        onKeepRequested: root.keep()
+        onRevertRequested: root.revert()
+        onCloseRequested: root.clear()
       }
     }
   }

@@ -64,7 +64,10 @@ test("footer controls share their tallest natural height and keep naming beside 
     assert.match(footer, new RegExp("id: " + id + "[\\s\\S]*?height: editorFooter.controlHeight"))
   assert.match(footer, /id: profileFooter\s+anchors.fill: parent/)
   assert.doesNotMatch(footer, /id: openTuiButton/)
-  assert.match(footer, /Flow \{\s+id: footerActions/)
+  // One-row footer: draft actions sit beside the status, which yields their width.
+  assert.match(footer, /Row \{\s+id: footerActions/)
+  assert.match(footer, /- \(footerActions\.visible \? footerActions\.width \+ parent\.spacing : 0\)/)
+  assert.ok(footer.indexOf("id: expandedProfileStatus") < footer.indexOf("id: footerActions"))
   assert.ok(footer.indexOf("Column {") < footer.indexOf("id: profileNameInput"))
   assert.ok(footer.indexOf("id: profileNameInput") < footer.indexOf("id: discardDraftButton"))
   assert.ok(footer.indexOf("id: discardDraftButton") < footer.indexOf("id: saveDraftButton"))
@@ -1001,15 +1004,20 @@ test("each monitor discovers management started from another panel", () => {
 test("the panel has management-first compact mode and a TUI-shaped expanded mode", () => {
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
   assert.match(qml, /property bool expanded: false/)
-  assert.match(qml, /Style\.space\(root\.expanded \? 1120 : 430\)/)
-  assert.match(qml, /Style\.space\(780\)/)
+  // Compact keeps its 430 width; expanded is content-sized by Model.expandedPanelLayout.
+  assert.match(qml, /panel\.fittedContentWidth\(root\.appliedPanelWidth \+ root\.panelHorizontalInset\)\s+: panel\.fittedContentWidth\(Style\.space\(430\)\)/)
+  assert.match(qml, /\? panel\.fittedContentHeight\(root\.appliedPanelHeight\)\s+: panel\.fittedContentHeight\(compactColumn\.implicitHeight\)/)
+  assert.match(qml, /readonly property var panelLayout: Model\.expandedPanelLayout\(\{/)
+  assert.doesNotMatch(qml, /Style\.space\(780\)/)
+  assert.doesNotMatch(qml, /Style\.space\(root\.expanded \? 1120 : 430\)/)
   assert.doesNotMatch(qml, /ScrollView \{/)
   assert.match(qml, /id: compactColumn/)
   assert.match(qml, /id: expandedEditor/)
   assert.match(qml, /label: "1  Layout"/)
   assert.match(qml, /label: "2  Workspaces"/)
   assert.match(qml, /label: "3  Profiles"/)
-  assert.match(qml, /title: "Monitor Layout"/)
+  // Stages carry no pane title: the drawn screens are the heading.
+  assert.match(qml, /id: layoutPane[\s\S]*?title: ""/)
   assert.match(qml, /MonitorInfo \{/)
   assert.doesNotMatch(qml, /title: "Display  -  Color"/)
   assert.match(qml, /title: "Saved Profiles"/)
@@ -1205,7 +1213,13 @@ test("display previews keep a shell-level confirmation across monitor rebuilds",
   assert.match(panel, /!root\.previewCoordinator \|\| !root\.previewCoordinator\.connected/)
   assert.match(guard, /root\.stage = "applying"/)
   assert.match(guard, /Model\.canConfirmPreview\(pending, root\.transactionId\)/)
-  assert.match(guard, /This confirmation stays open while your displays reconfigure\./)
+  // The guard owns keys and lifecycle; its dialog is drawn by PreviewConfirmCard.
+  const card = fs.readFileSync(path.join(__dirname, "..", "PreviewConfirmCard.qml"), "utf8")
+  assert.match(guard, /PreviewConfirmCard \{\s+id: dialog/)
+  assert.match(guard, /onKeepRequested: root\.keep\(\)/)
+  assert.match(guard, /onRevertRequested: root\.revert\(\)/)
+  assert.match(card, /This confirmation stays open while your displays reconfigure\./)
+  assert.match(card, /width: parent\.width \* root\.remaining/)
   assert.match(guard, /WlrKeyboardFocus\.Exclusive/)
   assert.doesNotMatch(guard, /WlrKeyboardFocus\.OnDemand/)
   assert.match(guard, /model: root\.opened \? Quickshell\.screens : \[\]/)
@@ -1215,7 +1229,8 @@ test("display previews keep a shell-level confirmation across monitor rebuilds",
   assert.match(guard, /onClicked: function\(mouse\) \{ mouse\.accepted = true \}/)
   assert.match(guard, /function startDraftApply\(profile, timeoutSeconds\)/)
   assert.match(guard, /save_on_commit: false/)
-  assert.match(guard, /root\.actionError !== ""/)
+  assert.match(guard, /actionError: root\.actionError/)
+  assert.match(card, /root\.actionError !== ""/)
   assert.match(guard, /event\.text === "y"/)
   assert.match(guard, /event\.text === "n"/)
 })
@@ -1314,7 +1329,10 @@ test("every panel canvas uses the same adaptive card with contextual emphasis", 
   assert.equal((panelQml.match(/emphasis: "profile"/g) || []).length, 1)
   assert.equal((panelQml.match(/emphasis: "workspaces"/g) || []).length, 1)
   assert.match(canvasQml, /readonly property string workspaceText:/)
-  assert.match(canvasQml, /visible: card\.workspaceText !== ""/)
+  // Workspaces are bare-ID chips, or one pill with the shared text when they do not fit.
+  assert.match(canvasQml, /readonly property var workspaceIds: workspaceText === "" \? \[\] : workspaceText\.split\(", "\)/)
+  assert.match(canvasQml, /visible: root\.detailed && card\.workspaceIds\.length > 0/)
+  assert.match(canvasQml, /model: card\.chipsFit \? card\.workspaceIds : \[card\.workspaceText\]/)
   assert.match(canvasQml, /visible: !card\.compact && root\.detailed/)
   assert.doesNotMatch(canvasQml, /showWorkspaces/)
 })
@@ -2042,7 +2060,8 @@ test("the layout draws only displays that own their image and names the rest", (
 
   const canvasQml = fs.readFileSync(path.join(__dirname, "..", "DisplayCanvas.qml"), "utf8")
   assert.match(canvasQml, /id: hiddenStrip/)
-  assert.match(canvasQml, /visible: root\.nonSpatialDisplays.length > 0/)
+  // Detailed canvases name Off/mirrored displays; tiny thumbnails leave that to the row text.
+  assert.match(canvasQml, /visible: root\.detailed && root\.nonSpatialDisplays\.length > 0/)
 })
 
 test("plugin text never interprets daemon or profile values as rich text", () => {

@@ -31,8 +31,8 @@ separate matching algorithm or monitor writer to make the UI appear complete.
 
 ## Compact view
 
-Keep the tidy vertical grouping: brightness, management, small layout, current
-setup, and contextual actions. Do not show a permanent maintenance alert when
+Use a canvas-first vertical grouping: small layout, brightness, management,
+current setup, and contextual actions. Do not show a permanent maintenance alert when
 nothing needs attention. Brightness is live hardware state, labeled `Brightness`
 with a secondary target name when useful. Selecting a screen changes the target;
 unavailable control should explain why. Management and automatic profile choice
@@ -42,6 +42,14 @@ An automatic extension shows `Laptop + new display` / `Unsaved setup` and
 `Adjust and save…`. The new output already works. Off and unusable connected
 displays get visible actionable rows. Dismissing a notification must lose no
 capability.
+
+Decision, 2026-09-28 (Carmine, canvas-stage direction): the layout canvas moves
+from the middle of the compact view to directly under the header. The arrangement
+is what people open the panel to see, and a launch audience that knows hyprmoncfg
+as a TUI should recognise a graphical display manager at first glance. The canvas
+is sized to the arrangement's aspect within fixed clamps (see Content-sized panel).
+Nothing was removed; only the order changed. The TUI keeps its own layout and
+wording; this is a presentation choice, not a change to shared operations.
 
 ## Expanded view
 
@@ -72,6 +80,15 @@ come first; mode and scale are secondary. Show all six hardware fields directly
 in the Info pane, without a More details toggle. Keep `Display` and `Color` tabs without the redundant `Display - Color`
 heading. Reduce nested borders and competing headings. Keep advanced HDR/ICC and
 signal controls accessible, with units and neutral values matching the TUI.
+
+The canvas is a stage: each enabled display is drawn as a screen (bezel and a
+panel lit with the theme's foreground, or its accent when selected) on a dotted
+field, with workspaces as bare-ID chips. The selected display's six hardware
+fields sit directly under the stage, because they describe the pictured screen;
+the right column holds only the editable Display and Color controls. Identify
+stays the only action in the hardware block. Pane chrome follows Omarchy's
+first-party panels: flat sections with uppercase headers and hairline dividers,
+no boxes inside boxes.
 
 Remove hardware brightness from the expanded profile editor. SDR brightness and
 luminance remain in Color because those are profile settings.
@@ -173,6 +190,39 @@ selected and a fresh snapshot. Preserve existing drafts and explain topology
 changes. Register panel availability through supported shell integration; fall
 back to launching the TUI when the panel is unavailable. Merely finding an Omarchy
 directory is insufficient. A late click after unplug should show current state.
+
+## Content-sized panel
+
+Decision, 2026-09-28 (Carmine): the panel is sized to its content instead of fixed
+1120x780 (expanded) boxes that left large empty areas. The geometry is computed by
+pure functions in `Model.js` (`stageSize`, `stageHeightForWidth`,
+`compactStageHeight`, `expandedPanelLayout`, `panelResizeAllowed`) and covered by
+`tests/sizing.test.js`; QML only supplies measured content heights and binds to
+the result.
+
+- Layout: the stage follows the arrangement's bounding-box aspect (enabled displays
+  plus an Off/mirrored row when present), starting from a preferred height and
+  clamped to a minimum and maximum width and height, so a single laptop is not
+  tiny and three wide screens do not overflow. The inspector keeps a fixed natural
+  width. Body height is the taller of stage plus hardware facts and the Display
+  controls; Color scrolls inside the inspector rather than resizing the panel.
+- Workspaces and Profiles: a fixed side column plus a stage and details; height
+  follows the row count up to a visible cap, after which the list scrolls.
+- Every expanded page shares the Layout page's width, so switching pages never
+  moves the tabs or header; only the height changes.
+- Compact keeps its 430 width; the canvas height follows the arrangement within
+  compact clamps and the column is content-sized as before.
+- Both axes are clamped to the available screen area. The header and footer stay
+  visible; the stage and lists absorb any shortfall and scroll (1366x768 stays
+  usable).
+- Resizing never happens mid-drag. A new size applies at once when the panel is
+  closed or the view mode changes, or when the pointer is outside the panel. With
+  a top bar the card's top edge is fixed, so height-only changes apply
+  immediately; width changes (which recenter the card) and any change under other
+  bar positions wait until the pointer leaves. Changes ease over 160 ms.
+
+TUI parity: the TUI sizes to its terminal and keeps its lists and terminology.
+There is no companion change; operations, names and page order are unchanged.
 
 ## Responsive layout and visual language
 
