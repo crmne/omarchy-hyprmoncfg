@@ -1204,6 +1204,13 @@ function arrangementAspect(bounds) {
 // the preferred height, clamp the width, derive the height from the width,
 // clamp it, and for tall arrangements derive the width back from the
 // clamped height. An Off/mirrored/disconnected row adds a fixed strip.
+// The Layout page's inspector column and gap, independent of any measured
+// height, so the stage width never feeds back into the panel's own sizing.
+function layoutInspectorSpan(unit) {
+  var u = unit > 0 ? unit : 1
+  return Math.round(panelSizing.inspectorWidth * u) + Math.round(panelSizing.columnGap * u)
+}
+
 function stageSize(bounds, unit, options) {
   var u = Number(unit || 1)
   var o = Object.assign({}, panelSizing.stage, options || {})
@@ -1317,6 +1324,7 @@ function panelResizeAllowed(state) {
 
 if (typeof module !== "undefined") {
   module.exports = {
+    layoutInspectorSpan: layoutInspectorSpan,
     installCommand: installCommand,
     installProcessArgs: installProcessArgs,
     parseEnvelope: parseEnvelope,

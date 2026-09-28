@@ -153,7 +153,10 @@ Panel {
     offRow: root.layoutOffRow,
     chromeHeight: editorNav.height + Style.space(20) + editorFooter.height
       + (previewBanner.visible ? previewBanner.height + Style.space(8) : 0),
-    inspectorHeight: inspectorTabs.implicitHeight + Style.space(8) + displayControls.implicitHeight,
+    // The active inspector page sets the height, so the Color tab grows the panel
+    // instead of scrolling; the viewport only scrolls once the screen clamps it.
+    inspectorHeight: inspectorTabs.implicitHeight + Style.space(8)
+      + (root.inspectorPage === "display" ? displayControls.implicitHeight : colorControls.implicitHeight),
     hardwareHeight: inspectorPane.implicitHeight,
     profileBounds: root.profileBounds,
     profileOffRow: root.profileOffRow,
@@ -2604,7 +2607,8 @@ Panel {
               id: layoutPane
               anchors.left: parent.left
               anchors.top: parent.top
-              width: parent.width - root.panelLayout.inspectorWidth - root.panelLayout.columnGap
+              // Not panelLayout: its height inputs depend on this pane's width.
+              width: parent.width - Model.layoutInspectorSpan(root.sizingUnit)
               // The stage takes what the hardware facts leave; the panel height
               // itself comes from Model.expandedPanelLayout.
               height: Math.max(Style.space(160), parent.height - inspectorPane.height - Style.space(10))

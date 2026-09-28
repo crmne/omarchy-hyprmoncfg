@@ -179,3 +179,20 @@ test("QML sizes the panel only through the Model functions", () => {
   assert.match(canvas, /root\.dragging = root\.movable/)
   assert.equal((canvas.match(/root\.dragging = false/g) || []).length, 2)
 })
+
+test("the Color tab grows the Layout page instead of scrolling", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const input = qml.slice(qml.indexOf("Model.expandedPanelLayout({"), qml.indexOf("hardwareHeight:"))
+  assert.match(input, /root\.inspectorPage === "display" \? displayControls\.implicitHeight : colorControls\.implicitHeight/,
+    "the panel height follows the active inspector page")
+})
+
+test("the Layout stage width does not depend on measured heights", () => {
+  const layout = Model.expandedPanelLayout(layoutInput(studioAndPortable))
+  assert.equal(Model.layoutInspectorSpan(1), layout.inspectorWidth + layout.columnGap)
+  assert.equal(Model.layoutInspectorSpan(1.5), Math.round(340 * 1.5) + Math.round(25 * 1.5))
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  const pane = qml.slice(qml.indexOf("id: layoutPane"), qml.indexOf("title:", qml.indexOf("id: layoutPane")))
+  const width = pane.split("\n").find(line => line.trim().startsWith("width:"))
+  assert.doesNotMatch(width, /panelLayout/, "binding the pane width to panelLayout forms a width/height loop")
+})
