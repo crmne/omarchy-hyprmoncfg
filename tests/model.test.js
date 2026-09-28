@@ -1256,7 +1256,9 @@ test("the expanded panel mirrors the TUI's contextual keyboard map", () => {
 test("manual profile choice is explicit and can return to automatic matching", () => {
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
   assert.match(qml, /label: "Automatically use the best profile"/)
-  assert.equal((qml.match(/Matches your connected displays to your saved profiles/g) || []).length, 1)
+  assert.match(qml, /Model\.automaticSelectionNote\(/)
+  const model = fs.readFileSync(path.join(__dirname, "..", "Model.js"), "utf8")
+  assert.equal((model.match(/Matches your connected displays to your saved profiles/g) || []).length, 1)
   assert.match(qml, /document\.daemon\.profile_override/)
   assert.match(qml, /root\.send\("set_profile_auto", \{ enabled: enabled \}\)/)
   assert.match(qml, /Automatic matching is paused/)
@@ -2255,4 +2257,45 @@ test("a display without a mode gets a named row instead of a card", () => {
   // Without notes nothing changes, so older callers keep their canvas.
   assert.deepEqual(Model.profileLayoutDisplays(profile, editor).map(d => d.key), ["desk", "hdmi"])
   assert.deepEqual(Model.nonSpatialDisplays(profile, editor, false), [])
+})
+
+test("automatic selection can be paused without an exact match by previewing the recommended profile", () => {
+  // Panel #20: the toggle used to stay disabled whenever no saved profile was
+  // exactly on screen, with no reason given.
+  assert.equal(Model.automaticSelectionCanToggle(true, "", "2 External"), true)
+  assert.equal(Model.automaticSelectionCanToggle(true, "", ""), false)
+  assert.equal(Model.automaticSelectionCanToggle(true, "Desk", ""), true)
+  assert.equal(Model.automaticSelectionCanToggle(false, "", ""), true)
+  assert.equal(Model.automaticSelectionNote(true, false, "", "2 External"),
+    "Turning this off previews 2 External and keeps it if you confirm")
+  assert.equal(Model.automaticSelectionNote(true, false, "", ""),
+    "Save a profile for these displays to turn this off")
+  assert.equal(Model.automaticSelectionNote(true, false, "Desk", "Desk"),
+    "Matches your connected displays to your saved profiles")
+  assert.equal(Model.automaticSelectionNote(true, true, "", ""), "Updating profile selection mode…")
+
+  const calls = []
+  const root = {
+    managedChecked: true, backendConnected: true, profileModePending: false, previewTransaction: "",
+    activeProfile: "", recommendedProfile: "2 External", lastError: "old",
+    previewProfile: name => calls.push(["preview", name]),
+    send: (method, params) => calls.push([method, params]),
+  }
+  panelFunction("setProfileAutomatic", root)(false)
+  assert.deepEqual(calls, [["preview", "2 External"]])
+  assert.equal(root.profileModePending, false, "the preview, not set_profile_auto, pauses matching")
+
+  calls.length = 0
+  root.activeProfile = "2 External"
+  panelFunction("setProfileAutomatic", root)(false)
+  assert.equal(JSON.stringify(calls), JSON.stringify([["set_profile_auto", { enabled: false }]]))
+})
+
+test("lid-closed match reasons have labels", () => {
+  const rows = Model.profileMatchReasonRows({ match_score: 300, match_reasons: [
+    { kind: "lid_closed_kept_off", count: 1, points: 100 },
+    { kind: "lid_closed_on", count: 1, points: 50 },
+  ] })
+  assert.equal(rows[0].value, "+100   1 display built-in, kept off with the lid closed")
+  assert.equal(rows[1].value, "+50   1 display built-in, turned off by the closed lid")
 })

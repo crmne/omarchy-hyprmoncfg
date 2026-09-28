@@ -799,8 +799,29 @@ function matchReasonLabel(kind) {
     case "not_connected": return "not connected"
     case "not_connected_kept_off": return "not connected, kept off"
     case "connected_unknown": return "connected, not in profile"
+    case "lid_closed_kept_off": return "built-in, kept off with the lid closed"
+    case "lid_closed_on": return "built-in, turned off by the closed lid"
     default: return ""
   }
+}
+
+// automaticSelectionNote explains the "Automatically use the best profile"
+// toggle. Turning it off pins the saved profile on screen. When none matches,
+// it previews the recommended profile instead, and says so; with nothing to
+// pin, it says why the toggle is unavailable. Mirrors panel #20.
+function automaticSelectionNote(automatic, pending, activeProfile, recommendedProfile) {
+  if (pending) return "Updating profile selection mode…"
+  if (automatic && String(activeProfile || "") === "") {
+    var recommended = String(recommendedProfile || "")
+    if (recommended !== "") return "Turning this off previews " + recommended + " and keeps it if you confirm"
+    return "Save a profile for these displays to turn this off"
+  }
+  return "Matches your connected displays to your saved profiles"
+}
+
+// automaticSelectionCanToggle reports whether the toggle has something to do.
+function automaticSelectionCanToggle(automatic, activeProfile, recommendedProfile) {
+  return !automatic || String(activeProfile || "") !== "" || String(recommendedProfile || "") !== ""
 }
 
 function profileMatchReasonRows(summary) {
@@ -1149,6 +1170,8 @@ if (typeof module !== "undefined") {
     monitorSnapshotsMatch: monitorSnapshotsMatch,
     hiddenDisplays: hiddenDisplays,
     displayNotes: displayNotes,
+    automaticSelectionNote: automaticSelectionNote,
+    automaticSelectionCanToggle: automaticSelectionCanToggle,
     layoutDisplays: layoutDisplays,
     displayModelLabel: displayModelLabel,
     displayDetailLabel: displayDetailLabel,

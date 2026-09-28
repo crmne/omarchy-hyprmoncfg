@@ -1180,6 +1180,12 @@ Panel {
 
   function setProfileAutomatic(enabled) {
     if (!root.managedChecked || !root.backendConnected || root.profileModePending || root.previewTransaction !== "") return
+    // Pausing pins the saved profile on screen. When none matches, preview the
+    // recommended one: keeping it pins it, and reverting leaves matching on.
+    if (!enabled && root.activeProfile === "") {
+      if (root.recommendedProfile !== "") root.previewProfile(root.recommendedProfile)
+      return
+    }
     root.lastError = ""
     if (enabled && root.activeProfile !== "") {
       root.profileChoice = root.activeProfile
@@ -3171,14 +3177,12 @@ Panel {
                 Toggle {
                   width: parent.width
                   label: "Automatically use the best profile"
-                  description: {
-                    if (root.profileModePending) return "Updating profile selection mode…"
-                    return "Matches your connected displays to your saved profiles"
-                  }
+                  description: Model.automaticSelectionNote(root.profileAutomatic, root.profileModePending,
+                    root.activeProfile, root.recommendedProfile)
                   checked: root.profileAutomatic
                   enabled: root.managedChecked && !root.profileModePending
                     && root.previewTransaction === "" && !root.previewPending
-                    && (!root.profileAutomatic || root.activeProfile !== "")
+                    && Model.automaticSelectionCanToggle(root.profileAutomatic, root.activeProfile, root.recommendedProfile)
                   foreground: root.foreground
                   fontFamily: root.fontFamily
                   onClicked: root.setProfileAutomatic(!checked)
