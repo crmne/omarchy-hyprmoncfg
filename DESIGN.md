@@ -94,10 +94,35 @@ Remove hardware brightness from the expanded profile editor. SDR brightness and
 luminance remain in Color because those are profile settings.
 
 Use `[-] [editable value] [+]` steppers with equal hit areas, exact entry, keyboard
-adjustment, units, and individual resets. Position uses logical pixels. Preserve
-canvas dragging, fine arrow movement, and snapping. Scrolling the inspector must
-not silently change numeric values. Preserve focus and the existing viewport
-behavior.
+adjustment, units, and individual resets for small counts (workspaces, group size).
+Scrolling the inspector must not silently change numeric values. Preserve focus and
+the existing viewport behavior.
+
+Inspector controls, decided 2026-09-28 (Carmine, control review). Each control
+matches the shape of its value; every field keeps its individual reset, its place
+in the keyboard field order, and Hyprland's terminology.
+
+- Position X/Y are exact-entry fields in logical pixels (`POSITION X (px)`), with
+  no -/+ buttons: four- and five-digit coordinates are set by dragging, arrow
+  nudges (Shift 10px, Ctrl 1px) and snapping, and typed when an exact value is
+  needed. Invalid text reverts; nothing is guessed.
+- `PLACE BESIDE <display>` offers Left, Right, Above and Below as the pointer
+  equivalent of Alt+arrows. It calls the same snapping function and names the
+  same nearest display, so there is one placement engine; the exact X/Y above
+  it show where the display landed.
+- Small closed sets are segmented rows of the shell's own buttons, showing every
+  choice: VRR (Off, On, Fullscreen), colour depth (8-bit, 10-bit), SDR EOTF,
+  and WCG/HDR capability (Force off, Auto-detect, Force on). A value the panel
+  does not recognise is shown as an extra choice and is never rewritten.
+- Rotation is Normal, 90°, 180° and 270° with a separate Flipped toggle. Both edit
+  the one Hyprland transform and preserve each other; an unknown transform is
+  shown and left alone.
+- Kept as they were: Enabled (toggle), Mode, Scale, Mirror and colour space
+  (dropdowns: long or open lists), SDR and display luminance values (exact
+  decimal entry with units; the underlying multipliers and nits are not bounded
+  ranges, so sliders would imply limits that do not exist), and the ICC path.
+
+Preserve canvas dragging, fine arrow movement, and snapping.
 
 ### Display states
 

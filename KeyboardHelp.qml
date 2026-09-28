@@ -34,7 +34,7 @@ Item {
             { keys: "Tab, Shift+Tab", action: "Move between canvas, Display, and Color" },
             { keys: "↑  ↓", action: "Select a field in Display or Color" },
             { keys: "←  →", action: "Adjust the selected field" },
-            { keys: "Enter", action: "Edit the selected field" }
+            { keys: "Enter", action: "Edit or apply the selected field" }
           ]
         }
       ]

@@ -62,7 +62,7 @@ Item {
     columns: Math.max(1, root.columns)
     columnSpacing: Style.space(20)
     rowSpacing: Style.space(5)
-    readonly property real cellWidth: (width - columnSpacing * (columns - 1)) / columns
+    readonly property real cellWidth: Model.gridCellWidth(width, columnSpacing, columns)
     Repeater {
       model: root.info.basic.concat(root.info.details)
       delegate: Row {

@@ -472,7 +472,10 @@ function cycleOptionValue(options, currentValue, delta) {
 // Match the TUI's Alt+arrow placement: use the nearest enabled, non-mirrored
 // output as the anchor, put the selected output flush beside it, and center it
 // on the other axis.
-function snapOutputPosition(profile, selectedKey, direction) {
+// The display a selected output snaps beside: the nearest other enabled,
+// unmirrored display by centre distance. Shared by keyboard snapping, the
+// inspector's placement buttons and their caption, so all three agree.
+function nearestSnapAnchor(profile, selectedKey) {
   var outputs = profile && profile.outputs instanceof Array ? profile.outputs : []
   var selectedIndex = -1
   for (var i = 0; i < outputs.length; i++) {
@@ -503,7 +506,18 @@ function snapOutputPosition(profile, selectedKey, direction) {
       anchor = { output: candidate, size: candidateSize }
     }
   }
+  return anchor ? { output: anchor.output, size: anchor.size, selectedSize: selectedSize } : null
+}
+
+function snapAnchorName(profile, selectedKey) {
+  var anchor = nearestSnapAnchor(profile, selectedKey)
+  return anchor ? String(anchor.output.name || "") : ""
+}
+
+function snapOutputPosition(profile, selectedKey, direction) {
+  var anchor = nearestSnapAnchor(profile, selectedKey)
   if (!anchor) return null
+  var selectedSize = anchor.selectedSize
 
   var anchorX = Number(anchor.output.x || 0)
   var anchorY = Number(anchor.output.y || 0)
@@ -1322,6 +1336,77 @@ function panelResizeAllowed(state) {
   return String(s.barPosition || "top") === "top" && s.widthChanged !== true
 }
 
+// Rotation and flip are one Hyprland transform (0-3 rotate, 4-7 flipped and
+// rotate). The inspector edits them separately; values outside 0-7 are left
+// untouched so an unknown transform survives readback.
+var rotationOptions = [
+  { value: "0", label: "Normal" },
+  { value: "1", label: "90°" },
+  { value: "2", label: "180°" },
+  { value: "3", label: "270°" }
+]
+
+function transformKnown(transform) {
+  var t = Number(transform)
+  return isFinite(t) && Math.floor(t) === t && t >= 0 && t <= 7
+}
+
+function transformRotation(transform) {
+  return transformKnown(transform) ? Number(transform) % 4 : -1
+}
+
+function transformFlipped(transform) {
+  return transformKnown(transform) && Number(transform) >= 4
+}
+
+function transformWith(transform, rotation, flipped) {
+  if (!transformKnown(transform)) return Number(transform)
+  var r = rotation === undefined || rotation === null ? transformRotation(transform) : Number(rotation)
+  var f = flipped === undefined || flipped === null ? transformFlipped(transform) : flipped === true
+  if (!(r >= 0 && r <= 3)) return Number(transform)
+  return r + (f ? 4 : 0)
+}
+
+// Directions for "Place beside nearest", identical to Alt+arrow snapping.
+var placementOptions = [
+  { value: "left", label: "Left" },
+  { value: "right", label: "Right" },
+  { value: "up", label: "Above" },
+  { value: "down", label: "Below" }
+]
+
+// Keep an unreported or unknown current value visible in a closed set instead
+// of silently showing nothing selected.
+function optionsWithCurrent(options, value) {
+  var items = options instanceof Array ? options.slice() : []
+  var current = String(value === undefined || value === null ? "" : value)
+  if (current === "") return items
+  for (var i = 0; i < items.length; i++)
+    if (String((items[i] || {}).value) === current) return items
+  items.push({ value: current, label: current })
+  return items
+}
+
+// Exact coordinate entry: whole logical pixels only; anything else is rejected
+// (null) so the field reverts instead of writing a guess.
+function parseCoordinate(text) {
+  var s = String(text === undefined || text === null ? "" : text).trim()
+  if (!/^[-+]?\d+$/.test(s)) return null
+  var n = Number(s)
+  return isFinite(n) && Math.abs(n) <= 20000 ? n : null
+}
+
+// Width of one column in an N-column form grid, in whole pixels. A fractional
+// width (e.g. (340 - 7) / 2 = 166.5) puts every right-column control on a half
+// pixel; the scene graph snaps it right and its border crosses the clipping
+// edge of the scrolling inspector. Flooring keeps each column on the pixel grid
+// and the last column's right edge inside the grid.
+function gridCellWidth(width, spacing, columns) {
+  var n = Math.max(1, Math.floor(Number(columns) || 1))
+  var gap = Math.max(0, Number(spacing) || 0)
+  return Math.max(0, Math.floor((Math.max(0, Number(width) || 0) - gap * (n - 1)) / n))
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     layoutInspectorSpan: layoutInspectorSpan,
@@ -1358,6 +1443,17 @@ if (typeof module !== "undefined") {
     adjacentProfileName: adjacentProfileName,
     cycleOptionValue: cycleOptionValue,
     snapOutputPosition: snapOutputPosition,
+    nearestSnapAnchor: nearestSnapAnchor,
+    snapAnchorName: snapAnchorName,
+    rotationOptions: rotationOptions,
+    transformKnown: transformKnown,
+    transformRotation: transformRotation,
+    transformFlipped: transformFlipped,
+    transformWith: transformWith,
+    placementOptions: placementOptions,
+    optionsWithCurrent: optionsWithCurrent,
+    parseCoordinate: parseCoordinate,
+    gridCellWidth: gridCellWidth,
     outputName: outputName,
     outputDisplayLabel: outputDisplayLabel,
     outputFieldValue: outputFieldValue,

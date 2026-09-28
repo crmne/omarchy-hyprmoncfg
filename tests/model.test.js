@@ -971,7 +971,7 @@ test("the panel hands monitor management over, not the user service", () => {
   assert.match(qml, /Switch layouts on monitor, lid, and resume events/)
   assert.match(qml, /if \(root\.managedChecked && root\.profileAutomatic\)/)
   assert.match(qml, /Owns and applies monitor configuration/)
-  assert.match(qml, /Read-only — display configuration is controlled elsewhere/)
+  assert.match(qml, /Read-only: display configuration is controlled elsewhere/)
   // Turning management on starts the unit and claims the displays.
   assert.match(qml, /systemctl --user enable --now hyprmoncfgd\.service && hyprmoncfg manage/)
   // Turning it off hands the config back and leaves the unit alone. Stopping
@@ -1066,10 +1066,17 @@ test("the inspectors use standards-based colour terms and per-field profile rese
   assert.match(qml, /BT\.2020 \+ PQ \(HDR\)/)
   assert.match(qml, /EDID primaries \+ PQ/)
   assert.match(qml, /function resetOutputField\(field\)/)
-  assert.equal((qml.match(/resetVisible: root\.outputFieldChanged/g) || []).length, 17)
-  assert.equal((qml.match(/onResetRequested: root\.resetOutputField/g) || []).length, 17)
-  assert.equal((qml.match(/visible: root\.outputFieldChanged/g) || []).length, 4)
-  assert.equal((qml.match(/onClicked: root\.resetOutputField/g) || []).length, 4)
+  // Every one of the 21 per-display fields keeps its individual reset: 19 through
+  // the control's own reset action (dropdowns, segmented, decimal and coordinate
+  // fields), 2 as standalone buttons (Enabled toggle, ICC path).
+  assert.equal((qml.match(/resetVisible: root\.outputFieldChanged/g) || []).length, 19)
+  assert.equal((qml.match(/onResetRequested: root\.resetOutputField/g) || []).length, 19)
+  assert.equal((qml.match(/visible: root\.outputFieldChanged/g) || []).length, 2)
+  assert.equal((qml.match(/onClicked: root\.resetOutputField/g) || []).length, 2)
+  for (const field of ["enabled", "mode", "scale", "vrr", "transform", "x", "y", "mirror_of", "bitdepth", "cm",
+    "sdr_brightness", "sdr_saturation", "sdr_min_luminance", "sdr_max_luminance", "sdr_eotf", "min_luminance",
+    "max_luminance", "max_avg_luminance", "supports_wide_color", "supports_hdr", "icc"])
+    assert.match(qml, new RegExp("root\\.resetOutputField\\(\"" + field + "\"\\)"), field)
   assert.match(qml, /visible: root\.outputFieldChanged\("icc"\)/)
   assert.match(qml, /onClicked: root\.resetOutputField\("icc"\)/)
   assert.match(dropdown, /signal resetRequested\(\)/)
@@ -1317,7 +1324,7 @@ test("profile details and workspace labels mirror the TUI semantics", () => {
   assert.match(panelQml, /Number\(root\.selectedSavedSummary\.connected_outputs \|\| 0\) \+ " connected"/)
   assert.match(panelQml, /model: root\.selectedSavedWorkspaceRows/)
   assert.match(panelQml, /Model\.outputDisplayLabel\(root\.draftProfile, String\(modelData\)\)/)
-  assert.match(panelQml, /label: "ROTATION"/)
+  assert.match(panelQml, /label: Model\.transformKnown\(transformValue\) \? "ROTATION"/)
   assert.doesNotMatch(panelQml, /label: "TRANSFORM"/)
 })
 

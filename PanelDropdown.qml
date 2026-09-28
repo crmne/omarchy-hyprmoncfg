@@ -63,13 +63,17 @@ Item {
   }
 
   implicitWidth: Style.spacing.dropdownWidth
-  implicitHeight: showLabel && label !== "" ? rowHeight + Style.spacing.huge : rowHeight
+  // Measure the label rather than assume it, so content-sized parents that
+  // sum implicit heights never clip the trigger.
+  implicitHeight: showLabel && label !== ""
+    ? dropdownLabel.implicitHeight + Style.spacing.labelGap + rowHeight : rowHeight
 
   Column {
     anchors.fill: parent
     spacing: Style.spacing.labelGap
 
     Text {
+      id: dropdownLabel
       textFormat: Text.PlainText
       visible: root.showLabel && root.label !== ""
       text: root.label
