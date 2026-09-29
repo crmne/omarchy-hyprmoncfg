@@ -6,7 +6,7 @@ An Omarchy bar panel for [hyprmoncfg](https://hyprmoncfg.dev/). Create multi-mon
 
 Version 2.6 draws your displays as screens on a stage, sizes the panel to what it shows, and gives every setting a control that fits it. The compact view leads with the layout; expand it for the full editor. The companion TUI shares the same design, placement rules and display terminology, with native keyboard-first controls. See the [release notes](design/releases/2.6.0.md) for highlights and remaining differences.
 
-Screenshots show the actual panel with synthetic display/profile data in an isolated capture host, not a live hardware test.
+Screenshots show the actual panel with synthetic display/profile data in an isolated capture host, not a live hardware test. The preview above combines two of those renders, the compact panel and the expanded editor, over Omarchy's ristretto wallpaper.
 
 <details>
 <summary>See the expanded editor</summary>
