@@ -4,7 +4,7 @@ An Omarchy bar panel for [hyprmoncfg](https://hyprmoncfg.dev/). Create multi-mon
 
 ![hyprmoncfg for Omarchy](preview.png)
 
-Version 2.4 brings a cleaner Layout / Workspaces / Profiles editor, more discoverable display and profile actions, and refreshes that preserve your edits while displays connect. The compact view keeps everyday controls close; expand it for the spatial editor. The companion TUI shares the core operations and display terminology, with native keyboard-first controls. See the [release notes](design/releases/2.4.0.md) for highlights and remaining differences.
+Version 2.6 draws your displays as screens on a stage, sizes the panel to what it shows, and gives every setting a control that fits it. The compact view leads with the layout; expand it for the full editor. The companion TUI shares the same design, placement rules and display terminology, with native keyboard-first controls. See the [release notes](design/releases/2.6.0.md) for highlights and remaining differences.
 
 Screenshots show the actual panel with synthetic display/profile data in an isolated capture host, not a live hardware test.
 
