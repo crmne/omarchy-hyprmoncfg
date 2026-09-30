@@ -61,7 +61,7 @@ BarWidget {
 
   BarIconButton {
     id: button
-    visible: root.showBarIcon
+    opacity: root.showBarIcon ? 1 : 0
     anchors.fill: parent
     bar: root.bar
     text: root.monitorCount > 1 ? "󰍺" : "󰍹"
