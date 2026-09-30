@@ -25,6 +25,27 @@ Screenshots show the actual panel with synthetic display/profile data in an isol
 
 </details>
 
+## Open from the Display menu
+
+The bar icon is optional. Set `"showBarIcon": false` on the
+`crmne.hyprmoncfg` bar entry in `~/.config/omarchy/shell.json` to collapse its
+icon while keeping the editor, IPC routing and persistent preview guard loaded.
+The default is `true`. Keep the entry in the bar configuration; removing it
+also removes the route to the editor.
+
+A customized Omarchy Display menu can open the editor using:
+
+```bash
+omarchy-shell shell summon crmne.hyprmoncfg '{}'
+```
+
+Omarchy currently has no Display-menu extension slot. Use
+`omarchy plugin clone omarchy.monitor` for a user-owned menu customization,
+and add a `Layouts & profiles` action that invokes the command above through a
+QML `Process` argument array. Expose the action to both pointer and keyboard navigation. Existing brightness,
+text-size, scale and display controls remain available. The editor opens on the focused display
+and retains its normal close, repeated-open and preview behavior.
+
 ## Automatically match the right layout to the connected monitors
 
 Set your profiles up once. The desk, with the ultrawide on and the laptop panel off. The dock with three screens. The conference room projector at its own resolution and scale. After that you do nothing. Plug the monitors in and the matching profile is applied. Close the lid and the clamshell layout takes over. Undock and your laptop screen comes back at the scale you picked, with your workspaces where you put them.
