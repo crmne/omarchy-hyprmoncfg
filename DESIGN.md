@@ -31,7 +31,7 @@ separate matching algorithm or monitor writer to make the UI appear complete.
 
 ## Compact view
 
-Use a canvas-first vertical grouping: small layout, brightness, management,
+Use a canvas-first vertical grouping: small layout, brightness, text size, management,
 current setup, and contextual actions. Do not show a permanent maintenance alert when
 nothing needs attention. Brightness is live hardware state, labeled `Brightness`
 with a secondary target name when useful. Selecting a screen changes the target;
@@ -50,6 +50,20 @@ as a TUI should recognise a graphical display manager at first glance. The canva
 is sized to the arrangement's aspect within fixed clamps (see Content-sized panel).
 Nothing was removed; only the order changed. The TUI keeps its own layout and
 wording; this is a presentation choice, not a change to shared operations.
+
+Text size (decided 2026-09-30, Carmine) sits directly under Brightness and is
+Omarchy's own control: the same stops (9, 10, 11, 12, 14, 16, 20 px), the same
+notched slider, `TEXT SIZE` with the px value right-aligned, applied when the knob
+is released. It is live desktop state like brightness, but desktop-wide rather
+than per display: Omarchy's shell base font, GTK text scaling and terminal font.
+The panel changes it only by running `omarchy-display-text-size <px>` and reads
+the live value from the shell's base size; it writes nothing itself, and text
+size is never part of a profile, a draft or the IPC. When the command is missing
+the row is hidden and unreachable by keyboard. In the compact key model it is the
+row above Management: Up reaches it, Left and Right step through the stops. A
+change rescales the whole content-sized panel, so hover cannot move the keyboard
+cursor until the reflow settles (300 ms), and nothing is applied mid-drag. The
+TUI has no counterpart: a terminal's text size is the terminal's.
 
 ## Expanded view
 
@@ -83,7 +97,17 @@ signal controls accessible, with units and neutral values matching the TUI.
 
 The canvas is a stage: each enabled display is drawn as a screen (bezel and a
 panel lit with the theme's foreground, or its accent when selected) on a dotted
-field, with workspaces as bare-ID chips. The selected display's six hardware
+field, with workspaces as bare-ID chips. When a plan change moves a workspace to
+another display (strategy, group size, manual reassignment, a display arriving or
+leaving, the lid), its chip glides from the old screen to the new one: keyed by
+workspace ID, about a quarter of a second, eased with no bounce, slightly
+staggered. Chips that keep their display do not travel, and chips that appear
+or disappear just do. The change is instant instead when more than twelve chips
+would move, during a drag, while the panel is resizing, where a small card shows
+its workspaces as one pill, or when Hyprland's `animations:enabled` is off (Omarchy
+has no reduced-motion setting of its own). The motion never delays input, and the
+settled picture is identical to an unanimated one. It applies to the compact
+canvas, the Layout stage and the Workspaces preview. The selected display's six hardware
 fields sit directly under the stage, because they describe the pictured screen;
 the right column holds only the editable Display and Color controls. Identify
 stays the only action in the hardware block. Pane chrome follows Omarchy's
@@ -256,7 +280,12 @@ the result.
 - Every expanded page shares the Layout page's width, so switching pages never
   moves the tabs or header; only the height changes.
 - Compact keeps its 430 width; the canvas height follows the arrangement within
-  compact clamps and the column is content-sized as before.
+  compact clamps and the card is content-sized. When the content is taller than
+  the screen (large text size, a small screen), the card stops at the available
+  height: the header and the footer (current setup, Create profile, Resume
+  automatic matching) stay fixed and only the body between them scrolls, with a
+  scrollbar only then. The keyboard cursor's row and a newly shown Keep/Revert
+  bar are scrolled into view (`Model.compactPanelLayout`).
 - Both axes are clamped to the available screen area. The header and footer stay
   visible; the stage and lists absorb any shortfall and scroll (1366x768 stays
   usable).

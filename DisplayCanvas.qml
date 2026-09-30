@@ -38,6 +38,78 @@ BorderSurface {
   property string fontFamily: Style.font.family
   readonly property real stagePadding: detailed ? Style.space(14) : Style.space(3)
 
+  // ---- Workspace chip travel. When a plan change moves a workspace to another
+  // display, its chip glides there instead of popping. The decision is
+  // Model.chipMoves (pure); this only measures chips and animates ghosts. The
+  // settled picture is exactly what it would be without any animation.
+  property bool chipTravelEnabled: false
+  property bool reducedMotion: false
+  property bool resizing: false
+  property int chipTravelDuration: Model.chipTravel.duration
+  property var chipItems: ({})
+  property var chipRects: ({})
+  property var travelingChips: []
+  property var travelingIds: ({})
+  property bool chipTravelPending: false
+
+  function registerChip(id, item) { root.chipItems[id] = item }
+  function unregisterChip(id, item) { if (root.chipItems[id] === item) delete root.chipItems[id] }
+
+  function snapshotChips() {
+    var rects = {}
+    for (var id in root.chipItems) {
+      var item = root.chipItems[id]
+      if (!item || !item.parent || !item.parent.visible) continue
+      if (typeof item.parent.forceLayout === "function") item.parent.forceLayout()
+      var point = item.mapToItem(canvas, 0, 0)
+      rects[id] = { x: point.x, y: point.y, width: item.width, height: item.height, owner: item.ownerKey }
+    }
+    return rects
+  }
+
+  function endChipTravel() {
+    root.travelingIds = ({})
+    root.travelingChips = []
+  }
+
+  function chipArrived(id) {
+    var left = Object.assign({}, root.travelingIds)
+    delete left[id]
+    root.travelingIds = left
+    if (Object.keys(left).length === 0) root.travelingChips = []
+  }
+
+  // Coalesces a burst of changes (profile and plan usually change together)
+  // into one comparison of the last settled chips with the new ones.
+  function chipsChanged(animate) {
+    if (root.chipTravelPending) return
+    root.chipTravelPending = true
+    var before = root.chipRects
+    Qt.callLater(function() {
+      root.chipTravelPending = false
+      var after = root.snapshotChips()
+      root.chipRects = after
+      root.endChipTravel()
+      var moves = animate ? Model.chipMoves(before, after, {
+        enabled: root.chipTravelEnabled && root.visible, dragging: root.dragging,
+        resizing: root.resizing, reducedMotion: root.reducedMotion
+      }) : []
+      if (moves.length === 0) return
+      var ids = {}
+      for (var i = 0; i < moves.length; i++) ids[moves[i].id] = true
+      root.travelingIds = ids
+      root.travelingChips = moves
+    })
+  }
+
+  onWorkspacePlanChanged: root.chipsChanged(true)
+  onProfileChanged: root.chipsChanged(true)
+  onWidthChanged: root.chipsChanged(false)
+  onHeightChanged: root.chipsChanged(false)
+  onDraggingChanged: if (root.dragging) root.endChipTravel()
+  onResizingChanged: if (root.resizing) root.endChipTravel()
+  Component.onCompleted: root.chipsChanged(false)
+
   signal outputSelected(string key)
   signal outputMoved(string key, int x, int y, int snapDistance)
 
@@ -244,8 +316,14 @@ BorderSurface {
           Repeater {
             model: card.chipsFit ? card.workspaceIds : [card.workspaceText]
             Rectangle {
+              id: chip
               required property var modelData
               readonly property bool strong: root.emphasis === "workspaces"
+              readonly property string ownerKey: String(card.modelData.key || "")
+              // Hidden only while its ghost is gliding in; never delays input.
+              opacity: root.travelingIds[String(modelData)] === true ? 0 : 1
+              Component.onCompleted: if (card.chipsFit) root.registerChip(String(modelData), chip)
+              Component.onDestruction: root.unregisterChip(String(modelData), chip)
               width: Math.min(card.width * 0.6, Math.max(height, chipText.implicitWidth + Style.space(8)))
               height: chipText.implicitHeight + Style.space(strong ? 5 : 3)
               radius: Math.min(Style.cornerRadius, Style.space(4))
@@ -356,6 +434,44 @@ BorderSurface {
             card.dragOffsetX = 0
             card.dragOffsetY = 0
           }
+        }
+      }
+    }
+
+    // Ghost chips: drawn like the real ones, above the cards, input-transparent.
+    Repeater {
+      model: root.travelingChips
+
+      Rectangle {
+        id: ghost
+        required property var modelData
+        readonly property bool strong: root.emphasis === "workspaces"
+        z: 10
+        x: modelData.fromX
+        y: modelData.fromY
+        width: modelData.width
+        height: modelData.height
+        radius: Math.min(Style.cornerRadius, Style.space(4))
+        color: strong ? root.accent : Qt.tint(Color.background, Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.35))
+
+        Text {
+          anchors.centerIn: parent
+          textFormat: Text.PlainText
+          text: String(ghost.modelData.id)
+          color: ghost.strong ? Color.background : root.accent
+          font.family: root.fontFamily
+          font.pixelSize: ghost.strong ? Style.font.bodySmall : Style.font.caption
+          font.bold: true
+        }
+
+        SequentialAnimation {
+          running: true
+          PauseAnimation { duration: ghost.modelData.delay }
+          ParallelAnimation {
+            NumberAnimation { target: ghost; property: "x"; to: ghost.modelData.toX; duration: root.chipTravelDuration; easing.type: Easing.InOutCubic }
+            NumberAnimation { target: ghost; property: "y"; to: ghost.modelData.toY; duration: root.chipTravelDuration; easing.type: Easing.InOutCubic }
+          }
+          ScriptAction { script: { ghost.visible = false; root.chipArrived(ghost.modelData.id) } }
         }
       }
     }

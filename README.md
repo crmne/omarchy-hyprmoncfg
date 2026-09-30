@@ -39,6 +39,7 @@ A small background service is what watches for this. It catches hotplug, lid and
 
 - Per-display brightness for the monitor selected on the layout, using Omarchy's own internal-backlight, DDC/CI, and Apple Display support
 - Brightness stays live hardware state rather than being stored in layout profiles, and changes made by Omarchy's panel or brightness keys remain compatible
+- Text size, the same desktop-wide control as Omarchy's Display panel (shell, GTK apps and terminals together), directly under Brightness. It runs Omarchy's `omarchy-display-text-size`, is live desktop state rather than part of a profile, and is hidden when that command is not installed
 
 **Keyboard controls**
 
@@ -97,6 +98,7 @@ Neutral SDR multipliers are shown as 1, including profiles that omit them. Reset
 **Workspaces**
 
 - A workspace planner that lays your workspaces out across the displays in a profile: manual, sequential, or interleaved
+- When a plan change moves a workspace to another display, its numbered chip glides there on the canvas, so you can see what moved. It follows Hyprland's animations setting and never delays input
 - Choose Off when another tool, such as hyprsplit, manages your workspaces: hyprmoncfg then writes no workspace rules for that profile and keeps the plan for when you choose a strategy again
 - Set how many workspaces there are, how they group, and the monitor order they follow
 - Workspace and group counts have no fixed product cap; type an exact large value directly

@@ -171,9 +171,20 @@ Panel {
     availableWidth: panel.availableCardWidth - root.panelHorizontalInset,
     availableHeight: panel.availableCardHeight - panel.verticalContentInset
   })
+  readonly property var compactLayout: Model.compactPanelLayout({
+    headerHeight: compactHeader.implicitHeight,
+    bodyHeight: compactBodyColumn.implicitHeight,
+    footerHeight: compactFooter.visible ? compactFooter.implicitHeight : 0,
+    gap: Style.space(14),
+    availableHeight: panel.availableCardHeight - panel.verticalContentInset
+  })
   readonly property real profileStageHeight: Model.stageHeightForWidth(root.profileBounds,
     root.panelLayout.width - root.panelLayout.sideWidth - root.panelLayout.columnGap,
     root.sizingUnit, { offRow: root.profileOffRow })
+  // True while the content-sized panel is between sizes; chips never travel then.
+  readonly property bool panelResizing: root.expanded
+    && (Math.round(root.appliedPanelHeight) !== Math.round(root.panelLayout.height)
+      || Math.round(root.appliedPanelWidth) !== Math.round(root.panelLayout.width))
   readonly property bool canvasDragging: layoutCanvas.dragging || compactCanvas.dragging
   property real appliedPanelWidth: 0
   property real appliedPanelHeight: 0
@@ -1490,7 +1501,52 @@ Panel {
 
   function moveCursor(delta) {
     root.cursorActive = true
-    root.cursorIndex = Math.max(0, Math.min(root.itemCount() - 1, root.cursorIndex + delta))
+    // Row -1 is Text size, above Management, when Omarchy's command exists.
+    root.cursorIndex = Math.max(root.textSizeAvailable ? -1 : 0,
+      Math.min(root.itemCount() - 1, root.cursorIndex + delta))
+  }
+
+  // ---- Text size: Omarchy's desktop-wide setting, changed only through
+  // omarchy-display-text-size. Live desktop state like brightness; never part
+  // of a profile and never written by this panel.
+  property bool textSizeAvailable: false
+  property int textSizePreviewIndex: -1
+  // A text-size change rescales the whole panel and slides rows under a still
+  // pointer. While true, hover may not move the keyboard cursor.
+  property bool reflowingText: false
+  // Hyprland's animations:enabled, the desktop's motion preference.
+  property bool reducedMotion: false
+
+  function markReflowing() {
+    root.reflowingText = true
+    reflowSettle.restart()
+  }
+
+  function checkTextSizeCommand() {
+    if (textSizeProbe.running) return
+    textSizeProbe.command = ["sh", "-c", "command -v omarchy-display-text-size >/dev/null 2>&1"]
+    textSizeProbe.running = true
+  }
+
+  function setTextSize(pixels) {
+    if (!root.textSizeAvailable) return
+    root.markReflowing()
+    root.textSizePreviewIndex = Model.nearestTextStop(pixels)
+    textSizeProcess.command = ["omarchy-display-text-size", String(pixels)]
+    if (!textSizeProcess.running) textSizeProcess.running = true
+  }
+
+  function adjustTextSize(deltaSteps) {
+    if (!root.textSizeAvailable) return
+    var index = Model.steppedTextIndex(
+      Model.textStopIndex(root.textSizePreviewIndex, Style.font.baseSize), deltaSteps)
+    root.setTextSize(Model.textSizeStops[index])
+  }
+
+  function checkMotionPreference() {
+    if (motionProbe.running) return
+    motionProbe.command = ["hyprctl", "-j", "getoption", "animations:enabled"]
+    motionProbe.running = true
   }
 
   function activateCursor() {
@@ -1498,6 +1554,7 @@ Panel {
       root.install()
       return
     }
+    if (root.cursorIndex === -1) return
     if (root.cursorIndex === 0) {
       root.setManaged(!root.managedChecked)
       return
@@ -1514,7 +1571,10 @@ Panel {
     if (id === "restart-service") root.restartService()
   }
 
-  Component.onCompleted: root.checkInstallation()
+  Component.onCompleted: {
+    root.checkInstallation()
+    root.checkTextSizeCommand()
+  }
   onActivePageChanged: {
     if (root.activePage === "workspaces")
       Qt.callLater(function() { root.ensureManualWorkspaceRules() })
@@ -1544,6 +1604,8 @@ Panel {
       root.keyboardInspectorField = 0
       root.workspaceKeyboardIndex = 0
       root.checkInstallation()
+      root.checkTextSizeCommand()
+      root.checkMotionPreference()
       if (root.compatible) root.checkServiceState()
       if (root.backendConnected) root.requestEditorState()
       brightnessSelectionTimer.restart()
@@ -1724,6 +1786,44 @@ Panel {
   }
 
   Process { id: tuiProcess }
+
+  Process {
+    id: textSizeProbe
+    onExited: function(exitCode) { root.textSizeAvailable = exitCode === 0 }
+  }
+
+  Process {
+    id: textSizeProcess
+    stdout: StdioCollector { waitForEnd: true }
+    // A failed change leaves the live size where it was; follow it again.
+    onExited: function(exitCode) { if (exitCode !== 0) root.textSizePreviewIndex = -1 }
+  }
+
+  Process {
+    id: motionProbe
+    stdout: StdioCollector {
+      id: motionOutput
+      waitForEnd: true
+      onStreamFinished: root.reducedMotion = Model.motionReduced(motionOutput.text)
+    }
+  }
+
+  Timer {
+    id: reflowSettle
+    interval: 300
+    onTriggered: root.reflowingText = false
+  }
+
+  // When the live base size lands on the pending stop, follow it again. The
+  // change reflows the panel, so hover stays quiet for a beat.
+  Connections {
+    target: Style
+    function onFontBaseSizeChanged() {
+      root.markReflowing()
+      if (Model.textPreviewSettled(root.textSizePreviewIndex, Style.font.baseSize))
+        root.textSizePreviewIndex = -1
+    }
+  }
 
   // Status events arrive while the panel remains open, including hotplug and
   // automatic profile changes. Refresh its separate editor snapshot after the
@@ -1916,7 +2016,7 @@ Panel {
       : panel.fittedContentWidth(Style.space(430))
     contentHeight: root.expanded
       ? panel.fittedContentHeight(root.appliedPanelHeight)
-      : panel.fittedContentHeight(compactColumn.implicitHeight)
+      : panel.fittedContentHeight(root.compactLayout.height)
 
     Item {
       width: 0
@@ -2019,6 +2119,7 @@ Panel {
         || workspaceStrategyDropdown.popupOpen || workspacePersistenceDropdown.popupOpen
       onMoveRequested: function(dx, dy) {
         if (!root.expanded && dy !== 0) root.moveCursor(dy)
+        else if (!root.expanded && dx !== 0 && root.cursorIndex === -1) root.adjustTextSize(dx)
         else if (root.expanded) root.handleExpandedMove(dx, dy)
       }
       onReturnRequested: returnPressed = true
@@ -2041,347 +2142,414 @@ Panel {
       // Pointer presence for the resize policy; passive, takes no input.
       HoverHandler { id: panelPointer; onHoveredChanged: root.applyPanelSize(false) }
 
-      Column {
+      // Compact view: a fixed header, a body that scrolls only when the card is
+      // clamped to the screen, and a fixed footer, so the current setup and its
+      // actions are never cut off. Heights come from Model.compactPanelLayout.
+      Item {
         id: compactColumn
         visible: !root.expanded
-        width: parent.width
-        spacing: Style.space(14)
-
-        Item {
-          width: parent.width
-          implicitHeight: Math.max(compactHeroIcon.implicitHeight, compactHeroLabels.implicitHeight, compactExpandButton.implicitHeight)
-
-          Item {
-            id: compactHeroIcon
-            implicitWidth: compactHeroGlyph.implicitWidth
-            implicitHeight: compactHeroGlyph.implicitHeight
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            opacity: root.backendConnected ? 1.0 : 0.6
-
-            Text {
-              textFormat: Text.PlainText
-              id: compactHeroGlyph
-              text: root.monitorCount > 1 ? "󰍺" : "󰍹"
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.display
-            }
-
-            Text {
-              textFormat: Text.PlainText
-              visible: root.backendConnected
-              anchors.right: compactHeroGlyph.right
-              anchors.bottom: compactHeroGlyph.bottom
-              anchors.rightMargin: -Style.space(2)
-              anchors.bottomMargin: -Style.space(1)
-              text: "󰄬"
-              color: Color.accent
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              font.bold: true
-            }
-          }
-
-          Column {
-            id: compactHeroLabels
-            anchors.left: compactHeroIcon.right
-            anchors.leftMargin: Style.space(14)
-            anchors.right: compactExpandButton.left
-            anchors.rightMargin: Style.space(10)
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: Style.space(1)
-
-            Text {
-              textFormat: Text.PlainText
-              width: parent.width
-              text: "Display"
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.title
-              font.bold: true
-              elide: Text.ElideRight
-            }
-
-            Text {
-              textFormat: Text.PlainText
-              width: parent.width
-              text: "hyprmoncfg"
-              font.capitalization: Font.AllUppercase
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              font.bold: true
-              font.letterSpacing: 1.2
-              elide: Text.ElideRight
-            }
-          }
-
-          Button {
-            id: compactExpandButton
-            visible: root.compatible
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            text: "Expand"
-            iconText: "󰊓"
-            bordered: true
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-            fontSize: Style.font.caption
-            onClicked: root.expanded = true
-          }
-        }
-
-        Text {
-          textFormat: Text.PlainText
-          visible: root.lastError !== ""
-          width: parent.width
-          text: root.lastError
-          color: root.urgent
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.bodySmall
-          wrapMode: Text.WordWrap
-        }
+        anchors.fill: parent
 
         Column {
-          visible: !root.compatible && !root.checkingInstallation
+          id: compactHeader
           width: parent.width
           spacing: Style.space(14)
 
-          PanelSeparator { foreground: root.foreground }
+          Item {
+            width: parent.width
+            implicitHeight: Math.max(compactHeroIcon.implicitHeight, compactHeroLabels.implicitHeight, compactExpandButton.implicitHeight)
+
+            Item {
+              id: compactHeroIcon
+              implicitWidth: compactHeroGlyph.implicitWidth
+              implicitHeight: compactHeroGlyph.implicitHeight
+              anchors.left: parent.left
+              anchors.verticalCenter: parent.verticalCenter
+              opacity: root.backendConnected ? 1.0 : 0.6
+
+              Text {
+                textFormat: Text.PlainText
+                id: compactHeroGlyph
+                text: root.monitorCount > 1 ? "󰍺" : "󰍹"
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.display
+              }
+
+              Text {
+                textFormat: Text.PlainText
+                visible: root.backendConnected
+                anchors.right: compactHeroGlyph.right
+                anchors.bottom: compactHeroGlyph.bottom
+                anchors.rightMargin: -Style.space(2)
+                anchors.bottomMargin: -Style.space(1)
+                text: "󰄬"
+                color: Color.accent
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.bold: true
+              }
+            }
+
+            Column {
+              id: compactHeroLabels
+              anchors.left: compactHeroIcon.right
+              anchors.leftMargin: Style.space(14)
+              anchors.right: compactExpandButton.left
+              anchors.rightMargin: Style.space(10)
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: Style.space(1)
+
+              Text {
+                textFormat: Text.PlainText
+                width: parent.width
+                text: "Display"
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.title
+                font.bold: true
+                elide: Text.ElideRight
+              }
+
+              Text {
+                textFormat: Text.PlainText
+                width: parent.width
+                text: "hyprmoncfg"
+                font.capitalization: Font.AllUppercase
+                color: root.dim
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.bold: true
+                font.letterSpacing: 1.2
+                elide: Text.ElideRight
+              }
+            }
+
+            Button {
+              id: compactExpandButton
+              visible: root.compatible
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              text: "Expand"
+              iconText: "󰊓"
+              bordered: true
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              fontSize: Style.font.caption
+              onClicked: root.expanded = true
+            }
+          }
 
           Text {
             textFormat: Text.PlainText
+            visible: root.lastError !== ""
             width: parent.width
-            text: root.installed
-              ? "Update hyprmoncfg to use the visual editor."
-              : "Install hyprmoncfg to manage monitor layouts."
-            color: root.dim
+            text: root.lastError
+            color: root.urgent
             font.family: root.fontFamily
-            font.pixelSize: Style.font.body
+            font.pixelSize: Style.font.bodySmall
             wrapMode: Text.WordWrap
-            horizontalAlignment: Text.AlignHCenter
           }
+        }
 
-          Button {
+        InspectorViewport {
+          id: compactBody
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: compactHeader.bottom
+          anchors.topMargin: Style.space(14)
+          height: root.compactLayout.bodyHeight
+          scrollBarGap: Style.space(4)
+          formHeight: compactBodyColumn.implicitHeight
+          // The keyboard cursor's row is scrolled into view.
+          currentField: !root.cursorActive ? null
+            : (root.cursorIndex === -1 ? compactTextSize
+              : (root.cursorIndex === 0 ? compactManagedToggle
+                : compactActionRows.itemAt(root.cursorIndex - 1)))
+
+          Column {
+            id: compactBodyColumn
             width: parent.width
-            text: root.installing
-              ? (root.installed ? "Updating hyprmoncfg…" : "Installing hyprmoncfg…")
-              : (root.installed ? "Update hyprmoncfg" : "Install hyprmoncfg")
-            iconText: root.installed ? "󰚰" : "󰏔"
-            iconSpinning: root.installing
-            selected: !root.installed
-            bordered: true
-            enabled: !root.installing
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-            onClicked: root.install()
+            spacing: Style.space(14)
+
+            Column {
+              visible: !root.compatible && !root.checkingInstallation
+              width: parent.width
+              spacing: Style.space(14)
+
+              PanelSeparator { foreground: root.foreground }
+
+              Text {
+                textFormat: Text.PlainText
+                width: parent.width
+                text: root.installed
+                  ? "Update hyprmoncfg to use the visual editor."
+                  : "Install hyprmoncfg to manage monitor layouts."
+                color: root.dim
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignHCenter
+              }
+
+              Button {
+                width: parent.width
+                text: root.installing
+                  ? (root.installed ? "Updating hyprmoncfg…" : "Installing hyprmoncfg…")
+                  : (root.installed ? "Update hyprmoncfg" : "Install hyprmoncfg")
+                iconText: root.installed ? "󰚰" : "󰏔"
+                iconSpinning: root.installing
+                selected: !root.installed
+                bordered: true
+                enabled: !root.installing
+                foreground: root.foreground
+                fontFamily: root.fontFamily
+                onClicked: root.install()
+              }
+            }
+
+            Column {
+              visible: root.compatible
+              width: parent.width
+              spacing: Style.space(14)
+
+              PanelSeparator { foreground: root.foreground }
+
+              EditorPane {
+                width: parent.width
+                // Fit the arrangement's aspect within the compact clamps.
+                height: Model.compactStageHeight(root.layoutBounds, width, root.sizingUnit, root.layoutOffRow)
+                title: ""
+                meta: ""
+                active: true
+                foreground: root.foreground
+                dim: root.dim
+                accent: Color.accent
+                fontFamily: root.fontFamily
+                opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
+
+                DisplayCanvas {
+                  id: compactCanvas
+                  anchors.fill: parent
+                  chipTravelEnabled: root.opened
+                  reducedMotion: root.reducedMotion
+                  resizing: root.panelResizing
+                  profile: root.draftProfile
+                  editorDisplays: root.editorDocument.displays
+                  notes: root.displayNotes
+                  workspacePlan: root.workspacePlan
+                  emphasis: "layout"
+                  selectedKey: root.selectedOutputKey
+                  interactive: false
+                  selectable: root.editorReady
+                  movable: root.managedChecked && root.editorReady && !root.editPending && root.previewTransaction === ""
+                  detailed: true
+                  framed: true
+                  foreground: root.foreground
+                  dim: root.dim
+                  accent: Color.accent
+                  fontFamily: root.fontFamily
+                  onOutputSelected: function(key) { root.selectedOutputKey = key }
+                  onOutputMoved: function(key, x, y, snapDistance) {
+                    root.editOutput({ x: x, y: y, snap_distance: snapDistance }, key)
+                  }
+                }
+              }
+
+              BorderSurface {
+                id: compactDraftBar
+                // Keep/Revert and Discard/Preview must be seen when they appear.
+                onVisibleChanged: if (visible) Qt.callLater(function() { compactBody.reveal(compactDraftBar) })
+                visible: root.draftDirty || root.previewTransaction !== ""
+                width: parent.width
+                implicitHeight: compactDraftActions.implicitHeight + Style.space(16)
+                color: Style.selectedFillFor(root.foreground, Color.accent)
+                borderSpec: Border.controlSpec("selected", root.foreground, Color.accent)
+                radius: Style.cornerRadius
+                opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
+
+                Row {
+                  id: compactDraftActions
+                  anchors.left: parent.left
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  anchors.leftMargin: Style.space(10)
+                  anchors.rightMargin: Style.space(10)
+                  spacing: Style.space(7)
+
+                  Column {
+                    width: parent.width - compactDiscardDraft.width - compactApplyDraft.width - parent.spacing * 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(1)
+
+                    Text {
+                      textFormat: Text.PlainText
+                      width: parent.width
+                      text: root.previewTransaction !== ""
+                        ? (root.previewKind === "profile" ? "Keep this profile?" : "Keep this layout?")
+                        : (root.editPending ? "Checking layout…" : "Layout changed")
+                      color: root.foreground
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.bodySmall
+                      font.bold: true
+                      elide: Text.ElideRight
+                    }
+
+                    Text {
+                      textFormat: Text.PlainText
+                      visible: root.previewTransaction !== ""
+                      width: parent.width
+                      text: root.previewSeconds + " seconds to decide"
+                      color: root.dim
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      elide: Text.ElideRight
+                    }
+                  }
+
+                  Button {
+                    id: compactDiscardDraft
+                    text: root.previewTransaction !== "" ? "Revert" : "Discard"
+                    bordered: true
+                    enabled: root.previewTransaction !== ""
+                      ? !root.previewPending
+                      : (!root.editorLoading && !root.editPending)
+                    foreground: root.foreground
+                    fontFamily: root.fontFamily
+                    fontSize: Style.font.caption
+                    horizontalPadding: Style.space(8)
+                    verticalPadding: Style.space(4)
+                    onClicked: {
+                      if (root.previewTransaction !== "") root.revertPreview()
+                      else root.requestEditorState()
+                    }
+                  }
+
+                  Button {
+                    id: compactApplyDraft
+                    text: root.previewTransaction !== ""
+                      ? "Keep"
+                      : (root.sourceProfile !== "" ? "Preview" : "Finish in editor")
+                    selected: true
+                    bordered: true
+                    enabled: !root.editPending && !root.previewPending
+                      && root.managedChecked
+                    foreground: root.foreground
+                    fontFamily: root.fontFamily
+                    fontSize: Style.font.caption
+                    horizontalPadding: Style.space(8)
+                    verticalPadding: Style.space(4)
+                    onClicked: {
+                      if (root.previewTransaction !== "") root.keepPreview()
+                      else if (root.sourceProfile !== "") root.previewDraft()
+                      else root.expanded = true
+                    }
+                  }
+                }
+              }
+
+              PanelSeparator { visible: root.brightnessConnector !== "" || root.textSizeAvailable; foreground: root.foreground }
+
+              BrightnessControl {
+                visible: root.brightnessConnector !== ""
+                width: parent.width
+                bar: root.bar
+                connector: root.brightnessConnector
+                displayLabel: root.brightnessDisplayLabel
+                value: root.brightnessPercent
+                available: root.brightnessAvailable
+                loading: root.brightnessLoading
+                foreground: root.foreground
+                dim: root.dim
+                accent: Color.accent
+                fontFamily: root.fontFamily
+                onPreviewed: function(value) { root.previewBrightness(value) }
+                onCommitted: function(value) {
+                  brightnessSetDebounce.stop()
+                  root.setBrightness(value)
+                }
+              }
+
+              PanelSeparator { visible: root.textSizeAvailable && root.brightnessConnector !== ""; foreground: root.foreground }
+
+              TextSizeControl {
+                id: compactTextSize
+                visible: root.textSizeAvailable
+                width: parent.width
+                bar: root.bar
+                previewIndex: root.textSizePreviewIndex
+                hasCursor: root.cursorActive && root.cursorIndex === -1
+                foreground: root.foreground
+                dim: root.dim
+                accent: Color.accent
+                fontFamily: root.fontFamily
+                onCommitted: function(pixels) { root.setTextSize(pixels) }
+                onHoveredRow: if (!root.reflowingText) {
+                  root.cursorActive = true
+                  root.cursorIndex = -1
+                }
+              }
+
+              PanelSeparator { foreground: root.foreground }
+
+              Column {
+                width: parent.width
+                spacing: Style.space(6)
+
+                PanelSectionHeader {
+                  text: "MONITOR MANAGEMENT"
+                  foreground: root.foreground
+                  fontFamily: root.fontFamily
+                }
+
+                Toggle {
+                  id: compactManagedToggle
+                  width: parent.width
+                  label: "Managed by hyprmoncfg"
+                  description: {
+                    if (root.serviceActionPending)
+                      return root.serviceTargetManaged ? "Taking control of display configuration…" : "Handing display control back…"
+                    if (root.serviceBroken) return "The background service could not start"
+                    if (root.managedChecked && root.profileAutomatic)
+                      return "Switch layouts on monitor, lid, and resume events"
+                    if (root.managedChecked) return "Owns and applies monitor configuration"
+                    return "Read-only: display configuration is controlled elsewhere"
+                  }
+                  checked: root.managedChecked
+                  enabled: !root.serviceActionPending
+                  hasCursor: root.cursorActive && root.cursorIndex === 0
+                  foreground: root.foreground
+                  fontFamily: root.fontFamily
+                  onClicked: root.setManaged(!root.managedChecked)
+                }
+              }
+
+              Repeater {
+                id: compactActionRows
+                model: root.actionRows
+
+                ActionRow {
+                  required property var modelData
+                  required property int index
+                  width: parent.width
+                  rowIndex: 1 + index
+                  icon: String(modelData.icon)
+                  title: String(modelData.title)
+                  subtitle: String(modelData.subtitle)
+                  onActivated: root.activateRow(String(modelData.id))
+                }
+              }
+            }
           }
         }
 
         Column {
+          id: compactFooter
           visible: root.compatible
-          width: parent.width
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
           spacing: Style.space(14)
-
-          PanelSeparator { foreground: root.foreground }
-
-          EditorPane {
-            width: parent.width
-            // Fit the arrangement's aspect within the compact clamps.
-            height: Model.compactStageHeight(root.layoutBounds, width, root.sizingUnit, root.layoutOffRow)
-            title: ""
-            meta: ""
-            active: true
-            foreground: root.foreground
-            dim: root.dim
-            accent: Color.accent
-            fontFamily: root.fontFamily
-            opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
-
-            DisplayCanvas {
-              id: compactCanvas
-              anchors.fill: parent
-              profile: root.draftProfile
-              editorDisplays: root.editorDocument.displays
-              notes: root.displayNotes
-              workspacePlan: root.workspacePlan
-              emphasis: "layout"
-              selectedKey: root.selectedOutputKey
-              interactive: false
-              selectable: root.editorReady
-              movable: root.managedChecked && root.editorReady && !root.editPending && root.previewTransaction === ""
-              detailed: true
-              framed: true
-              foreground: root.foreground
-              dim: root.dim
-              accent: Color.accent
-              fontFamily: root.fontFamily
-              onOutputSelected: function(key) { root.selectedOutputKey = key }
-              onOutputMoved: function(key, x, y, snapDistance) {
-                root.editOutput({ x: x, y: y, snap_distance: snapDistance }, key)
-              }
-            }
-          }
-
-          BorderSurface {
-            visible: root.draftDirty || root.previewTransaction !== ""
-            width: parent.width
-            implicitHeight: compactDraftActions.implicitHeight + Style.space(16)
-            color: Style.selectedFillFor(root.foreground, Color.accent)
-            borderSpec: Border.controlSpec("selected", root.foreground, Color.accent)
-            radius: Style.cornerRadius
-            opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
-
-            Row {
-              id: compactDraftActions
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              anchors.leftMargin: Style.space(10)
-              anchors.rightMargin: Style.space(10)
-              spacing: Style.space(7)
-
-              Column {
-                width: parent.width - compactDiscardDraft.width - compactApplyDraft.width - parent.spacing * 2
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Style.space(1)
-
-                Text {
-                  textFormat: Text.PlainText
-                  width: parent.width
-                  text: root.previewTransaction !== ""
-                    ? (root.previewKind === "profile" ? "Keep this profile?" : "Keep this layout?")
-                    : (root.editPending ? "Checking layout…" : "Layout changed")
-                  color: root.foreground
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.bodySmall
-                  font.bold: true
-                  elide: Text.ElideRight
-                }
-
-                Text {
-                  textFormat: Text.PlainText
-                  visible: root.previewTransaction !== ""
-                  width: parent.width
-                  text: root.previewSeconds + " seconds to decide"
-                  color: root.dim
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.caption
-                  elide: Text.ElideRight
-                }
-              }
-
-              Button {
-                id: compactDiscardDraft
-                text: root.previewTransaction !== "" ? "Revert" : "Discard"
-                bordered: true
-                enabled: root.previewTransaction !== ""
-                  ? !root.previewPending
-                  : (!root.editorLoading && !root.editPending)
-                foreground: root.foreground
-                fontFamily: root.fontFamily
-                fontSize: Style.font.caption
-                horizontalPadding: Style.space(8)
-                verticalPadding: Style.space(4)
-                onClicked: {
-                  if (root.previewTransaction !== "") root.revertPreview()
-                  else root.requestEditorState()
-                }
-              }
-
-              Button {
-                id: compactApplyDraft
-                text: root.previewTransaction !== ""
-                  ? "Keep"
-                  : (root.sourceProfile !== "" ? "Preview" : "Finish in editor")
-                selected: true
-                bordered: true
-                enabled: !root.editPending && !root.previewPending
-                  && root.managedChecked
-                foreground: root.foreground
-                fontFamily: root.fontFamily
-                fontSize: Style.font.caption
-                horizontalPadding: Style.space(8)
-                verticalPadding: Style.space(4)
-                onClicked: {
-                  if (root.previewTransaction !== "") root.keepPreview()
-                  else if (root.sourceProfile !== "") root.previewDraft()
-                  else root.expanded = true
-                }
-              }
-            }
-          }
-
-          PanelSeparator { visible: root.brightnessConnector !== ""; foreground: root.foreground }
-
-          BrightnessControl {
-            visible: root.brightnessConnector !== ""
-            width: parent.width
-            bar: root.bar
-            connector: root.brightnessConnector
-            displayLabel: root.brightnessDisplayLabel
-            value: root.brightnessPercent
-            available: root.brightnessAvailable
-            loading: root.brightnessLoading
-            foreground: root.foreground
-            dim: root.dim
-            accent: Color.accent
-            fontFamily: root.fontFamily
-            onPreviewed: function(value) { root.previewBrightness(value) }
-            onCommitted: function(value) {
-              brightnessSetDebounce.stop()
-              root.setBrightness(value)
-            }
-          }
-
-          PanelSeparator { foreground: root.foreground }
-
-          Column {
-            width: parent.width
-            spacing: Style.space(6)
-
-            PanelSectionHeader {
-              text: "MONITOR MANAGEMENT"
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-            }
-
-            Toggle {
-              width: parent.width
-              label: "Managed by hyprmoncfg"
-              description: {
-                if (root.serviceActionPending)
-                  return root.serviceTargetManaged ? "Taking control of display configuration…" : "Handing display control back…"
-                if (root.serviceBroken) return "The background service could not start"
-                if (root.managedChecked && root.profileAutomatic)
-                  return "Switch layouts on monitor, lid, and resume events"
-                if (root.managedChecked) return "Owns and applies monitor configuration"
-                return "Read-only: display configuration is controlled elsewhere"
-              }
-              checked: root.managedChecked
-              enabled: !root.serviceActionPending
-              hasCursor: root.cursorActive && root.cursorIndex === 0
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-              onClicked: root.setManaged(!root.managedChecked)
-            }
-          }
-
-          Repeater {
-            model: root.actionRows
-
-            ActionRow {
-              required property var modelData
-              required property int index
-              width: parent.width
-              rowIndex: 1 + index
-              icon: String(modelData.icon)
-              title: String(modelData.title)
-              subtitle: String(modelData.subtitle)
-              onActivated: root.activateRow(String(modelData.id))
-            }
-          }
 
           PanelSeparator { foreground: root.foreground }
 
@@ -2637,6 +2805,9 @@ Panel {
               DisplayCanvas {
                 id: layoutCanvas
                 anchors.fill: parent
+                chipTravelEnabled: root.opened
+                reducedMotion: root.reducedMotion
+                resizing: root.panelResizing
                 focusOutline: root.keyboardLayoutPane === "canvas"
                 profile: root.draftProfile
                 editorDisplays: root.editorDocument.displays
@@ -3981,6 +4152,9 @@ Panel {
                   notes: root.displayNotes
                   workspacePlan: root.workspacesOff ? [] : root.workspacePlan
                   emphasis: "workspaces"
+                  chipTravelEnabled: root.opened
+                  reducedMotion: root.reducedMotion
+                  resizing: root.panelResizing
                   selectedKey: root.selectedWorkspaceDisplayKey
                   interactive: false
                   detailed: true
@@ -4584,6 +4758,7 @@ Panel {
       cursorShape: actionRow.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
       enabled: actionRow.enabled
       onEntered: {
+        if (root.reflowingText) return
         root.cursorActive = true
         root.cursorIndex = actionRow.rowIndex
       }

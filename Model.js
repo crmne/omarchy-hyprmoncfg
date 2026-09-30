@@ -1509,6 +1509,121 @@ function stepScaleOption(options, current, delta) {
   return String(items[0].value)
 }
 
+// ---------------------------------------------------------------------------
+// Text size: Omarchy's desktop-wide setting (shell base font, GTK text scaling
+// and terminal font), shown with the same stops as Omarchy's Display panel.
+// It is live desktop state like brightness: never part of a profile.
+var textSizeStops = [9, 10, 11, 12, 14, 16, 20]
+
+function nearestTextStop(px) {
+  var best = 0, bestDistance = Infinity
+  for (var i = 0; i < textSizeStops.length; i++) {
+    var distance = Math.abs(textSizeStops[i] - Number(px))
+    if (distance < bestDistance) { bestDistance = distance; best = i }
+  }
+  return best
+}
+
+// Stop index the slider shows: the pending choice while a change is in
+// flight (previewIndex >= 0), otherwise the live base size's nearest stop.
+function textStopIndex(previewIndex, baseSize) {
+  return previewIndex >= 0 ? Math.min(previewIndex, textSizeStops.length - 1) : nearestTextStop(baseSize)
+}
+
+// Pixels shown in the header: the pending stop, else the true base size
+// (which may sit between stops when set from the command line).
+function textSizeLabel(previewIndex, baseSize) {
+  return (previewIndex >= 0 ? textSizeStops[Math.min(previewIndex, textSizeStops.length - 1)] : Number(baseSize)) + "px"
+}
+
+function steppedTextIndex(index, delta) {
+  return Math.max(0, Math.min(textSizeStops.length - 1, Number(index) + Number(delta || 0)))
+}
+
+// The pending choice is dropped once the live base size lands on it.
+function textPreviewSettled(previewIndex, baseSize) {
+  return previewIndex >= 0 && nearestTextStop(baseSize) === previewIndex
+}
+
+// Hyprland's animations:enabled (hyprctl -j getoption) is the desktop's motion
+// preference; Omarchy's shell has no reduced-motion setting of its own.
+// Hyprland reports it as {"bool": false}; older builds used {"int": 0}.
+// Anything unreadable means "not reduced".
+function motionReduced(getoptionJson) {
+  try {
+    var value = JSON.parse(String(getoptionJson || "{}"))
+    if (typeof value.bool === "boolean") return value.bool === false
+    return value.int !== undefined && Number(value.int) === 0
+  } catch (e) {
+    return false
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Workspace chip travel. When a plan change moves a workspace to another
+// display, its chip glides from the old card to the new one. `before` and
+// `after` map workspace ID to the chip's rectangle and owning display:
+//   { "4": { x, y, width, height, owner: "<output key>" }, ... }
+// Only chips present on both sides whose owner changed travel; chips that stay
+// with their display, appear or disappear do not move. More than `limit`
+// movers, or any disabling condition, returns no moves (the change is instant).
+var chipTravel = { limit: 12, duration: 240, stagger: 28 }
+
+function workspaceOwners(plan) {
+  var owners = {}
+  var rows = plan instanceof Array ? plan : []
+  for (var i = 0; i < rows.length; i++) {
+    var ids = (rows[i] || {}).workspaces instanceof Array ? rows[i].workspaces : []
+    for (var j = 0; j < ids.length; j++) owners[String(ids[j])] = String(rows[i].output_key || "")
+  }
+  return owners
+}
+
+function chipMoves(before, after, options) {
+  var o = options || {}
+  if (o.enabled === false || o.dragging === true || o.resizing === true || o.reducedMotion === true) return []
+  var limit = o.limit === undefined ? chipTravel.limit : Number(o.limit)
+  var a = before || {}, b = after || {}
+  var ids = Object.keys(b).filter(function(id) {
+    return a[id] && String(a[id].owner) !== String(b[id].owner)
+  })
+  if (ids.length === 0 || ids.length > limit) return []
+  ids.sort(function(x, y) {
+    var nx = Number(x), ny = Number(y)
+    return isFinite(nx) && isFinite(ny) ? nx - ny : (x < y ? -1 : x > y ? 1 : 0)
+  })
+  return ids.map(function(id, index) {
+    return {
+      id: id,
+      fromX: Number(a[id].x), fromY: Number(a[id].y),
+      toX: Number(b[id].x), toY: Number(b[id].y),
+      width: Number(b[id].width), height: Number(b[id].height),
+      delay: index * chipTravel.stagger
+    }
+  })
+}
+
+// Compact view: header, body and footer stacked with one gap between them. The
+// card is as tall as its content up to the available screen height; past that
+// only the body shrinks and scrolls, so the header and the footer (current
+// setup and its actions) always stay visible.
+function compactPanelLayout(input) {
+  var i = input || {}
+  var header = Math.max(0, Number(i.headerHeight) || 0)
+  var body = Math.max(0, Number(i.bodyHeight) || 0)
+  var footer = Math.max(0, Number(i.footerHeight) || 0)
+  var gap = Math.max(0, Number(i.gap) || 0)
+  var available = Number(i.availableHeight) > 0 ? Number(i.availableHeight) : Infinity
+  var fixed = header + gap + (footer > 0 ? gap + footer : 0)
+  var natural = fixed + body
+  var height = Math.min(natural, available)
+  return {
+    height: Math.round(height),
+    bodyHeight: Math.max(0, Math.round(height - fixed)),
+    scrolls: natural > available
+  }
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     layoutInspectorSpan: layoutInspectorSpan,
@@ -1613,6 +1728,17 @@ if (typeof module !== "undefined") {
     compactStageHeight: compactStageHeight,
     visibleRowsHeight: visibleRowsHeight,
     expandedPanelLayout: expandedPanelLayout,
-    panelResizeAllowed: panelResizeAllowed
+    panelResizeAllowed: panelResizeAllowed,
+    textSizeStops: textSizeStops,
+    nearestTextStop: nearestTextStop,
+    textStopIndex: textStopIndex,
+    textSizeLabel: textSizeLabel,
+    steppedTextIndex: steppedTextIndex,
+    textPreviewSettled: textPreviewSettled,
+    motionReduced: motionReduced,
+    chipTravel: chipTravel,
+    workspaceOwners: workspaceOwners,
+    chipMoves: chipMoves,
+    compactPanelLayout: compactPanelLayout
   }
 }

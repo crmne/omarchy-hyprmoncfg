@@ -1006,7 +1006,7 @@ test("the panel has management-first compact mode and a TUI-shaped expanded mode
   assert.match(qml, /property bool expanded: false/)
   // Compact keeps its 430 width; expanded is content-sized by Model.expandedPanelLayout.
   assert.match(qml, /panel\.fittedContentWidth\(root\.appliedPanelWidth \+ root\.panelHorizontalInset\)\s+: panel\.fittedContentWidth\(Style\.space\(430\)\)/)
-  assert.match(qml, /\? panel\.fittedContentHeight\(root\.appliedPanelHeight\)\s+: panel\.fittedContentHeight\(compactColumn\.implicitHeight\)/)
+  assert.match(qml, /\? panel\.fittedContentHeight\(root\.appliedPanelHeight\)\s+: panel\.fittedContentHeight\(root\.compactLayout\.height\)/)
   assert.match(qml, /readonly property var panelLayout: Model\.expandedPanelLayout\(\{/)
   assert.doesNotMatch(qml, /Style\.space\(780\)/)
   assert.doesNotMatch(qml, /Style\.space\(root\.expanded \? 1120 : 430\)/)

@@ -196,3 +196,46 @@ test("the Layout stage width does not depend on measured heights", () => {
   const width = pane.split("\n").find(line => line.trim().startsWith("width:"))
   assert.doesNotMatch(width, /panelLayout/, "binding the pane width to panelLayout forms a width/height loop")
 })
+
+test("a clamped compact card keeps its header and footer and scrolls only the body", () => {
+  const fits = Model.compactPanelLayout({ headerHeight: 40, bodyHeight: 380, footerHeight: 100, gap: 14, availableHeight: 700 })
+  assert.deepEqual(fits, { height: 40 + 14 + 380 + 14 + 100, bodyHeight: 380, scrolls: false })
+
+  // 20px text on a 1366x768 screen: the content is far taller than the screen.
+  const clamped = Model.compactPanelLayout({ headerHeight: 66, bodyHeight: 800, footerHeight: 180, gap: 23, availableHeight: 676 })
+  assert.equal(clamped.height, 676, "the card stops at the available height")
+  assert.equal(clamped.bodyHeight, 676 - 66 - 23 - 23 - 180, "only the body gives way")
+  assert.equal(clamped.scrolls, true)
+
+  const exact = Model.compactPanelLayout({ headerHeight: 40, bodyHeight: 300, footerHeight: 60, gap: 10, availableHeight: 420 })
+  assert.deepEqual(exact, { height: 420, bodyHeight: 300, scrolls: false }, "an exact fit does not scroll")
+
+  const noFooter = Model.compactPanelLayout({ headerHeight: 40, bodyHeight: 120, footerHeight: 0, gap: 14, availableHeight: 700 })
+  assert.deepEqual(noFooter, { height: 174, bodyHeight: 120, scrolls: false }, "install state: no footer, no second gap")
+
+  const tiny = Model.compactPanelLayout({ headerHeight: 66, bodyHeight: 800, footerHeight: 180, gap: 23, availableHeight: 200 })
+  assert.equal(tiny.bodyHeight, 0, "the body never goes negative")
+  assert.equal(Model.compactPanelLayout({ headerHeight: 40, bodyHeight: 300, footerHeight: 60, gap: 10 }).scrolls, false,
+    "unknown screen height means content-sized")
+})
+
+test("the compact view binds its height and scrolling to the Model", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  assert.match(qml, /readonly property var compactLayout: Model\.compactPanelLayout\(\{/)
+  assert.match(qml, /: panel\.fittedContentHeight\(root\.compactLayout\.height\)/)
+  assert.match(qml, /InspectorViewport \{\s+id: compactBody/)
+  assert.match(qml, /height: root\.compactLayout\.bodyHeight/)
+  assert.match(qml, /formHeight: compactBodyColumn\.implicitHeight/)
+  // Header above, footer below, both outside the scrolling body.
+  const body = qml.slice(qml.indexOf("id: compactBody"), qml.indexOf("id: compactFooter"))
+  assert.doesNotMatch(body, /text: "PROFILE"|id: compactExpandButton/)
+  assert.match(body, /TextSizeControl \{|BrightnessControl \{/)
+  const footer = qml.slice(qml.indexOf("id: compactFooter"), qml.indexOf("id: expandedEditor"))
+  assert.match(footer, /anchors\.bottom: parent\.bottom/)
+  assert.match(footer, /text: "PROFILE"/)
+  assert.match(footer, /text: "Create profile"/)
+  assert.match(footer, /"Resume automatic matching"/)
+  // The keyboard cursor's row and a newly shown Keep/Revert bar are revealed.
+  assert.match(qml, /currentField: !root\.cursorActive \? null\s+: \(root\.cursorIndex === -1 \? compactTextSize\s+: \(root\.cursorIndex === 0 \? compactManagedToggle\s+: compactActionRows\.itemAt\(root\.cursorIndex - 1\)\)\)/)
+  assert.match(qml, /onVisibleChanged: if \(visible\) Qt\.callLater\(function\(\) \{ compactBody\.reveal\(compactDraftBar\) \}\)/)
+})
