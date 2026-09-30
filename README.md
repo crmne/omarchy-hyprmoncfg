@@ -2,6 +2,10 @@
 
 An Omarchy bar panel for [hyprmoncfg](https://hyprmoncfg.dev/). Create multi-monitor layouts for Hyprland in a visual editor and switch them automatically on hotplug and lid events.
 
+https://github.com/user-attachments/assets/d3da78df-2280-481b-b38d-a48bb28dc2e6
+
+The film animates a rebuild of the panel that is checked against real captures, with sample displays. [Download it in full quality](https://github.com/crmne/omarchy-hyprmoncfg/releases/download/v2.7.0/hyprmoncfg-panel-film.mp4).
+
 ![hyprmoncfg for Omarchy](preview.png)
 
 Version 2.7 adds Omarchy's Text size slider to the compact view and lets workspace numbers glide between displays when their plan changes. The panel draws your displays as screens on a stage, sizes itself to what it shows, and gives every setting a control that fits it. The companion TUI shares the same design, placement rules and display terminology, with native keyboard-first controls. See the [release notes](design/releases/2.7.0.md) for highlights.
