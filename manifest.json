@@ -19,7 +19,19 @@
     "description": "Multi-monitor layouts that switch themselves on hotplug and lid events.",
     "category": "System",
     "allowMultiple": false,
-    "defaultSection": "right"
+    "defaultSection": "right",
+    "schema": [
+      {
+        "key": "showBarIcon",
+        "type": "boolean",
+        "label": "Show bar icon",
+        "description": "Hide the icon when opening layouts from a customized Display menu. The panel and preview service remain available.",
+        "defaultValue": true
+      }
+    ],
+    "defaults": {
+      "showBarIcon": true
+    }
   },
   "hyprmoncfg": {
     "package": "hyprmoncfg",

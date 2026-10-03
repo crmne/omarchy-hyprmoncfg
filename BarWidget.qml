@@ -40,8 +40,11 @@ BarWidget {
     if (panelLoader.item) panelLoader.item.closeForPopoutSwitch()
   }
 
-  implicitWidth: button.implicitWidth
-  implicitHeight: button.implicitHeight
+  // Keep the widget root visible so its separate panel window can still map.
+  // Only collapse the icon slot; IPC routing and the preview service stay live.
+  readonly property bool showBarIcon: root.setting("showBarIcon", true) !== false
+  implicitWidth: root.showBarIcon ? button.implicitWidth : 0
+  implicitHeight: root.showBarIcon ? button.implicitHeight : 0
 
   onBarChanged: injectPanel()
   onSettingsChanged: injectPanel()
@@ -58,6 +61,7 @@ BarWidget {
 
   BarIconButton {
     id: button
+    opacity: root.showBarIcon ? 1 : 0
     anchors.fill: parent
     bar: root.bar
     text: root.monitorCount > 1 ? "󰍺" : "󰍹"
