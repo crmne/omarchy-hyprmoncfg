@@ -182,3 +182,56 @@ test("form grid columns land on whole pixels inside the inspector's clip edge", 
   const pills = fs.readFileSync(path.join(__dirname, "..", "ScaleField.qml"), "utf8")
   assert.match(pills, /Math\.floor\(\(width - moreWidth - spacing \* count\) \/ count\)/, "pill cells are whole pixels")
 })
+
+test("rotation offers Auto as a fifth choice and it round-trips", () => {
+  const auto = { transform: 3, rotation_auto: true }
+  assert.equal(Model.rotationIsAuto(auto), true)
+  assert.equal(Model.rotationIsAuto({ transform: 3 }), false)
+  assert.equal(Model.rotationFieldValue(auto), "auto", "auto shows as its own choice")
+  assert.equal(Model.rotationFieldValue({ transform: 3 }), "3")
+
+  // Auto rides with the four angles, and whichever is current stays visible.
+  const values = Model.rotationFieldOptions("auto").map(o => o.value)
+  assert.deepEqual(values, ["0", "1", "2", "3", "auto"])
+  assert.deepEqual(Model.rotationFieldOptions("2").map(o => o.value), ["0", "1", "2", "3", "auto"])
+
+  assert.deepEqual(Model.rotationFieldEdit(auto, "auto"), { rotation_auto: true })
+  // transform 7 is flipped+270, so picking 90 keeps the flip and clears auto.
+  assert.deepEqual(Model.rotationFieldEdit({ transform: 7, rotation_auto: true }, "1"),
+    { transform: 5, rotation_auto: false },
+    "picking an angle keeps the flip and clears auto")
+  assert.deepEqual(Model.rotationFieldEdit({ transform: 3 }, "1"), { transform: 1 },
+    "an ordinary rotation edit does not name auto at all")
+  assert.deepEqual(Model.rotationFieldEdit(auto, "nonsense"), null)
+  assert.deepEqual(Model.rotationFlipEdit(auto, true), { transform: 7, rotation_auto: false })
+  assert.deepEqual(Model.rotationFlipEdit({ transform: 3 }, true), { transform: 7 })
+})
+
+test("resetting rotation restores a saved Auto setting", () => {
+  const defaults = { outputs: [{ key: "desk", transform: 1, rotation_auto: true }] }
+  assert.deepEqual(Model.outputFieldResetEdit(defaults, "desk", "transform"),
+    { transform: 1, rotation_auto: true })
+  assert.deepEqual(Model.outputFieldResetEdit({ outputs: [{ key: "desk" }] }, "desk", "transform"),
+    { transform: 0, rotation_auto: false })
+
+  // Leaving rotation to the sensor is a change even when the retained angle
+  // still matches the saved one, so the reset must stay discoverable.
+  const draft = { outputs: [{ key: "desk", transform: 1, rotation_auto: true }] }
+  const saved = { outputs: [{ key: "desk", transform: 1 }] }
+  assert.equal(Model.outputFieldChanged(draft, saved, "desk", "transform"), true)
+  assert.equal(Model.outputFieldChanged(saved, draft, "desk", "transform"), true)
+  assert.equal(Model.outputFieldChanged(draft, draft, "desk", "transform"), false)
+})
+
+test("Auto is only offered when the daemon advertises it", () => {
+  // An older daemon drops the rotation_auto edit, so the choice is withheld
+  // rather than offered and silently ignored.
+  assert.deepEqual(Model.rotationFieldOptions("2", true).map(o => o.value), ["0", "1", "2", "3", "auto"])
+  assert.deepEqual(Model.rotationFieldOptions("2", false).map(o => o.value), ["0", "1", "2", "3"])
+  assert.deepEqual(Model.rotationFieldOptions("2").map(o => o.value), ["0", "1", "2", "3", "auto"],
+    "an older caller keeps the previous behaviour")
+
+  const panel = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  assert.match(panel, /rotation_auto_supported === true/)
+  assert.match(panel, /root\.rotationAutoSupported/)
+})

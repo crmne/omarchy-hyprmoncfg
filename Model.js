@@ -609,6 +609,10 @@ var outputFieldDefaults = {
 function outputFieldValue(profile, key, field) {
   var edit = outputFieldResetEdit(profile, key, field)
   if (!edit) return undefined
+  // Rotation and its Auto setting are one field to the user, so a layout that
+  // leaves rotation to the sensor reads as changed even when the retained
+  // angle still matches.
+  if (field === "transform") return edit.rotation_auto ? rotationAutoValue : String(edit.transform)
   var value = edit[field]
   if (field === "cm") return value || "srgb"
   if (field === "sdr_eotf") return value || "default"
@@ -635,6 +639,10 @@ function outputFieldResetEdit(defaults, key, field) {
   if (field === "bitdepth" && value === 0) value = 8
   var edit = {}
   edit[field] = value
+  // Rotation is one field to the user, so resetting it restores the saved Auto
+  // setting too. Without this a profile that leaves rotation to the sensor
+  // could never be reset back to that, since the retained angle still matches.
+  if (field === "transform") edit.rotation_auto = output.rotation_auto === true
   return edit
 }
 
@@ -1452,6 +1460,54 @@ function transformWith(transform, rotation, flipped) {
   return r + (f ? 4 : 0)
 }
 
+// Rotation can be left to an authority outside the layout: on a 2-in-1 an
+// orientation sensor sets the transform, and the saved profile should not hold
+// one. hyprmoncfg stores that as rotation_auto beside transform, which keeps
+// the last captured angle, because a generated Hyprland rule always states a
+// transform and leaving it out would pin the panel to normal on every reload.
+var rotationAutoValue = "auto"
+
+// Auto is not a transform, so it is not one of the four angles: it says the
+// rotation is not ours. It rides along in the same closed set so the field
+// stays a single choice.
+function rotationIsAuto(output) {
+  return !!output && output.rotation_auto === true
+}
+
+function rotationFieldOptions(current, autoSupported) {
+  var options = autoSupported === false ? rotationOptions.slice() : rotationOptions.concat([{ value: rotationAutoValue, label: "Auto" }])
+  return optionsWithCurrent(options, current)
+}
+
+function rotationFieldValue(output) {
+  if (rotationIsAuto(output)) return rotationAutoValue
+  return String(transformRotation(output ? Number(output.transform || 0) : 0))
+}
+
+// Choosing Auto or an angle is one choice, so each clears the other. The stored
+// transform is retained either way, both as the fallback Auto keeps and so an
+// unknown transform is never silently rewritten into a rotation. Auto is only
+// named when it has to change, so an ordinary rotation edit stays the single
+// field it has always been.
+function rotationFieldEdit(output, value) {
+  if (String(value) === rotationAutoValue) return { rotation_auto: true }
+  var angle = Number(value)
+  if (!(angle >= 0 && angle <= 3)) return null
+  var stored = output ? Number(output.transform) : 0
+  var edit = { transform: transformKnown(stored) ? transformWith(stored, angle, null) : angle }
+  if (rotationIsAuto(output)) edit.rotation_auto = false
+  return edit
+}
+
+// Flipped is part of the one Hyprland transform, so flipping is an explicit
+// rotation choice and turns Auto off with the angles.
+function rotationFlipEdit(output, flipped) {
+  var stored = output ? Number(output.transform) : 0
+  var edit = { transform: transformKnown(stored) ? transformWith(stored, null, flipped === true) : (flipped === true ? 4 : 0) }
+  if (rotationIsAuto(output)) edit.rotation_auto = false
+  return edit
+}
+
 // Directions for "Place beside nearest", identical to Alt+arrow snapping.
 var placementOptions = [
   { value: "left", label: "Left" },
@@ -1680,6 +1736,12 @@ if (typeof module !== "undefined") {
     nearestSnapAnchor: nearestSnapAnchor,
     snapAnchorName: snapAnchorName,
     rotationOptions: rotationOptions,
+    rotationAutoValue: rotationAutoValue,
+    rotationIsAuto: rotationIsAuto,
+    rotationFieldOptions: rotationFieldOptions,
+    rotationFieldValue: rotationFieldValue,
+    rotationFieldEdit: rotationFieldEdit,
+    rotationFlipEdit: rotationFlipEdit,
     transformKnown: transformKnown,
     transformRotation: transformRotation,
     transformFlipped: transformFlipped,

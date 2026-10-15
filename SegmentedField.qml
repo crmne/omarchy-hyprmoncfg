@@ -29,6 +29,7 @@ Column {
   property string resetTooltip: "Reset to loaded profile value"
   // Optional trailing on/off chip in the same row (Rotation's Flipped).
   property string toggleLabel: ""
+  property bool toggleEnabled: true
   property bool toggleChecked: false
   property bool toggleHasCursor: false
   property color foreground: Color.popups.text
@@ -117,7 +118,7 @@ Column {
         hasCursor: root.toggleHasCursor
         bordered: true
         focusable: true
-        enabled: root.enabled
+        enabled: root.enabled && root.toggleEnabled
         foreground: root.foreground
         accent: root.accent
         fontFamily: root.fontFamily

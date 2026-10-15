@@ -160,7 +160,15 @@ in the keyboard field order, and Hyprland's terminology.
   PLACE BESIDE names the display it snaps to.
 - Rotation is Normal, 90°, 180° and 270° with a separate Flipped toggle. Both edit
   the one Hyprland transform and preserve each other; an unknown transform is
-  shown and left alone; the ROTATION header shows the raw transform.
+  shown and left alone; the ROTATION header shows the raw transform. Rotation
+  also offers Auto, for a panel whose orientation something outside the layout
+  sets, such as a 2-in-1 following an orientation sensor. Auto is not a fifth
+  angle: choosing it says the rotation is not ours, so Flipped is disabled while
+  it is on, and choosing an angle or Flipped turns it off. The retained angle is
+  kept behind Auto, both as the fallback it returns to and so an unknown
+  transform is never rewritten into a rotation. Resetting rotation restores the
+  saved Auto setting as well as the angle, and leaving rotation to the sensor
+  reads as changed even when the retained angle still matches.
 - Kept as they were: Enabled (toggle), Mode, Mirror and colour space
   (dropdowns: long or open lists), SDR and display luminance values (exact
   decimal entry with units; the underlying multipliers and nits are not bounded

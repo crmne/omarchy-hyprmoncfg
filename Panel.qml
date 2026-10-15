@@ -294,6 +294,10 @@ Panel {
       ? !root.daemonUnmanaged
       : (serviceEnabled || serviceActive || backendConnected))
   readonly property string runningVersion: Model.releaseVersion(root.document ? root.document.version : "")
+  // An older daemon drops the rotation_auto edit, so the choice is left out
+  // rather than offered and silently ignored.
+  readonly property bool rotationAutoSupported: !!root.editorDocument
+    && root.editorDocument.rotation_auto_supported === true
   readonly property string installedRelease: Model.releaseVersion(root.installedVersion)
   readonly property bool daemonOutdated: root.backendConnected
     && root.documentReady
@@ -896,10 +900,15 @@ Panel {
     else if (field === 5) edit.vrr = Number(root.pillStep(root.vrrOptions,
       String(output.vrr || 0), delta, wrap))
     else if (field === 6) {
+      // An auto rotation still retains an angle, so stepping picks an explicit
+      // one from there and turns Auto off, the same as clicking a chip.
       var transform = Number(output.transform || 0)
-      if (!Model.transformKnown(transform)) return
-      edit.transform = Model.transformWith(transform, Number(root.pillStep(Model.rotationOptions,
-        String(Model.transformRotation(transform)), delta, wrap)), null)
+      if (!Model.rotationIsAuto(output) && !Model.transformKnown(transform)) return
+      var rotationEdit = Model.rotationFieldEdit(output, Number(root.pillStep(Model.rotationOptions,
+        Model.rotationFieldValue(output), delta, wrap)))
+      if (!rotationEdit) return
+      edit.transform = rotationEdit.transform
+      if (rotationEdit.rotation_auto !== undefined) edit.rotation_auto = rotationEdit.rotation_auto
     }
     else if (field === 7) edit.x = Number(output.x || 0) + delta * 10
     else if (field === 8) edit.y = Number(output.y || 0) + delta * 10
@@ -3049,27 +3058,33 @@ Panel {
                     SegmentedField {
                       id: rotationField
                       readonly property int transformValue: root.selectedOutput ? Number(root.selectedOutput.transform || 0) : 0
+                      readonly property bool rotationAuto: Model.rotationIsAuto(root.selectedOutput)
                       width: parent.width
                       enabled: root.managedChecked && !!root.selectedOutput && !root.editPending
-                        && Model.transformKnown(transformValue)
+                        && (rotationAuto || Model.transformKnown(transformValue))
                       opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
                       label: "ROTATION"
                       detail: Model.transformKnown(transformValue) ? "" : "transform " + transformValue
-                      options: Model.rotationOptions
-                      value: String(Model.transformRotation(transformValue))
+                      options: Model.rotationFieldOptions(Model.rotationFieldValue(root.selectedOutput),
+                        root.rotationAutoSupported)
+                      value: Model.rotationFieldValue(root.selectedOutput)
                       hasCursor: root.inspectorHasCursor(6)
                       toggleLabel: "Flipped"
-                      toggleChecked: Model.transformFlipped(transformValue)
+                      // Flipped is part of the one transform, so it is not ours
+                      // to set while an external authority holds the rotation.
+                      toggleEnabled: !rotationAuto
+                      toggleChecked: !rotationAuto && Model.transformFlipped(transformValue)
                       toggleHasCursor: root.inspectorHasCursor(22)
                       foreground: root.foreground
                       fontFamily: root.fontFamily
                       resetVisible: root.outputFieldChanged("transform")
                       resetTooltip: root.outputFieldResetTooltip("rotation")
                       onChanged: function(value) {
-                        root.editOutput({ transform: Model.transformWith(transformValue, Number(value), null) })
+                        var edit = Model.rotationFieldEdit(root.selectedOutput, value)
+                        if (edit) root.editOutput(edit)
                       }
                       onToggled: function(checked) {
-                        root.editOutput({ transform: Model.transformWith(transformValue, null, checked) })
+                        root.editOutput(Model.rotationFlipEdit(root.selectedOutput, checked))
                       }
                       onResetRequested: root.resetOutputField("transform")
                     }
