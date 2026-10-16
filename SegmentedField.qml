@@ -27,7 +27,9 @@ Column {
   property int cursorIndex: -1
   property bool resetVisible: false
   property string resetTooltip: "Reset to loaded profile value"
-  // Optional trailing on/off chip in the same row (Rotation's Flipped).
+  // Optional leading on/off chip in the same row (Rotation's Flipped). It sits
+  // before the choices rather than after so that Flipped and the Auto chip that
+  // follows the choices do not split the angles.
   property string toggleLabel: ""
   property bool toggleEnabled: true
   property bool toggleChecked: false
@@ -97,20 +99,6 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       spacing: group.spacing
 
-      ButtonGroup {
-        id: group
-        options: root.options
-        value: root.actions ? "" : root.value
-        enabled: root.enabled
-        cursorIndex: !root.hasCursor ? -1
-          : (root.cursorIndex >= 0 ? root.cursorIndex : Math.max(0, root.selectedIndex()))
-        foreground: root.foreground
-        accent: root.accent
-        fontFamily: root.fontFamily
-        fontSize: root.fontSize
-        onChanged: function(value) { root.changed(value) }
-      }
-
       Button {
         visible: root.toggleLabel !== ""
         text: root.toggleLabel
@@ -124,6 +112,20 @@ Column {
         fontFamily: root.fontFamily
         fontSize: root.fontSize
         onClicked: root.toggled(!root.toggleChecked)
+      }
+
+      ButtonGroup {
+        id: group
+        options: root.options
+        value: root.actions ? "" : root.value
+        enabled: root.enabled
+        cursorIndex: !root.hasCursor ? -1
+          : (root.cursorIndex >= 0 ? root.cursorIndex : Math.max(0, root.selectedIndex()))
+        foreground: root.foreground
+        accent: root.accent
+        fontFamily: root.fontFamily
+        fontSize: root.fontSize
+        onChanged: function(value) { root.changed(value) }
       }
     }
 
