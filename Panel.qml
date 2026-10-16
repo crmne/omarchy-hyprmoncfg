@@ -3070,7 +3070,7 @@ Panel {
                       // the rotation is not this layout's to set.
                       value: rotationAuto ? "" : Model.rotationFieldValue(root.selectedOutput)
                       hasCursor: root.inspectorHasCursor(6) && !rotationAuto
-                      toggleLabel: "Flipped"
+                      toggleLabel: "Flip"
                       // Flipped is part of the one transform, so it is not ours
                       // to set while an external authority holds the rotation.
                       toggleEnabled: !rotationAuto

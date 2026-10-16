@@ -147,20 +147,22 @@ Column {
         fontSize: root.fontSize
         onClicked: root.tailClicked()
       }
-    }
 
-    PanelActionButton {
-      id: resetAction
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      visible: root.resetVisible
-      enabled: root.enabled
-      iconText: "󰑐"
-      tooltipText: root.resetTooltip
-      foreground: root.foreground
-      fontFamily: root.fontFamily
-      focusable: true
-      onClicked: root.resetRequested()
+      // Reset rides in the row rather than at the panel's right edge. Anchored
+      // right it overlapped the choices once a field grew wide enough to reach
+      // it, and the choice chips cannot shrink out of the way.
+      PanelActionButton {
+        id: resetAction
+        anchors.verticalCenter: controls.verticalCenter
+        visible: root.resetVisible
+        enabled: root.enabled
+        iconText: "󰑐"
+        tooltipText: root.resetTooltip
+        foreground: root.foreground
+        fontFamily: root.fontFamily
+        focusable: true
+        onClicked: root.resetRequested()
+      }
     }
   }
 }
