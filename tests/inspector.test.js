@@ -183,17 +183,16 @@ test("form grid columns land on whole pixels inside the inspector's clip edge", 
   assert.match(pills, /Math\.floor\(\(width - moreWidth - spacing \* count\) \/ count\)/, "pill cells are whole pixels")
 })
 
-test("rotation offers Auto as a fifth choice and it round-trips", () => {
+test("rotation offers Auto as a separate opt-out, and it round-trips", () => {
   const auto = { transform: 3, rotation_auto: true }
   assert.equal(Model.rotationIsAuto(auto), true)
   assert.equal(Model.rotationIsAuto({ transform: 3 }), false)
   assert.equal(Model.rotationFieldValue(auto), "auto", "auto shows as its own choice")
   assert.equal(Model.rotationFieldValue({ transform: 3 }), "3")
 
-  // Auto rides with the four angles, and whichever is current stays visible.
-  const values = Model.rotationFieldOptions("auto").map(o => o.value)
-  assert.deepEqual(values, ["0", "1", "2", "3", "auto"])
-  assert.deepEqual(Model.rotationFieldOptions("2").map(o => o.value), ["0", "1", "2", "3", "auto"])
+  // Auto is not one of the angles: it says this layout does not hold a rotation.
+  assert.deepEqual(Model.rotationOptions.map(o => o.value), ["0", "1", "2", "3"])
+  assert.deepEqual(Model.rotationFieldOptions("2").map(o => o.value), ["0", "1", "2", "3"])
 
   assert.deepEqual(Model.rotationFieldEdit(auto, "auto"), { rotation_auto: true })
   // transform 7 is flipped+270, so picking 90 keeps the flip and clears auto.
@@ -225,13 +224,18 @@ test("resetting rotation restores a saved Auto setting", () => {
 
 test("Auto is only offered when the daemon advertises it", () => {
   // An older daemon drops the rotation_auto edit, so the choice is withheld
-  // rather than offered and silently ignored.
-  assert.deepEqual(Model.rotationFieldOptions("2", true).map(o => o.value), ["0", "1", "2", "3", "auto"])
-  assert.deepEqual(Model.rotationFieldOptions("2", false).map(o => o.value), ["0", "1", "2", "3"])
-  assert.deepEqual(Model.rotationFieldOptions("2").map(o => o.value), ["0", "1", "2", "3", "auto"],
-    "an older caller keeps the previous behaviour")
-
+  // rather than offered and silently ignored. Auto is its own control after
+  // Flipped, not an extra angle.
   const panel = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
   assert.match(panel, /rotation_auto_supported === true/)
-  assert.match(panel, /root\.rotationAutoSupported/)
+  assert.match(panel, /tailLabel: root\.rotationAutoSupported \? "Auto" : ""/)
+  assert.match(panel, /tailSelected: rotationAuto/)
+  assert.match(panel, /onTailClicked: function\(\) \{\s*root\.editOutput\(\{ rotation_auto: true \}\)/)
+
+  const field = fs.readFileSync(path.join(__dirname, "..", "SegmentedField.qml"), "utf8")
+  // Order in the row: the choices, then Flipped, then the opt-out chip.
+  const group = field.indexOf("id: group")
+  const toggle = field.indexOf("onClicked: root.toggled")
+  const tail = field.indexOf("onClicked: root.tailClicked")
+  assert.ok(group < toggle && toggle < tail, "Auto should follow Flipped, which follows the angles")
 })

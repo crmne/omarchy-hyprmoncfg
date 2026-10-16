@@ -3065,16 +3065,20 @@ Panel {
                       opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
                       label: "ROTATION"
                       detail: Model.transformKnown(transformValue) ? "" : "transform " + transformValue
-                      options: Model.rotationFieldOptions(Model.rotationFieldValue(root.selectedOutput),
-                        root.rotationAutoSupported)
-                      value: Model.rotationFieldValue(root.selectedOutput)
-                      hasCursor: root.inspectorHasCursor(6)
+                      options: Model.rotationOptions
+                      // Auto selects no angle: it is not a fifth angle, it says
+                      // the rotation is not this layout's to set.
+                      value: rotationAuto ? "" : Model.rotationFieldValue(root.selectedOutput)
+                      hasCursor: root.inspectorHasCursor(6) && !rotationAuto
                       toggleLabel: "Flipped"
                       // Flipped is part of the one transform, so it is not ours
                       // to set while an external authority holds the rotation.
                       toggleEnabled: !rotationAuto
                       toggleChecked: !rotationAuto && Model.transformFlipped(transformValue)
                       toggleHasCursor: root.inspectorHasCursor(22)
+                      tailLabel: root.rotationAutoSupported ? "Auto" : ""
+                      tailSelected: rotationAuto
+                      tailHasCursor: root.inspectorHasCursor(6) && rotationAuto
                       foreground: root.foreground
                       fontFamily: root.fontFamily
                       resetVisible: root.outputFieldChanged("transform")
@@ -3085,6 +3089,9 @@ Panel {
                       }
                       onToggled: function(checked) {
                         root.editOutput(Model.rotationFlipEdit(root.selectedOutput, checked))
+                      }
+                      onTailClicked: function() {
+                        root.editOutput({ rotation_auto: true })
                       }
                       onResetRequested: root.resetOutputField("transform")
                     }

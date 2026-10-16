@@ -27,12 +27,16 @@ Column {
   property int cursorIndex: -1
   property bool resetVisible: false
   property string resetTooltip: "Reset to loaded profile value"
-  // Optional leading on/off chip in the same row (Rotation's Flipped). It sits
-  // before the choices rather than after so that Flipped and the Auto chip that
-  // follows the choices do not split the angles.
+  // Optional trailing on/off chip in the same row (Rotation's Flipped).
   property string toggleLabel: ""
   property bool toggleEnabled: true
   property bool toggleChecked: false
+  // Optional chip after the toggle, for opting out of the field rather than
+  // choosing within it (Rotation's Auto). Not an option: selecting it clears the
+  // choices instead of joining them.
+  property string tailLabel: ""
+  property bool tailSelected: false
+  property bool tailHasCursor: false
   property bool toggleHasCursor: false
   property color foreground: Color.popups.text
   property color accent: Color.accent
@@ -41,6 +45,7 @@ Column {
 
   signal changed(string value)
   signal toggled(bool checked)
+  signal tailClicked()
   signal resetRequested()
 
   spacing: Style.spacing.labelGap
@@ -99,6 +104,20 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       spacing: group.spacing
 
+      ButtonGroup {
+        id: group
+        options: root.options
+        value: root.actions ? "" : root.value
+        enabled: root.enabled
+        cursorIndex: !root.hasCursor ? -1
+          : (root.cursorIndex >= 0 ? root.cursorIndex : Math.max(0, root.selectedIndex()))
+        foreground: root.foreground
+        accent: root.accent
+        fontFamily: root.fontFamily
+        fontSize: root.fontSize
+        onChanged: function(value) { root.changed(value) }
+      }
+
       Button {
         visible: root.toggleLabel !== ""
         text: root.toggleLabel
@@ -114,18 +133,19 @@ Column {
         onClicked: root.toggled(!root.toggleChecked)
       }
 
-      ButtonGroup {
-        id: group
-        options: root.options
-        value: root.actions ? "" : root.value
+      Button {
+        visible: root.tailLabel !== ""
+        text: root.tailLabel
+        selected: root.tailSelected
+        hasCursor: root.tailHasCursor
+        bordered: true
+        focusable: true
         enabled: root.enabled
-        cursorIndex: !root.hasCursor ? -1
-          : (root.cursorIndex >= 0 ? root.cursorIndex : Math.max(0, root.selectedIndex()))
         foreground: root.foreground
         accent: root.accent
         fontFamily: root.fontFamily
         fontSize: root.fontSize
-        onChanged: function(value) { root.changed(value) }
+        onClicked: root.tailClicked()
       }
     }
 

@@ -1474,9 +1474,11 @@ function rotationIsAuto(output) {
   return !!output && output.rotation_auto === true
 }
 
-function rotationFieldOptions(current, autoSupported) {
-  var options = autoSupported === false ? rotationOptions.slice() : rotationOptions.concat([{ value: rotationAutoValue, label: "Auto" }])
-  return optionsWithCurrent(options, current)
+// Auto is deliberately not part of this set. rotationOptions is the four angles
+// the transform can take; Auto is the separate choice to not hold one, so it is
+// offered as its own control rather than as a fifth angle.
+function rotationFieldOptions(current) {
+  return optionsWithCurrent(rotationOptions, current)
 }
 
 function rotationFieldValue(output) {
