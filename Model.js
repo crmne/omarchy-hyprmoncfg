@@ -609,6 +609,10 @@ var outputFieldDefaults = {
 function outputFieldValue(profile, key, field) {
   var edit = outputFieldResetEdit(profile, key, field)
   if (!edit) return undefined
+  // Rotation and its Auto setting are one field to the user: opting out of
+  // rotation is a change to it, so it has to light the reset like any angle
+  // would, and the reset has to be able to put it back.
+  if (field === "transform") return edit.rotation_auto ? rotationAutoValue : String(edit.transform)
   var value = edit[field]
   if (field === "cm") return value || "srgb"
   if (field === "sdr_eotf") return value || "default"
@@ -635,6 +639,10 @@ function outputFieldResetEdit(defaults, key, field) {
   if (field === "bitdepth" && value === 0) value = 8
   var edit = {}
   edit[field] = value
+  // Rotation is one field to the user, so resetting it restores the saved Auto
+  // setting too. Without this, a profile that leaves rotation to the sensor
+  // could not be reset back to that once an angle was picked.
+  if (field === "transform") edit.rotation_auto = output.rotation_auto === true
   return edit
 }
 

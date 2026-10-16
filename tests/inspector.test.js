@@ -206,17 +206,20 @@ test("rotation offers Auto as a separate opt-out, and it round-trips", () => {
   assert.deepEqual(Model.rotationFlipEdit({ transform: 3 }, true), { transform: 7 })
 })
 
-test("the rotation reset tracks the transform, not Auto", () => {
+test("the rotation reset covers Auto as well as the angles", () => {
   const defaults = { outputs: [{ key: "desk", transform: 1, rotation_auto: true }] }
-  assert.deepEqual(Model.outputFieldResetEdit(defaults, "desk", "transform"), { transform: 1 })
+  assert.deepEqual(Model.outputFieldResetEdit(defaults, "desk", "transform"),
+    { transform: 1, rotation_auto: true }, "reset restores a saved Auto setting")
   assert.deepEqual(Model.outputFieldResetEdit({ outputs: [{ key: "desk" }] }, "desk", "transform"),
-    { transform: 0 })
+    { transform: 0, rotation_auto: false })
 
-  // Opting out of rotation is not a transform edit, so it must not light the
-  // reset that belongs to the transform. Picking an angle back does.
+  // Opting out of rotation is a change to the field, so it lights the reset
+  // like any angle would, and resetting puts the saved state back.
   const saved = { outputs: [{ key: "desk", transform: 1 }] }
   const auto = { outputs: [{ key: "desk", transform: 1, rotation_auto: true }] }
-  assert.equal(Model.outputFieldChanged(auto, saved, "desk", "transform"), false)
+  assert.equal(Model.outputFieldChanged(auto, saved, "desk", "transform"), true)
+  assert.equal(Model.outputFieldChanged(saved, auto, "desk", "transform"), true)
+  assert.equal(Model.outputFieldChanged(auto, auto, "desk", "transform"), false)
   const turned = { outputs: [{ key: "desk", transform: 3 }] }
   assert.equal(Model.outputFieldChanged(turned, saved, "desk", "transform"), true)
 })
