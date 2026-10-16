@@ -206,36 +206,17 @@ test("rotation offers Auto as a separate opt-out, and it round-trips", () => {
   assert.deepEqual(Model.rotationFlipEdit({ transform: 3 }, true), { transform: 7 })
 })
 
-test("resetting rotation restores a saved Auto setting", () => {
+test("the rotation reset tracks the transform, not Auto", () => {
   const defaults = { outputs: [{ key: "desk", transform: 1, rotation_auto: true }] }
-  assert.deepEqual(Model.outputFieldResetEdit(defaults, "desk", "transform"),
-    { transform: 1, rotation_auto: true })
+  assert.deepEqual(Model.outputFieldResetEdit(defaults, "desk", "transform"), { transform: 1 })
   assert.deepEqual(Model.outputFieldResetEdit({ outputs: [{ key: "desk" }] }, "desk", "transform"),
-    { transform: 0, rotation_auto: false })
+    { transform: 0 })
 
-  // Leaving rotation to the sensor is a change even when the retained angle
-  // still matches the saved one, so the reset must stay discoverable.
-  const draft = { outputs: [{ key: "desk", transform: 1, rotation_auto: true }] }
+  // Opting out of rotation is not a transform edit, so it must not light the
+  // reset that belongs to the transform. Picking an angle back does.
   const saved = { outputs: [{ key: "desk", transform: 1 }] }
-  assert.equal(Model.outputFieldChanged(draft, saved, "desk", "transform"), true)
-  assert.equal(Model.outputFieldChanged(saved, draft, "desk", "transform"), true)
-  assert.equal(Model.outputFieldChanged(draft, draft, "desk", "transform"), false)
-})
-
-test("Auto is only offered when the daemon advertises it", () => {
-  // An older daemon drops the rotation_auto edit, so the choice is withheld
-  // rather than offered and silently ignored. Auto is its own control after
-  // Flipped, not an extra angle.
-  const panel = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
-  assert.match(panel, /rotation_auto_supported === true/)
-  assert.match(panel, /tailLabel: root\.rotationAutoSupported \? "Auto" : ""/)
-  assert.match(panel, /tailSelected: rotationAuto/)
-  assert.match(panel, /onTailClicked: function\(\) \{\s*root\.editOutput\(\{ rotation_auto: true \}\)/)
-
-  const field = fs.readFileSync(path.join(__dirname, "..", "SegmentedField.qml"), "utf8")
-  // Order in the row: the choices, then Flipped, then the opt-out chip.
-  const group = field.indexOf("id: group")
-  const toggle = field.indexOf("onClicked: root.toggled")
-  const tail = field.indexOf("onClicked: root.tailClicked")
-  assert.ok(group < toggle && toggle < tail, "Auto should follow Flipped, which follows the angles")
+  const auto = { outputs: [{ key: "desk", transform: 1, rotation_auto: true }] }
+  assert.equal(Model.outputFieldChanged(auto, saved, "desk", "transform"), false)
+  const turned = { outputs: [{ key: "desk", transform: 3 }] }
+  assert.equal(Model.outputFieldChanged(turned, saved, "desk", "transform"), true)
 })

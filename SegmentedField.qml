@@ -124,6 +124,10 @@ Column {
         selected: root.toggleChecked
         hasCursor: root.toggleHasCursor
         bordered: true
+        // Same chrome as the group's chips, which get this from ButtonGroup.
+        // Button's own default is transparent, so without it a selected state
+        // has no fill to show and the chip looks the same either way.
+        background: Color.background
         focusable: true
         enabled: root.enabled && root.toggleEnabled
         foreground: root.foreground
@@ -139,6 +143,7 @@ Column {
         selected: root.tailSelected
         hasCursor: root.tailHasCursor
         bordered: true
+        background: Color.background
         focusable: true
         enabled: root.enabled
         foreground: root.foreground
