@@ -60,16 +60,21 @@ ShellRoot {
     var smaller = glyphBounds(smallerFontSample, smallerFontSample)
     check(Math.abs(smaller.width - expected.width) > 0.05,
       "measurement failed to detect a smaller glyph font")
-    var size = Math.min(Style.bar.iconCanvas, Style.bar.iconSize + Style.space(2))
+    var size = Style.bar.iconSize
     check(Math.abs(Math.max(actual.width, actual.height) - size) < 0.05,
-      "monitor did not receive the modest optical size increase")
-    check(Math.abs(actual.width / actual.height - expected.width / expected.height) < 0.05,
+      "monitor size differs from the stock icon")
+    check(Math.abs(actual.width - expected.width) < 0.05 && Math.abs(actual.height - expected.height) < 0.05,
       "monitor glyph proportions differ from stock")
     check(Math.abs(actual.x + actual.width / 2 - button.width / 2) < 0.05
       && Math.abs(actual.y + actual.height / 2 - button.height / 2) < 0.05,
       "monitor is no longer optically centered")
     check(widget.implicitWidth === reference.implicitWidth, "slot width changed")
     check(widget.implicitHeight === reference.implicitHeight, "slot height changed")
+    var headerActual = glyphBounds(headerSample, headerSample)
+    var headerExpected = glyphBounds(stockHero, stockHero)
+    check(Math.abs(headerActual.width - headerExpected.width) < 0.05
+      && Math.abs(headerActual.height - headerExpected.height) < 0.05,
+      "panel-header glyph differs from stock Display panel")
 
     // Measure the painted Text itself, including all transforms of its parents.
     var badge = null
@@ -198,6 +203,18 @@ ShellRoot {
         font.family: reference.fontFamily
         font.pixelSize: Math.max(1, reference.fontSize - 4)
       }
+    }
+    Item {
+      id: stockHero
+      opacity: 0
+      Text { text: reference.text; font.family: Style.font.family; font.pixelSize: Style.font.display }
+    }
+    DisplayIcon {
+      id: headerSample
+      opacity: 0
+      optical: false
+      fontSize: Style.font.display
+      monitorCount: root.panel ? root.panel.monitorCount : 1
     }
     Row {
       spacing: 20

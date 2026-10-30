@@ -269,18 +269,26 @@ Manual, Sequential, and Interleaved; Off is the stored `enabled: false`, keeps t
 saved strategy and plan, writes no workspace rules, and suits user-managed rules
 or tools such as hyprsplit. While Off, the other plan values are inert.
 
-The optional hyprmoncfg Workspaces picker is offered below the resolved plan.
-Check installed/enabled state through Omarchy's local plugin CLI when the panel
-opens. Offer Install picker, Use in bar, or Show overview. Installation uses
-Omarchy's presented terminal with its normal trust, enablement and placement
-questions. Enabling replaces the previous workspace widget through native plugin
-commands and restores it on failure. Do not change workspace assignments or
-keyboard bindings here. Require the daemon's additive `workspace_plan` status
-capability and an applied plan before offering installation or enablement; an
-already enabled picker can still open its live-workspace overview with an older
-daemon. Disable these actions during a preview, unapplied draft or pending
-operation, and include the action in keyboard navigation. Nothing is installed
-or changed just by opening the panel.
+The optional hyprmoncfg Workspaces picker is offered inside the top of the
+Workspaces canvas, with its real grouped-number preview in physical left-to-right,
+then top-to-bottom monitor order. The benefit is "A workspace picker that follows
+your monitor layout." Offer Install picker when absent, Use in bar when disabled,
+and hide the promotion when enabled. Installing uses Omarchy's presented terminal
+and its normal trust, enablement and placement questions. Native plugin commands
+replace the previous widget and restore it on failure. Nothing changes just by
+opening the panel; drafts and previews block installation or enablement. Require
+the additive `workspace_plan` status capability and an applied plan.
+
+Right-clicking the picker opens only this Workspaces tab, anchored to the picker
+on the clicked display. Reuse the existing editor, draft and persistent preview
+guard through a UI-only shell IPC route. Do not duplicate the editor or expose
+Layout/Profiles tabs, TUI or Compact controls in this popup. The main panel keeps
+its normal navigation. Keep workspace-only mode through preview recovery and bar
+rebuilds. Assigned IDs in the workspace-plan rows remain direct Hyprland switching
+targets, including numbers omitted from the compact bar; disable switching while
+there are unapplied edits or a preview. Opening the planner sends no daemon
+configuration or switching command. Older or absent panels retain the picker's
+live overview, with an installation action when the panel is missing or disabled.
 
 ### Profiles
 
@@ -340,11 +348,11 @@ route to the editor. A hidden icon is skipped by the shell's numbered panel
 hotkeys and Tab switching between panels, which count only visible slots.
 Covered by `tests/baricon.test.js` and `tests/qml-bar`.
 
-Use Omarchy's single/multiple-display glyphs. Size their painted bounds two
-scaled pixels above the stock bar icon size, capped by the normal icon canvas,
-inside the unchanged slot. A separate tiny theme-accent check indicates the
-backend connection; its presence never changes the monitor's scale or center.
-The compact header uses the same component at display-heading size.
+Use Omarchy's single/multiple-display glyphs at exactly the stock painted size
+and in the unchanged bar slot. The compact header follows the stock Display
+panel's text metrics too. A separate small theme-accent check indicates the
+backend connection, slightly clearer than the first version; its presence never
+changes the monitor's scale or center.
 
 TUI parity: the TUI has no bar icon; there is no companion change.
 

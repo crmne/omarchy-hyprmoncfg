@@ -282,7 +282,7 @@ function previewGuard() {
   })
   Object.defineProperty(root, "opened", { get: () => root.stage !== "idle" })
   const socket = { connected: true, write(line) { requests.push(JSON.parse(line)) }, flush() {} }
-  const context = vm.createContext({ root, Model, IdentifyModel: require("../IdentifyModel.js"), backendSocket: socket,
+  const context = vm.createContext({ root, Model, Picker: require("../WorkspacePicker.js"), IdentifyModel: require("../IdentifyModel.js"), backendSocket: socket,
     identifyOverlay: { clear() {}, show() {} }, Quickshell: { screens: [] },
     identifyTimeout: { restart() {}, stop() {} },
     Hyprland: { focusedMonitor: { name: "eDP-1" } },
@@ -2225,7 +2225,7 @@ test("workspace keyboard cycles Off first and Off leaves only Strategy", () => {
   const root = { managedChecked: true, editPending: false, previewTransaction: "",
     draftProfile: { workspaces: { enabled: false, strategy: "sequential", max_workspaces: 9 } },
     workspaceKeyboardIndex: 0, workspacesOff: true, workspaceGroupSizeApplicable: false,
-    workspacePlanKeyboardCount: () => 1,
+    workspacePlanKeyboardCount: () => 1, pickerOfferVisible: true,
     workspacePersistenceKeyboardIndex: -1, workspaceListKeyboardStart: 1, workspaceValueMaximum: 100,
     editorDocument: { workspace_persistence_supported: true },
     changeWorkspaceStrategy: value => choices.push(value), editWorkspaces: value => edits.push(value),
@@ -2248,6 +2248,8 @@ test("workspace keyboard cycles Off first and Off leaves only Strategy", () => {
   assert.deepEqual(edits, [])
   const count = panelFunction("workspaceKeyboardCount", root)
   assert.equal(count(), 2)
+  root.pickerOfferVisible = false
+  assert.equal(count(), 1)
 })
 
 test("Off replaces the Enabled toggle, hides plan controls, and explains the empty plan", () => {
@@ -2357,4 +2359,55 @@ test("expanded mode survives the bar rebuild a preview triggers", () => {
   const panel = { expanded: false, previewCoordinator: { panelExpanded: true } }
   panelFunction("restorePanelExpanded", panel)()
   assert.equal(panel.expanded, true, "a rebuilt panel comes back expanded")
+})
+
+
+test("the picker opens only Workspaces on its own monitor without replacing the draft", () => {
+  const draft = {name:"Unapplied edit"}
+  let opened = 0
+  const root = {workspaceOnly:false, expanded:false, activePage:"layout", draftProfile:draft,
+    draftDirty:true, previewCoordinator:{}, open:()=>opened++}
+  const open = panelFunction("openWorkspacePage",root,{panel:{screen:{name:"DP-1"}}})
+  open({screen:"DP-2",x:10,y:0,width:140,height:26})
+  assert.equal(opened,0)
+  open({screen:"DP-1",x:10,y:0,width:140,height:26})
+  assert.equal(opened,1)
+  assert.equal(root.workspaceOnly,true)
+  assert.equal(root.activePage,"workspaces")
+  assert.equal(root.expanded,true)
+  assert.equal(root.draftProfile,draft)
+  assert.equal(root.draftDirty,true)
+  assert.equal(root.previewCoordinator.workspacePageHandled,true)
+})
+test("workspace-only navigation cannot enter hidden tabs and survives preview recovery", () => {
+  const root = {workspaceOnly:true,activePage:"workspaces",keyboardHelpOpen:false,previewTransaction:""}
+  const key = panelFunction("handleExpandedText",root)
+  for (const number of ["1","2","3"]) key(number)
+  assert.equal(root.activePage,"workspaces")
+  root.workspaceOnly=false
+  key("3")
+  assert.equal(root.activePage,"profiles")
+  const rebuilt={expanded:false,workspaceOnly:false,activePage:"layout",previewCoordinator:{panelExpanded:true,panelWorkspaceOnly:true}}
+  panelFunction("restorePanelExpanded",rebuilt)()
+  assert.equal(rebuilt.workspaceOnly,true)
+  assert.equal(rebuilt.activePage,"workspaces")
+})
+test("the picker UI route never sends a daemon command", () => {
+  const guard=previewGuard()
+  guard.root.workspacePageRequested=()=>{guard.root.workspacePageHandled=true}
+  assert.equal(guard.root.openWorkspacePage('{}'),'ok')
+  assert.equal(guard.root.openWorkspacePage('broken'),'invalid request')
+  assert.deepEqual(guard.requests,[])
+})
+
+test('workspace switching from the planner is direct and blocked during drafts or previews', () => {
+  const calls=[]
+  const root={workspaceOnly:true,pickerBlockedReason:'',close:()=>calls.push('close')}
+  const switchWorkspace=panelFunction('switchWorkspace',root,{Picker:require('../WorkspacePicker.js'),Hyprland:{usingLua:true,dispatch:value=>calls.push(value)}})
+  switchWorkspace(4)
+  assert.deepEqual(calls,['hl.dsp.focus({ workspace = "4" })','close'])
+  calls.length=0
+  root.pickerBlockedReason='Save your changes first'
+  switchWorkspace(5)
+  assert.deepEqual(calls,[])
 })

@@ -8,6 +8,7 @@ import qs.Commons as Commons
 import qs.Ui
 import "Model.js" as Model
 import "IdentifyModel.js" as IdentifyModel
+import "WorkspacePicker.js" as Picker
 
 // Display previews can rebuild every per-monitor bar instance. Keep the
 // safety decision in a shell-level service so the confirmation is already on
@@ -26,7 +27,28 @@ Item {
   property int statusRevision: 0
   // The panel's expanded mode, held here so it survives the bar rebuild a
   // preview triggers.
+  // One UI route shared by the picker and the panel, so planner drafts and
+  // confirmation still belong to the existing editor and its preview guard.
+  signal workspacePageRequested(var origin)
+  property bool workspacePageHandled: false
+  function openWorkspacePage(payload) {
+    var focused = Hyprland.focusedMonitor
+    var origin = Picker.editorOrigin(payload, focused ? focused.name : "")
+    if (!origin) return "invalid request"
+    root.workspacePageHandled = false
+    root.workspacePageRequested(origin)
+    return root.workspacePageHandled ? "ok" : "unavailable"
+  }
+  Commons.ShellIpc {
+    target: "crmne.hyprmoncfg.editor"
+    function workspaces(payload: string): string { return root.openWorkspacePage(payload) }
+  }
+
   property bool panelExpanded: false
+  property bool panelWorkspaceOnly: false
+  function setPanelWorkspaceOnly(value) {
+    root.panelWorkspaceOnly = value === true
+  }
   function setPanelExpanded(value) {
     root.panelExpanded = value === true
   }

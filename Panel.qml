@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Controls as Controls
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
@@ -16,6 +17,7 @@ Panel {
   manageIpc: false
 
   property var anchorItem: null
+  property var workspaceLaunchOrigin: null
   property var hostWidget: null
   readonly property var barIdentity: hostWidget || root
 
@@ -52,6 +54,7 @@ Panel {
   property bool cursorActive: false
   property bool keyboardHelpOpen: false
   property var pickerStatus: null
+  readonly property bool pickerOfferVisible: !root.pickerStatus || !root.pickerStatus.enabled
   readonly property string pickerBlockedReason: root.editorPreviewBlocked || root.identifyBlockedByPreview
     ? "Finish the display preview before changing the bar."
     : root.draftDirty || root.editPending || root.creatingProfile
@@ -107,6 +110,7 @@ Panel {
   property string selectedOutputKey: ""
   property string activePage: "layout"
   property bool expanded: false
+  property bool workspaceOnly: false
   property string inspectorPage: "display"
   property string selectedSavedProfileName: ""
   property string profileChoice: ""
@@ -183,7 +187,7 @@ Panel {
     workspaceSettingsHeight: Style.space(30) + workspaceSettingsColumn.implicitHeight
       - (manualAssignmentList.visible ? manualAssignmentList.height + workspaceSettingsColumn.spacing : 0),
     workspaceRowCount: manualAssignmentList.visible ? root.manualWorkspaceRows.length : 0,
-    workspacePlanHeight: workspacePlanPane.height + workspacePickerOffer.implicitHeight + Style.space(10),
+    workspacePlanHeight: workspacePlanPane.height + (root.pickerOfferVisible ? workspacePickerOffer.implicitHeight + Style.space(32) : 0),
     availableWidth: panel.availableCardWidth - root.panelHorizontalInset,
     availableHeight: panel.availableCardHeight - panel.verticalContentInset
   })
@@ -238,6 +242,10 @@ Panel {
   // expanded mode in the shell-level service and restore it from there.
   Connections {
     target: root
+    function onWorkspaceOnlyChanged() {
+      if (root.previewCoordinator && typeof root.previewCoordinator.setPanelWorkspaceOnly === "function")
+        root.previewCoordinator.setPanelWorkspaceOnly(root.workspaceOnly)
+    }
     function onExpandedChanged() {
       if (root.previewCoordinator && typeof root.previewCoordinator.setPanelExpanded === "function")
         root.previewCoordinator.setPanelExpanded(root.expanded)
@@ -245,6 +253,10 @@ Panel {
   }
   onPreviewCoordinatorChanged: root.restorePanelExpanded()
   function restorePanelExpanded() {
+    if (root.previewCoordinator && root.previewCoordinator.panelWorkspaceOnly === true) {
+      root.workspaceOnly = true
+      root.activePage = "workspaces"
+    }
     if (root.previewCoordinator && root.previewCoordinator.panelExpanded === true) root.expanded = true
   }
   readonly property var displayNotes: Model.displayNotes(root.backendConnected ? monitorSummaries : [])
@@ -507,7 +519,28 @@ Panel {
     if (alreadyOpen && root.backendConnected) root.requestEditorState(true)
   }
 
-  function openFromHotkey() { root.open() }
+  function openFromHotkey() {
+    root.workspaceLaunchOrigin = null
+    root.workspaceOnly = !!(root.previewCoordinator && root.previewCoordinator.transactionId !== ""
+      && root.previewCoordinator.panelWorkspaceOnly === true)
+    root.open()
+  }
+  function openWorkspacePage(origin) {
+    if (!panel.screen || panel.screen.name !== origin.screen) return
+    root.workspaceLaunchOrigin = origin.width !== undefined ? origin : null
+    root.workspaceOnly = true
+    root.expanded = true
+    root.activePage = "workspaces"
+    root.open()
+    if (root.previewCoordinator) root.previewCoordinator.workspacePageHandled = true
+  }
+  function switchWorkspace(id) {
+    if (!root.workspaceOnly || root.pickerBlockedReason !== "") return
+    var request = Picker.focusRequest(id, Hyprland.usingLua)
+    if (!request) return
+    Hyprland.dispatch(request)
+    root.close()
+  }
   function checkWorkspacePicker() {
     if (!pickerProbe.running) pickerProbe.running = true
   }
@@ -516,8 +549,7 @@ Panel {
     var action = root.pickerOffer.action
     if (action === "check") { root.checkWorkspacePicker(); return }
     var command
-    if (action === "open") command = ["omarchy-shell", "shell", "summon", Picker.pickerId, "{}"]
-    else if (action === "install") command = ["omarchy", "launch", "floating", "terminal", "with", "presentation",
+    if (action === "install") command = ["omarchy", "launch", "floating", "terminal", "with", "presentation",
       "ruby " + Util.shellQuote(root.pickerScript) + " install"]
     else if (action === "use") command = ["ruby", root.pickerScript, "use"]
     else return
@@ -1153,7 +1185,7 @@ Panel {
     return root.workspaceListKeyboardStart + order.length
   }
   function workspaceKeyboardCount() {
-    return root.workspacePlanKeyboardCount() + 1
+    return root.workspacePlanKeyboardCount() + (root.pickerOfferVisible ? 1 : 0)
   }
 
   function normalizeWorkspaceCursor() {
@@ -1177,7 +1209,7 @@ Panel {
   }
 
   function adjustWorkspaceKeyboard(delta) {
-    if (root.workspaceKeyboardIndex === root.workspacePlanKeyboardCount()) return
+    if (root.pickerOfferVisible && root.workspaceKeyboardIndex === root.workspacePlanKeyboardCount()) return
     if (!root.managedChecked || root.editPending || root.previewTransaction !== "") return
     var settings = Model.clone((root.draftProfile || {}).workspaces || {}) || {}
     var index = root.workspaceKeyboardIndex
@@ -1318,7 +1350,7 @@ Panel {
       if (returnPressed) root.activateSelectedSavedProfile()
       else root.setProfileAutomatic(!root.profileAutomatic)
     } else if (root.activePage === "workspaces") {
-      if (root.workspaceKeyboardIndex === root.workspacePlanKeyboardCount()) root.activateWorkspacePicker()
+      if (root.pickerOfferVisible && root.workspaceKeyboardIndex === root.workspacePlanKeyboardCount()) root.activateWorkspacePicker()
       else root.adjustWorkspaceKeyboard(1)
     }
   }
@@ -1343,6 +1375,7 @@ Panel {
       return
     }
     if (key === "1" || key === "2" || key === "3") {
+      if (root.workspaceOnly) return
       root.activePage = key === "1" ? "layout" : (key === "2" ? "workspaces" : "profiles")
       return
     }
@@ -1803,6 +1836,7 @@ Panel {
     root.restorePanelExpanded()
   }
   onActivePageChanged: {
+    if (root.workspaceOnly && root.activePage !== "workspaces") { root.activePage = "workspaces"; return }
     if (root.activePage === "workspaces") {
       Qt.callLater(function() { root.ensureManualWorkspaceRules() })
       if (root.opened) root.checkWorkspacePicker()
@@ -1812,6 +1846,7 @@ Panel {
   Connections {
     target: root.previewCoordinator
     ignoreUnknownSignals: true
+    function onWorkspacePageRequested(origin) { root.openWorkspacePage(origin) }
     function onTransactionIdChanged() { root.statusRevision++; root.editorPreviewRevision++; root.syncDaemonPreview(root.daemonPreview) }
     function onRequestPendingChanged() { root.statusRevision++; root.editorPreviewRevision++ }
     function onActionPendingChanged() { root.statusRevision++; root.editorPreviewRevision++ }
@@ -2284,9 +2319,18 @@ Panel {
     }
   }
 
+  Item {
+    id: workspaceLaunchAnchor
+    parent: root.anchorItem
+    readonly property var origin: root.workspaceLaunchOrigin || ({x:0,y:0,width:0,height:0})
+    readonly property var base: root.anchorItem && root.anchorItem.QsWindow.window
+      ? root.anchorItem.mapToItem(root.anchorItem.QsWindow.window.contentItem, 0, 0) : Qt.point(0,0)
+    x: origin.x - base.x; y: origin.y - base.y
+    width: origin.width; height: origin.height
+  }
   KeyboardPanel {
     id: panel
-    anchorItem: root.anchorItem
+    anchorItem: root.workspaceLaunchOrigin ? workspaceLaunchAnchor : root.anchorItem
     owner: root.barIdentity
     bar: root.bar
     open: root.opened
@@ -2442,7 +2486,8 @@ Panel {
 
             DisplayIcon {
               id: compactHeroIcon
-              size: Style.font.display + Style.space(2)
+              size: Style.font.display
+              optical: false
               monitorCount: root.monitorCount
               connected: root.backendConnected
               fontFamily: root.fontFamily
@@ -2903,6 +2948,7 @@ Panel {
 
           Row {
             id: editorTabsRow
+            visible: !root.workspaceOnly
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(2)
@@ -2923,6 +2969,16 @@ Panel {
                 onClicked: root.activePage = String(modelData.value || "layout")
               }
             }
+          }
+
+          Text {
+            visible: root.workspaceOnly
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Workspaces"
+            textFormat: Text.PlainText
+            font.family: root.fontFamily; font.pixelSize: Style.font.title
+            color: root.foreground
           }
 
           Row {
@@ -2956,6 +3012,7 @@ Panel {
 
             Button {
               id: openTuiButton
+              visible: !root.workspaceOnly
               anchors.verticalCenter: parent.verticalCenter
               text: "TUI"
               implicitHeight: identifyAllButton.implicitHeight
@@ -2969,13 +3026,13 @@ Panel {
             Button {
               id: compactButton
               anchors.verticalCenter: parent.verticalCenter
-              text: "Compact"
+              text: root.workspaceOnly ? "Close" : "Compact"
               implicitHeight: identifyAllButton.implicitHeight
               bordered: true
               foreground: root.foreground
               fontFamily: root.fontFamily
               fontSize: Style.font.caption
-              onClicked: root.expanded = false
+              onClicked: { if (root.workspaceOnly) root.close(); else root.expanded = false }
             }
           }
 
@@ -4460,7 +4517,7 @@ Panel {
 
               EditorPane {
                 width: parent.width
-                height: parent.height - workspacePlanPane.height - workspacePickerOffer.height - parent.spacing * 2
+                height: parent.height - workspacePlanPane.height - parent.spacing
                 title: ""
                 foreground: root.foreground
                 dim: root.dim
@@ -4485,12 +4542,28 @@ Panel {
                   dim: root.dim
                   accent: Commons.Color.accent
                   fontFamily: root.fontFamily
+                  headerHeight: root.pickerOfferVisible ? workspacePickerOffer.implicitHeight + Style.space(32) : 0
+                  WorkspacePickerOffer {
+                    id: workspacePickerOffer
+                    x: Style.space(16); y: Style.space(16)
+                    width: parent.width - Style.space(32)
+                    visible: root.pickerOfferVisible
+                    height: implicitHeight
+                    offer: root.pickerOffer
+                    blockedReason: root.pickerBlockedReason
+                    previewGroups: Picker.previewGroups(root.workspacePlan, parent.displays)
+                    foreground: root.foreground
+                    fontFamily: root.fontFamily
+                    hasCursor: root.expanded && root.activePage === "workspaces"
+                      && root.workspaceKeyboardIndex === root.workspacePlanKeyboardCount()
+                    onActivated: root.activateWorkspacePicker()
+                  }
                 }
               }
               EditorPane {
                 id: workspacePlanPane
                 width: parent.width
-                height: Style.space(40) + Math.max(1, root.workspacesOff ? 2 : root.workspaceRows.length) * Style.space(20)
+                height: Style.space(40) + Math.max(Style.space(40), workspacePlanRows.implicitHeight)
                 title: "Workspace Plan"
                 foreground: root.foreground
                 dim: root.dim
@@ -4498,18 +4571,37 @@ Panel {
                 fontFamily: root.fontFamily
 
                 Column {
+                  id: workspacePlanRows
                   anchors.fill: parent
                   spacing: Style.space(5)
 
                   Repeater {
                     model: root.workspacesOff ? [] : root.workspaceRows
 
-                    InfoRow {
+                    Item {
                       required property var modelData
-                      labelWidth: Math.min(width * 0.5, Style.space(220))
-                      label: String(modelData.name || "Display")
-                      value: String(modelData.workspaces || "—")
-                      valueAccent: true
+                      width: parent.width
+                      implicitHeight: root.workspaceOnly ? switchRow.implicitHeight : planRow.implicitHeight
+                      InfoRow {
+                        id: planRow
+                        visible: !root.workspaceOnly
+                        width: parent.width
+                        labelWidth: Math.min(width * 0.5, Style.space(220))
+                        label: String(modelData.name || "Display")
+                        value: String(modelData.workspaces || "—")
+                        valueAccent: true
+                      }
+                      WorkspacePlanRow {
+                        id: switchRow
+                        visible: root.workspaceOnly
+                        width: parent.width
+                        label: String(modelData.name || "Display")
+                        workspaceIds: Picker.workspaceIds(String(modelData.workspaces || ""))
+                        switchingEnabled: root.pickerBlockedReason === ""
+                        foreground: root.foreground
+                        fontFamily: root.fontFamily
+                        onChosen: function(id) { root.switchWorkspace(id) }
+                      }
                     }
                   }
 
@@ -4526,18 +4618,7 @@ Panel {
                 }
               }
 
-              WorkspacePickerOffer {
-                id: workspacePickerOffer
-                width: parent.width
-                height: implicitHeight
-                offer: root.pickerOffer
-                blockedReason: root.pickerBlockedReason
-                foreground: root.foreground
-                fontFamily: root.fontFamily
-                hasCursor: root.expanded && root.activePage === "workspaces"
-                  && root.workspaceKeyboardIndex === root.workspacePlanKeyboardCount()
-                onActivated: root.activateWorkspacePicker()
-              }
+
             }
           }
         }
@@ -4758,6 +4839,7 @@ Panel {
         z: 100
         visible: root.keyboardHelpOpen
         page: root.activePage
+        workspaceOnly: root.workspaceOnly
         foreground: root.foreground
         background: root.bar ? root.bar.background : Commons.Color.background
         accent: Commons.Color.accent

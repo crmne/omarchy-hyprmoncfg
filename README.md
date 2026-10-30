@@ -53,17 +53,22 @@ close, repeated-open and preview behavior.
 
 ## Add a workspace picker
 
-The Workspaces page offers [hyprmoncfg Workspaces](https://github.com/crmne/omarchy-hyprmoncfg-workspaces),
-which groups workspace numbers by monitor and shows your screen arrangement on
-right-click. Choose **Install picker** to open Omarchy's normal interactive
-installer, or **Use in bar** if it is already installed. Once enabled, the action
-becomes **Show overview**. Changing the picker preserves workspace assignments
-and keyboard shortcuts. Finish any preview and save or discard edits first.
+The Workspaces canvas previews [hyprmoncfg Workspaces](https://github.com/crmne/omarchy-hyprmoncfg-workspaces),
+a workspace picker that follows your monitor layout. It shows your actual numbers
+in monitor order. Choose **Install picker** for Omarchy's interactive installer,
+or **Use in bar** if it is installed but disabled. The promotion disappears once
+the picker is enabled. Finish any preview and save or discard edits first.
+
+Right-clicking the picker opens just the **Workspaces** tab beside it: the same
+planner controls, draft, Apply/Save and confirmation flow, without Layout or
+Profiles tabs. Workspace-plan numbers also switch directly to that workspace
+when there are no unapplied edits or previews. The main panel keeps its normal
+navigation. Changing the picker preserves assignments and keyboard shortcuts.
 
 The offer requires a daemon that supplies `workspace_plan` in its status and an
 applied workspace plan. This capability is on hyprmoncfg main after 1.25.1,
-awaiting a stable release. Existing installations of the picker can still open
-the overview with older daemons. The integration helper uses Ruby, included in
+awaiting a stable release. Existing installations of the picker can still switch live workspaces with
+older daemons. The integration helper uses Ruby, included in
 Omarchy's base packages, and native Omarchy plugin commands.
 
 ## Automatically match the right layout to the connected monitors

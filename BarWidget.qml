@@ -18,7 +18,17 @@ BarWidget {
   }
 
   function togglePanel() {
-    if (panelLoader.item && panelLoader.item.toggle) panelLoader.item.toggle()
+    if (panelLoader.item && panelLoader.item.toggle) {
+      if (panelLoader.item.opened && panelLoader.item.workspaceOnly) {
+        panelLoader.item.openFromHotkey()
+        return
+      }
+      if (!panelLoader.item.opened) {
+        panelLoader.item.workspaceLaunchOrigin = null
+        panelLoader.item.workspaceOnly = false
+      }
+      panelLoader.item.toggle()
+    }
   }
 
   readonly property bool opened: panelLoader.item ? panelLoader.item.opened === true : false
@@ -81,7 +91,7 @@ BarWidget {
       x: (parent.width - width) / 2
       y: (parent.height - height) / 2
       fontSize: button.fontSize
-      size: Math.min(Style.bar.iconCanvas, Style.bar.iconSize + Style.space(2))
+      size: Style.bar.iconSize
       monitorCount: root.monitorCount
       connected: root.backendConnected
       fontFamily: button.fontFamily

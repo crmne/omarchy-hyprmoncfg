@@ -7,6 +7,7 @@ Item {
   id: root
 
   property string page: "layout"
+  property bool workspaceOnly: false
   property color foreground: Commons.Color.foreground
   property color background: Commons.Color.background
   property color accent: Commons.Color.accent
@@ -64,15 +65,14 @@ Item {
     }
     contextual.push({
       title: "Anywhere",
-      bindings: [
-        { keys: "1  2  3", action: "Switch tabs" },
+      bindings: (root.workspaceOnly ? [] : [{ keys: "1  2  3", action: "Switch tabs" }]).concat([
         { keys: "a", action: "Apply the current draft or selected profile" },
         { keys: "s", action: "Save the current draft as a profile" },
         { keys: "r", action: "Reset from live Hyprland state" },
         { keys: "?", action: "Show these keys" },
         { keys: "R", action: "Restart the daemon after an upgrade" },
         { keys: "q, Esc", action: "Close the panel" }
-      ]
+      ])
     })
     return contextual
   }

@@ -15,8 +15,8 @@ test('picker actions require the current plan and never silently enable planning
   assert.equal(picker.offer(absent, true, true, false).action, 'install')
   assert.equal(picker.offer({installed:true, enabled:false}, true, true, false).action, 'use')
 })
-test('an active picker opens its overview even with an older daemon', () => {
-  assert.equal(picker.offer({installed:true, enabled:true}, false, false, false).action, 'open')
+test('an active picker has no installation offer', () => {
+  assert.equal(picker.offer({installed:true, enabled:true}, false, false, false).action, '')
 })
 test('previews, dirty drafts and ongoing operations block every picker action', () => {
   for (const status of [null, {installed:false}, {installed:true}, {installed:true, enabled:true}])
@@ -41,9 +41,6 @@ function actionHarness(action, blocked = false) {
   delayed.forEach(fn=>fn())
   return calls
 }
-test('opening the picker uses the complete shell summon signature after closing', () => {
-  assert.deepEqual(actionHarness('open'), ['close', ['omarchy-shell','shell','summon','crmne.hyprmoncfg-workspaces','{}']])
-})
 test('the installer stays interactive and quotes a plugin path with spaces and quotes', () => {
   const calls = actionHarness('install')
   assert.equal(calls[0], 'close')
@@ -53,4 +50,26 @@ test('the installer stays interactive and quotes a plugin path with spaces and q
 test('blocked actions do not close a preview or launch a process', () => {
   for (const action of ['open','install','use']) assert.deepEqual(actionHarness(action,true), [])
   assert.deepEqual(actionHarness('check'), ['check'])
+})
+
+test('the in-canvas preview follows physical display order without renumbering workspaces', () => {
+  const displays = [{key:'right',x:100,y:0},{key:'bottom',x:0,y:100},{key:'top',x:0,y:-100}]
+  const plan = [{output_key:'right',workspaces:['7','8','9']},{output_key:'top',workspaces:['1','2','3']},{output_key:'bottom',workspaces:['4','5','6']}]
+  assert.deepEqual(picker.previewGroups(plan,displays).map(group=>group.workspaces), [['1','2','3'],['4','5','6'],['7','8','9']])
+  displays[0].x = -100
+  assert.deepEqual(picker.previewGroups(plan,displays)[0].workspaces, ['7','8','9'])
+  assert.deepEqual(picker.previewGroups(plan,[]), [])
+})
+
+test('planner launch requests accept only bounded local popup coordinates', () => {
+  assert.deepEqual(picker.editorOrigin('{}','DP-1'), {screen:'DP-1'})
+  assert.deepEqual(picker.editorOrigin('{"screen":"DP-2","x":12,"y":0,"width":124,"height":26}','DP-1'), {screen:'DP-2',x:12,y:0,width:124,height:26})
+  for (const text of ['broken','null','[]','{"screen":"DP-1","x":0,"y":0,"width":-1,"height":26}','x'.repeat(4097)]) assert.equal(picker.editorOrigin(text,''),null)
+})
+
+test('workspace targets preserve numeric IDs and never accept dispatch fragments', () => {
+  assert.deepEqual(picker.workspaceIds('1, 2, 12'),[1,2,12])
+  assert.equal(picker.focusRequest(12,true),'hl.dsp.focus({ workspace = "12" })')
+  assert.equal(picker.focusRequest(12,false),'workspace 12')
+  for (const value of ['1; exec bad','1,2','1 2','-1','0',2147483648]) assert.equal(picker.focusRequest(value,true),'')
 })

@@ -24,6 +24,8 @@ BorderSurface {
   property string emphasis: "layout"
   property bool detailed: true
   property bool framed: true
+  // Optional client-owned content above the monitor drawing.
+  property real headerHeight: 0
   property bool markDisconnected: false
   property bool dotted: framed
   // Keyboard focus on the stage (Layout page): a quiet accent outline.
@@ -132,6 +134,7 @@ BorderSurface {
     visible: root.dotted
     anchors.fill: parent
     anchors.margins: Style.space(6)
+    anchors.topMargin: root.headerHeight + Style.space(6)
     property color dotColor: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.13)
     onDotColorChanged: requestPaint()
     onWidthChanged: requestPaint()
@@ -156,7 +159,7 @@ BorderSurface {
     anchors.top: parent.top
     anchors.leftMargin: Style.space(10)
     anchors.rightMargin: Style.space(10)
-    anchors.topMargin: Style.space(7)
+    anchors.topMargin: root.headerHeight + Style.space(7)
     spacing: Style.space(4)
 
     Repeater {
@@ -184,7 +187,7 @@ BorderSurface {
     anchors.top: hiddenStrip.visible ? hiddenStrip.bottom : parent.top
     anchors.bottom: parent.bottom
     anchors.margins: root.detailed ? Style.space(8) : Style.space(2)
-    anchors.topMargin: hiddenStrip.visible ? Style.space(5) : (root.detailed ? Style.space(8) : Style.space(2))
+    anchors.topMargin: hiddenStrip.visible ? Style.space(5) : root.headerHeight + (root.detailed ? Style.space(8) : Style.space(2))
 
     Repeater {
       model: root.displays
