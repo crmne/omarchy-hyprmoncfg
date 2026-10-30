@@ -1845,7 +1845,11 @@ Panel {
           serviceRefreshTimer.restart()
       }
     }
-    onError: function(error) { backendSocket.connected = false }
+    onError: function(error) {
+      // Quickshell 0.3.2 still uses its socket after emitting error. Disconnecting
+      // synchronously can clear that pointer inside its error handler.
+      Qt.callLater(function() { backendSocket.connected = false })
+    }
   }
 
   Process {
