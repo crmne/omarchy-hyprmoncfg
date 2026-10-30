@@ -269,6 +269,19 @@ Manual, Sequential, and Interleaved; Off is the stored `enabled: false`, keeps t
 saved strategy and plan, writes no workspace rules, and suits user-managed rules
 or tools such as hyprsplit. While Off, the other plan values are inert.
 
+The optional hyprmoncfg Workspaces picker is offered below the resolved plan.
+Check installed/enabled state through Omarchy's local plugin CLI when the panel
+opens. Offer Install picker, Use in bar, or Show overview. Installation uses
+Omarchy's presented terminal with its normal trust, enablement and placement
+questions. Enabling replaces the previous workspace widget through native plugin
+commands and restores it on failure. Do not change workspace assignments or
+keyboard bindings here. Require the daemon's additive `workspace_plan` status
+capability and an applied plan before offering installation or enablement; an
+already enabled picker can still open its live-workspace overview with an older
+daemon. Disable these actions during a preview, unapplied draft or pending
+operation, and include the action in keyboard navigation. Nothing is installed
+or changed just by opening the panel.
+
 ### Profiles
 
 Show labels such as Current, Preferred, Matches these displays, and Other setup.
@@ -326,6 +339,12 @@ preview guard service stay loaded. Removing the bar entry instead removes the
 route to the editor. A hidden icon is skipped by the shell's numbered panel
 hotkeys and Tab switching between panels, which count only visible slots.
 Covered by `tests/baricon.test.js` and `tests/qml-bar`.
+
+Use Omarchy's single/multiple-display glyphs. Size their painted bounds two
+scaled pixels above the stock bar icon size, capped by the normal icon canvas,
+inside the unchanged slot. A separate tiny theme-accent check indicates the
+backend connection; its presence never changes the monitor's scale or center.
+The compact header uses the same component at display-heading size.
 
 TUI parity: the TUI has no bar icon; there is no companion change.
 

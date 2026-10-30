@@ -7,6 +7,7 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "Model.js" as Model
+import "WorkspacePicker.js" as Picker
 
 Panel {
   id: root
@@ -50,6 +51,18 @@ Panel {
   property int cursorIndex: 0
   property bool cursorActive: false
   property bool keyboardHelpOpen: false
+  property var pickerStatus: null
+  readonly property string pickerBlockedReason: root.editorPreviewBlocked || root.identifyBlockedByPreview
+    ? "Finish the display preview before changing the bar."
+    : root.draftDirty || root.editPending || root.creatingProfile
+      ? "Save or discard your changes before changing the bar."
+      : root.installing || root.serviceActionPending ? "Wait for the current operation to finish." : ""
+  readonly property var pickerOffer: pickerProbe.running
+    ? ({ action: "", label: "Checking…", description: "Workspaces grouped by monitor in your bar.", enabled: false })
+    : Picker.offer(root.pickerStatus, Array.isArray(root.document.workspace_plan),
+        Array.isArray(root.document.workspace_plan) && root.document.workspace_plan.some(function(group) { return group.workspaces && group.workspaces.length > 0 }),
+        root.pickerBlockedReason !== "")
+  readonly property string pickerScript: decodeURIComponent(String(Qt.resolvedUrl("scripts/workspace-picker.rb")).replace(/^file:\/\//, ""))
   property string keyboardLayoutPane: "canvas"
   property int keyboardInspectorField: 0
   property int workspaceKeyboardIndex: 0
@@ -170,7 +183,7 @@ Panel {
     workspaceSettingsHeight: Style.space(30) + workspaceSettingsColumn.implicitHeight
       - (manualAssignmentList.visible ? manualAssignmentList.height + workspaceSettingsColumn.spacing : 0),
     workspaceRowCount: manualAssignmentList.visible ? root.manualWorkspaceRows.length : 0,
-    workspacePlanHeight: workspacePlanPane.height,
+    workspacePlanHeight: workspacePlanPane.height + workspacePickerOffer.implicitHeight + Style.space(10),
     availableWidth: panel.availableCardWidth - root.panelHorizontalInset,
     availableHeight: panel.availableCardHeight - panel.verticalContentInset
   })
@@ -495,6 +508,24 @@ Panel {
   }
 
   function openFromHotkey() { root.open() }
+  function checkWorkspacePicker() {
+    if (!pickerProbe.running) pickerProbe.running = true
+  }
+  function activateWorkspacePicker() {
+    if (!root.pickerOffer.enabled || root.pickerBlockedReason !== "") return
+    var action = root.pickerOffer.action
+    if (action === "check") { root.checkWorkspacePicker(); return }
+    var command
+    if (action === "open") command = ["omarchy-shell", "shell", "summon", Picker.pickerId, "{}"]
+    else if (action === "install") command = ["omarchy", "launch", "floating", "terminal", "with", "presentation",
+      "ruby " + Util.shellQuote(root.pickerScript) + " install"]
+    else if (action === "use") command = ["ruby", root.pickerScript, "use"]
+    else return
+    root.close()
+    pickerAction.command = command
+    // Changing the bar rebuilds its widgets. Let the action finish independently.
+    Qt.callLater(function() { pickerAction.startDetached() })
+  }
   function close() {
     if (root.previewTransaction !== "" && !root.previewCoordinator) root.revertPreview()
     root.keyboardHelpOpen = false
@@ -1113,7 +1144,7 @@ Panel {
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
 
-  function workspaceKeyboardCount() {
+  function workspacePlanKeyboardCount() {
     var settings = ((root.draftProfile || {}).workspaces || {})
     if (root.workspacesOff) return root.workspaceListKeyboardStart
     if (root.workspaceStrategy === "manual")
@@ -1121,12 +1152,16 @@ Panel {
     var order = settings.monitor_order || []
     return root.workspaceListKeyboardStart + order.length
   }
+  function workspaceKeyboardCount() {
+    return root.workspacePlanKeyboardCount() + 1
+  }
 
   function normalizeWorkspaceCursor() {
     root.workspaceKeyboardIndex = Model.wrapIndex(
       root.workspaceKeyboardIndex, root.workspaceKeyboardCount())
     if (manualAssignmentList.visible
-        && root.workspaceKeyboardIndex >= root.workspaceListKeyboardStart)
+        && root.workspaceKeyboardIndex >= root.workspaceListKeyboardStart
+        && root.workspaceKeyboardIndex < root.workspacePlanKeyboardCount())
       manualAssignmentList.positionViewAtIndex(
         root.workspaceKeyboardIndex - root.workspaceListKeyboardStart, ListView.Contain)
   }
@@ -1135,12 +1170,14 @@ Panel {
     root.workspaceKeyboardIndex = Model.wrapIndex(
       root.workspaceKeyboardIndex + delta, root.workspaceKeyboardCount())
     if (manualAssignmentList.visible
-        && root.workspaceKeyboardIndex >= root.workspaceListKeyboardStart)
+        && root.workspaceKeyboardIndex >= root.workspaceListKeyboardStart
+        && root.workspaceKeyboardIndex < root.workspacePlanKeyboardCount())
       manualAssignmentList.positionViewAtIndex(
         root.workspaceKeyboardIndex - root.workspaceListKeyboardStart, ListView.Contain)
   }
 
   function adjustWorkspaceKeyboard(delta) {
+    if (root.workspaceKeyboardIndex === root.workspacePlanKeyboardCount()) return
     if (!root.managedChecked || root.editPending || root.previewTransaction !== "") return
     var settings = Model.clone((root.draftProfile || {}).workspaces || {}) || {}
     var index = root.workspaceKeyboardIndex
@@ -1281,7 +1318,8 @@ Panel {
       if (returnPressed) root.activateSelectedSavedProfile()
       else root.setProfileAutomatic(!root.profileAutomatic)
     } else if (root.activePage === "workspaces") {
-      root.adjustWorkspaceKeyboard(1)
+      if (root.workspaceKeyboardIndex === root.workspacePlanKeyboardCount()) root.activateWorkspacePicker()
+      else root.adjustWorkspaceKeyboard(1)
     }
   }
 
@@ -1765,8 +1803,10 @@ Panel {
     root.restorePanelExpanded()
   }
   onActivePageChanged: {
-    if (root.activePage === "workspaces")
+    if (root.activePage === "workspaces") {
       Qt.callLater(function() { root.ensureManualWorkspaceRules() })
+      if (root.opened) root.checkWorkspacePicker()
+    }
   }
 
   Connections {
@@ -1792,6 +1832,7 @@ Panel {
       root.keyboardLayoutPane = "canvas"
       root.keyboardInspectorField = 0
       root.workspaceKeyboardIndex = 0
+      root.checkWorkspacePicker()
       root.checkInstallation()
       root.checkTextSizeCommand()
       root.readTerminalSize()
@@ -1969,6 +2010,13 @@ Panel {
   }
 
   Process { id: installerProcess }
+  Process {
+    id: pickerProbe
+    command: ["timeout", "5s", "omarchy", "plugin", "list", "--json"]
+    stdout: StdioCollector { id: pickerOutput; waitForEnd: true }
+    onExited: function(exitCode) { root.pickerStatus = exitCode === 0 ? Picker.parseStatus(pickerOutput.text) : null }
+  }
+  Process { id: pickerAction }
 
   Process {
     id: serviceProcess
@@ -2392,36 +2440,17 @@ Panel {
             width: parent.width
             implicitHeight: Math.max(compactHeroIcon.implicitHeight, compactHeroLabels.implicitHeight, compactExpandButton.implicitHeight)
 
-            Item {
+            DisplayIcon {
               id: compactHeroIcon
-              implicitWidth: compactHeroGlyph.implicitWidth
-              implicitHeight: compactHeroGlyph.implicitHeight
+              size: Style.font.display + Style.space(2)
+              monitorCount: root.monitorCount
+              connected: root.backendConnected
+              fontFamily: root.fontFamily
+              foreground: root.foreground
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
               opacity: root.backendConnected ? 1.0 : 0.6
 
-              Text {
-                textFormat: Text.PlainText
-                id: compactHeroGlyph
-                text: root.monitorCount > 1 ? "󰍺" : "󰍹"
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.display
-              }
-
-              Text {
-                textFormat: Text.PlainText
-                visible: root.backendConnected
-                anchors.right: compactHeroGlyph.right
-                anchors.bottom: compactHeroGlyph.bottom
-                anchors.rightMargin: -Style.space(2)
-                anchors.bottomMargin: -Style.space(1)
-                text: "󰄬"
-                color: Commons.Color.accent
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-                font.bold: true
-              }
             }
 
             Column {
@@ -4431,7 +4460,7 @@ Panel {
 
               EditorPane {
                 width: parent.width
-                height: parent.height - workspacePlanPane.height - parent.spacing
+                height: parent.height - workspacePlanPane.height - workspacePickerOffer.height - parent.spacing * 2
                 title: ""
                 foreground: root.foreground
                 dim: root.dim
@@ -4497,6 +4526,18 @@ Panel {
                 }
               }
 
+              WorkspacePickerOffer {
+                id: workspacePickerOffer
+                width: parent.width
+                height: implicitHeight
+                offer: root.pickerOffer
+                blockedReason: root.pickerBlockedReason
+                foreground: root.foreground
+                fontFamily: root.fontFamily
+                hasCursor: root.expanded && root.activePage === "workspaces"
+                  && root.workspaceKeyboardIndex === root.workspacePlanKeyboardCount()
+                onActivated: root.activateWorkspacePicker()
+              }
             }
           }
         }

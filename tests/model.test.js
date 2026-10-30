@@ -27,7 +27,7 @@ test("persistence keyboard action respects old daemon capability and manual rule
   const root = { managedChecked: true, editPending: false, previewTransaction: "",
     draftProfile: { workspaces: { enabled: true, strategy: "sequential", persist_all: false } },
     workspaceKeyboardIndex: 3, workspaceGroupSizeApplicable: true, workspacePersistenceKeyboardIndex: 3,
-    workspaceStrategy: "sequential", editorDocument: {}, editWorkspaces: value => edits.push(value) }
+    workspaceStrategy: "sequential", workspacePlanKeyboardCount: () => 4, editorDocument: {}, editWorkspaces: value => edits.push(value) }
   const adjust = panelFunction("adjustWorkspaceKeyboard", root)
   adjust(1)
   assert.equal(edits.length, 0)
@@ -950,9 +950,11 @@ test("bar icon stays legible through transient daemon restarts", () => {
   assert.match(qml, /text: root\.monitorCount > 1 \? "󰍺" : "󰍹"/)
   assert.match(qml, /dimmed: root\.barIconDimmed/)
   assert.doesNotMatch(qml, /dimmed: !root\.backendConnected/)
-  assert.match(qml, /visible: root\.backendConnected/)
-  assert.match(qml, /text: "󰄬"/)
-  assert.match(qml, /color: Commons\.Color\.accent/)
+  assert.match(qml, /connected: root\.backendConnected/)
+  const icon = fs.readFileSync(path.join(__dirname, "..", "DisplayIcon.qml"), "utf8")
+  assert.match(icon, /visible: root\.connected/)
+  assert.match(icon, /text: "󰄬"/)
+  assert.match(icon, /color: Commons\.Color\.accent/)
 })
 
 test("the update call to action uses a plain refresh icon", () => {
@@ -963,10 +965,12 @@ test("the update call to action uses a plain refresh icon", () => {
 
 test("the panel header uses the clear managed check at hero scale", () => {
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
-  assert.match(qml, /id: compactHeroGlyph/)
-  assert.match(qml, /visible: root\.backendConnected/)
-  assert.match(qml, /text: "󰄬"/)
-  assert.match(qml, /color: Commons\.Color\.accent/)
+  assert.match(qml, /DisplayIcon \{\s+id: compactHeroIcon/)
+  assert.match(qml, /connected: root\.backendConnected/)
+  const icon = fs.readFileSync(path.join(__dirname, "..", "DisplayIcon.qml"), "utf8")
+  assert.match(icon, /visible: root\.connected/)
+  assert.match(icon, /text: "󰄬"/)
+  assert.match(icon, /color: Commons\.Color\.accent/)
   assert.match(qml, /text: "hyprmoncfg"/)
 })
 
@@ -2221,6 +2225,7 @@ test("workspace keyboard cycles Off first and Off leaves only Strategy", () => {
   const root = { managedChecked: true, editPending: false, previewTransaction: "",
     draftProfile: { workspaces: { enabled: false, strategy: "sequential", max_workspaces: 9 } },
     workspaceKeyboardIndex: 0, workspacesOff: true, workspaceGroupSizeApplicable: false,
+    workspacePlanKeyboardCount: () => 1,
     workspacePersistenceKeyboardIndex: -1, workspaceListKeyboardStart: 1, workspaceValueMaximum: 100,
     editorDocument: { workspace_persistence_supported: true },
     changeWorkspaceStrategy: value => choices.push(value), editWorkspaces: value => edits.push(value),
@@ -2242,7 +2247,7 @@ test("workspace keyboard cycles Off first and Off leaves only Strategy", () => {
   }
   assert.deepEqual(edits, [])
   const count = panelFunction("workspaceKeyboardCount", root)
-  assert.equal(count(), 1)
+  assert.equal(count(), 2)
 })
 
 test("Off replaces the Enabled toggle, hides plan controls, and explains the empty plan", () => {

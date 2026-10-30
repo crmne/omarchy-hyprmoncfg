@@ -60,12 +60,14 @@ ShellRoot {
     var smaller = glyphBounds(smallerFontSample, smallerFontSample)
     check(Math.abs(smaller.width - expected.width) > 0.05,
       "measurement failed to detect a smaller glyph font")
-    check(Math.abs(actual.width - expected.width) < 0.05,
-      "monitor width " + actual.width + " differs from stock " + expected.width)
-    check(Math.abs(actual.height - expected.height) < 0.05,
-      "monitor height " + actual.height + " differs from stock " + expected.height)
-    check(Math.abs(actual.x - expected.x) < 0.05 && Math.abs(actual.y - expected.y) < 0.05,
-      "monitor alignment differs from stock")
+    var size = Math.min(Style.bar.iconCanvas, Style.bar.iconSize + Style.space(2))
+    check(Math.abs(Math.max(actual.width, actual.height) - size) < 0.05,
+      "monitor did not receive the modest optical size increase")
+    check(Math.abs(actual.width / actual.height - expected.width / expected.height) < 0.05,
+      "monitor glyph proportions differ from stock")
+    check(Math.abs(actual.x + actual.width / 2 - button.width / 2) < 0.05
+      && Math.abs(actual.y + actual.height / 2 - button.height / 2) < 0.05,
+      "monitor is no longer optically centered")
     check(widget.implicitWidth === reference.implicitWidth, "slot width changed")
     check(widget.implicitHeight === reference.implicitHeight, "slot height changed")
 
@@ -80,6 +82,7 @@ ShellRoot {
     check(badge.visible === data.connected, "badge does not follow backend state")
     if (data.connected) {
       check(badge.color.toString() === Commons.Color.accent.toString(), "badge lost accent color")
+      badgeMetrics.font = badge.font
       var ink = badge.mapToItem(button, badgeMetrics.tightBoundingRect.x,
         badge.baselineOffset + badgeMetrics.tightBoundingRect.y,
         badgeMetrics.tightBoundingRect.width, badgeMetrics.tightBoundingRect.height)

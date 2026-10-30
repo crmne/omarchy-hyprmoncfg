@@ -51,6 +51,21 @@ navigation. Existing brightness, text-size, scale and display controls remain
 available. The editor opens on the focused display and retains its normal
 close, repeated-open and preview behavior.
 
+## Add a workspace picker
+
+The Workspaces page offers [hyprmoncfg Workspaces](https://github.com/crmne/omarchy-hyprmoncfg-workspaces),
+which groups workspace numbers by monitor and shows your screen arrangement on
+right-click. Choose **Install picker** to open Omarchy's normal interactive
+installer, or **Use in bar** if it is already installed. Once enabled, the action
+becomes **Show overview**. Changing the picker preserves workspace assignments
+and keyboard shortcuts. Finish any preview and save or discard edits first.
+
+The offer requires a daemon that supplies `workspace_plan` in its status and an
+applied workspace plan. This capability is on hyprmoncfg main after 1.25.1,
+awaiting a stable release. Existing installations of the picker can still open
+the overview with older daemons. The integration helper uses Ruby, included in
+Omarchy's base packages, and native Omarchy plugin commands.
+
 ## Automatically match the right layout to the connected monitors
 
 Set your profiles up once. The desk, with the ultrawide on and the laptop panel off. The dock with three screens. The conference room projector at its own resolution and scale. After that you do nothing. Plug the monitors in and the matching profile is applied. Close the lid and the clamshell layout takes over. Undock and your laptop screen comes back at the scale you picked, with your workspaces where you put them.
@@ -246,6 +261,9 @@ QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -platform offscreen -in
 omarchy plugin validate .
 git diff --check
 ```
+
+Run `ruby tests/workspace-picker.rb` for workspace-widget replacement and
+recovery, and `python3 tests/socket-reconnect.py` for daemon-disconnect recovery.
 
 On an Omarchy installation, also run `bash tests/baricon-geometry.sh` to compare
 the actual bar glyph and badge against the shell's stock icon rendering. It uses

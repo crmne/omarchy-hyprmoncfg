@@ -65,27 +65,28 @@ BarWidget {
     }
   }
 
-  BarIconButton {
+  WidgetButton {
     id: button
     opacity: root.showBarIcon ? 1 : 0
     anchors.fill: parent
     bar: root.bar
     text: root.monitorCount > 1 ? "󰍺" : "󰍹"
+    labelVisible: false
+    fontSize: Style.bar.iconFont
+    fixedWidth: vertical ? -1 : Style.bar.iconSlot
+    fixedHeight: vertical ? Style.bar.iconSlot : -1
     dimmed: root.barIconDimmed
     tooltipText: root.activeProfile !== "" ? "Display · " + root.activeProfile : "Display · hyprmoncfg"
-    // Keep the status badge outside the icon's sizing calculation.
-    Text {
-      textFormat: Text.PlainText
-      visible: root.backendConnected
-      anchors.right: parent.right
-      anchors.bottom: parent.bottom
-      anchors.rightMargin: (button.width - button.opticalSize) / 2 - Style.space(1)
-      anchors.bottomMargin: (button.height - button.opticalSize) / 2 - Style.space(1)
-      text: "󰄬"
-      color: Commons.Color.accent
-      font.family: button.fontFamily
-      font.pixelSize: Math.max(7, Math.round(button.fontSize * 0.45))
-      font.bold: true
+    DisplayIcon {
+      x: (parent.width - width) / 2
+      y: (parent.height - height) / 2
+      fontSize: button.fontSize
+      size: Math.min(Style.bar.iconCanvas, Style.bar.iconSize + Style.space(2))
+      monitorCount: root.monitorCount
+      connected: root.backendConnected
+      fontFamily: button.fontFamily
+      foreground: button.foreground
+      scale: button.pressScale
     }
 
     onPressed: function(mouseButton) {

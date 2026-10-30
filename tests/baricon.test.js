@@ -48,7 +48,7 @@ test("hiding the bar icon collapses only the slot", () => {
 })
 
 test("the hidden icon still anchors the panel window", () => {
-  const button = directProperties(qml, "BarIconButton")
+  const button = directProperties(qml, "WidgetButton")
   assert.equal(button.id, "button")
   // An invisible anchor has no window, so the panel would never map.
   assert.equal(button.visible, undefined)
