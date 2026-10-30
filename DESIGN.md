@@ -283,8 +283,10 @@ Right-clicking the picker opens only this Workspaces tab, anchored to the picker
 on the clicked display. Reuse the existing editor, draft and persistent preview
 guard through a UI-only shell IPC route. Do not duplicate the editor or expose
 Layout/Profiles tabs, TUI or Compact controls in this popup. The main panel keeps
-its normal navigation. Keep workspace-only mode through preview recovery and bar
-rebuilds. Assigned IDs in the workspace-plan rows remain direct Hyprland switching
+its normal navigation. A hyprmoncfg button immediately before Identify all opens
+the full editor's Layout page in place, retaining the draft and any active preview.
+Its tooltip reads "Open display settings". Keep workspace-only mode through preview
+recovery and bar rebuilds. Assigned IDs in the workspace-plan rows remain direct Hyprland switching
 targets, including numbers omitted from the compact bar; disable switching while
 there are unapplied edits or a preview. Opening the planner sends no daemon
 configuration or switching command. Older or absent panels retain the picker's

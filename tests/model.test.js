@@ -2392,6 +2392,24 @@ test("workspace-only navigation cannot enter hidden tabs and survives preview re
   assert.equal(rebuilt.workspaceOnly,true)
   assert.equal(rebuilt.activePage,"workspaces")
 })
+test("opening display settings preserves workspace drafts and active previews", () => {
+  for (const previewTransaction of ["", "active-preview"]) {
+    const draft = {name:"Workspace edits", workspaces:{total:9}}
+    const origin = {screen:"DP-1",x:10,y:0,width:140,height:26}
+    const root = {workspaceOnly:true,expanded:true,activePage:"workspaces",
+      draftProfile:draft,draftDirty:true,previewTransaction,workspaceLaunchOrigin:origin}
+    let focused = false
+    panelFunction("showDisplaySettings",root,{keyCatcher:{forceActiveFocus:()=>{focused=true}}})()
+    assert.equal(root.workspaceOnly,false)
+    assert.equal(root.activePage,"layout")
+    assert.equal(root.expanded,true)
+    assert.equal(root.draftProfile,draft)
+    assert.equal(root.draftDirty,true)
+    assert.equal(root.previewTransaction,previewTransaction)
+    assert.equal(root.workspaceLaunchOrigin,origin)
+    assert.equal(focused,true)
+  }
+})
 test("the picker UI route never sends a daemon command", () => {
   const guard=previewGuard()
   guard.root.workspacePageRequested=()=>{guard.root.workspacePageHandled=true}

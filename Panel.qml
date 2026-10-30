@@ -541,6 +541,11 @@ Panel {
     Hyprland.dispatch(request)
     root.close()
   }
+  function showDisplaySettings() {
+    root.workspaceOnly = false
+    root.activePage = "layout"
+    keyCatcher.forceActiveFocus()
+  }
   function checkWorkspacePicker() {
     if (!pickerProbe.running) pickerProbe.running = true
   }
@@ -2985,6 +2990,21 @@ Panel {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(6)
+
+            Button {
+              objectName: "workspaceDisplaySettings"
+              visible: root.workspaceOnly
+              anchors.verticalCenter: parent.verticalCenter
+              text: "hyprmoncfg"
+              tooltipText: "Open display settings"
+              focusable: true
+              implicitHeight: identifyAllButton.implicitHeight
+              bordered: true
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              fontSize: Style.font.caption
+              onClicked: root.showDisplaySettings()
+            }
 
             Button {
               id: identifyAllButton
