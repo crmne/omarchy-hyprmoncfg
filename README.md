@@ -74,8 +74,7 @@ service gets the usual start/recovery controls. The planner appears once the
 daemon is ready, without losing drafts or active previews during reconnects.
 
 The offer requires a daemon that supplies `workspace_plan` in its status and an
-applied workspace plan. This capability is on hyprmoncfg main after 1.25.1,
-awaiting a stable release. Existing installations of the picker can still switch live workspaces with
+applied workspace plan. This capability requires hyprmoncfg 1.26.0 or newer. Existing installations of the picker can still switch live workspaces with
 older daemons. The integration helper uses Ruby, included in
 Omarchy's base packages, and native Omarchy plugin commands.
 
