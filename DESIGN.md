@@ -284,13 +284,19 @@ on the clicked display. Reuse the existing editor, draft and persistent preview
 guard through a UI-only shell IPC route. Do not duplicate the editor or expose
 Layout/Profiles tabs, TUI or Compact controls in this popup. The main panel keeps
 its normal navigation. A hyprmoncfg button immediately before Identify all opens
-the full editor's Layout page in place, retaining the draft and any active preview.
+the full editor's Layout page from its own display icon, retaining the draft and any active preview.
 Its tooltip reads "Open display settings". Keep workspace-only mode through preview
 recovery and bar rebuilds. Assigned IDs in the workspace-plan rows remain direct Hyprland switching
 targets, including numbers omitted from the compact bar; disable switching while
 there are unapplied edits or a preview. Opening the planner sends no daemon
 configuration or switching command. Older or absent panels retain the picker's
-live overview, with an installation action when the panel is missing or disabled.
+live overview, with distinct Install panel, Enable panel and Update panel actions.
+After the panel is enabled, open the shared editor. If the daemon is missing,
+outdated or stopped, show the panel's existing installation and service controls
+under a Workspaces header. Advance to the planner when the daemon is ready.
+Never collapse an unsaved draft or active preview during a daemon reconnect.
+There is one daemon installer, including its progress, errors and interactive
+terminal; the picker does not duplicate it or install packages automatically.
 
 ### Profiles
 

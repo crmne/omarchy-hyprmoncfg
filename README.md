@@ -64,8 +64,14 @@ planner controls, draft, Apply/Save and confirmation flow, without Layout or
 Profiles tabs. Workspace-plan numbers also switch directly to that workspace
 when there are no unapplied edits or previews. The main panel keeps its normal
 navigation. The **hyprmoncfg** button beside Identify all opens the full display
-editor on Layout, keeping any workspace edits or active preview. Changing the
+editor on Layout from its own bar icon, keeping any workspace edits or active preview. Changing the
 picker preserves assignments and keyboard shortcuts.
+
+If hyprmoncfg is missing or needs an update, opening the picker shows this panel's
+same **Install hyprmoncfg** or **Update hyprmoncfg** control. The existing
+interactive installer handles the package and background service. A stopped
+service gets the usual start/recovery controls. The planner appears once the
+daemon is ready, without losing drafts or active previews during reconnects.
 
 The offer requires a daemon that supplies `workspace_plan` in its status and an
 applied workspace plan. This capability is on hyprmoncfg main after 1.25.1,

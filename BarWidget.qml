@@ -20,7 +20,7 @@ BarWidget {
   function togglePanel() {
     if (panelLoader.item && panelLoader.item.toggle) {
       if (panelLoader.item.opened && panelLoader.item.workspaceOnly) {
-        panelLoader.item.openFromHotkey()
+        panelLoader.item.showDisplaySettings()
         return
       }
       if (!panelLoader.item.opened) {

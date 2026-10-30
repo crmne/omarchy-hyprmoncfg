@@ -2392,7 +2392,19 @@ test("workspace-only navigation cannot enter hidden tabs and survives preview re
   assert.equal(rebuilt.workspaceOnly,true)
   assert.equal(rebuilt.activePage,"workspaces")
 })
-test("opening display settings preserves workspace drafts and active previews", () => {
+test("the picker opens the existing setup UI until the daemon is ready", () => {
+  for (const workspaceSetupRequired of [true,false]) {
+    const root={workspaceOnly:false,workspaceSetupRequired,expanded:false,activePage:'layout',open:()=>{}}
+    panelFunction('openWorkspacePage',root,{panel:{screen:{name:'DP-1'}}})({screen:'DP-1'})
+    assert.equal(root.workspaceOnly,true)
+    assert.equal(root.expanded,!workspaceSetupRequired)
+    assert.equal(root.activePage,'workspaces')
+    root.previewCoordinator={panelWorkspaceOnly:true,panelExpanded:true}
+    panelFunction('restorePanelExpanded',root)()
+    assert.equal(root.expanded,!workspaceSetupRequired)
+  }
+})
+test("opening display settings returns to the display icon and preserves edits and previews", () => {
   for (const previewTransaction of ["", "active-preview"]) {
     const draft = {name:"Workspace edits", workspaces:{total:9}}
     const origin = {screen:"DP-1",x:10,y:0,width:140,height:26}
@@ -2406,7 +2418,7 @@ test("opening display settings preserves workspace drafts and active previews", 
     assert.equal(root.draftProfile,draft)
     assert.equal(root.draftDirty,true)
     assert.equal(root.previewTransaction,previewTransaction)
-    assert.equal(root.workspaceLaunchOrigin,origin)
+    assert.equal(root.workspaceLaunchOrigin,null)
     assert.equal(focused,true)
   }
 })

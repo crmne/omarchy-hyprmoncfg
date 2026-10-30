@@ -111,6 +111,14 @@ Panel {
   property string activePage: "layout"
   property bool expanded: false
   property bool workspaceOnly: false
+  // The picker uses this panel's installer and service controls until its
+  // daemon is ready. Keep edits and preview recovery visible across a restart.
+  readonly property bool workspaceSetupRequired: root.workspaceOnly
+    && (!root.compatible || !root.backendConnected)
+    && !root.draftDirty && !root.editorPreviewBlocked
+  onWorkspaceSetupRequiredChanged: {
+    if (root.workspaceOnly) root.expanded = !root.workspaceSetupRequired
+  }
   property string inspectorPage: "display"
   property string selectedSavedProfileName: ""
   property string profileChoice: ""
@@ -257,7 +265,8 @@ Panel {
       root.workspaceOnly = true
       root.activePage = "workspaces"
     }
-    if (root.previewCoordinator && root.previewCoordinator.panelExpanded === true) root.expanded = true
+    if (root.previewCoordinator && root.previewCoordinator.panelExpanded === true)
+      root.expanded = !root.workspaceSetupRequired
   }
   readonly property var displayNotes: Model.displayNotes(root.backendConnected ? monitorSummaries : [])
   readonly property string hiddenDisplays: root.daemonPreview && root.daemonPreview.profile
@@ -529,7 +538,7 @@ Panel {
     if (!panel.screen || panel.screen.name !== origin.screen) return
     root.workspaceLaunchOrigin = origin.width !== undefined ? origin : null
     root.workspaceOnly = true
-    root.expanded = true
+    root.expanded = !root.workspaceSetupRequired
     root.activePage = "workspaces"
     root.open()
     if (root.previewCoordinator) root.previewCoordinator.workspacePageHandled = true
@@ -542,6 +551,7 @@ Panel {
     root.close()
   }
   function showDisplaySettings() {
+    root.workspaceLaunchOrigin = null
     root.workspaceOnly = false
     root.activePage = "layout"
     keyCatcher.forceActiveFocus()
@@ -2515,7 +2525,7 @@ Panel {
               Text {
                 textFormat: Text.PlainText
                 width: parent.width
-                text: "Display"
+                text: root.workspaceOnly ? "Workspaces" : "Display"
                 color: root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.title
@@ -2539,7 +2549,7 @@ Panel {
 
             Button {
               id: compactExpandButton
-              visible: root.compatible
+              visible: root.compatible && !root.workspaceOnly
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
               text: "Expand"
