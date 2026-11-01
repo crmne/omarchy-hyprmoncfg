@@ -1,11 +1,11 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const fs = require('node:fs')
+const { fs } = require('./english')
 const os = require('node:os')
 const path = require('node:path')
 const {spawnSync} = require('node:child_process')
 const vm = require('node:vm')
-const Model = require('../Model.js')
+const Model = require('./script')('Model.js')
 const qml = fs.readFileSync(path.join(__dirname, '..', 'Panel.qml'), 'utf8')
 
 test('package detection excludes binary, development, and unmanaged installs from migration', () => {

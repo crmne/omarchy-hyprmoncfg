@@ -100,7 +100,8 @@ For a saved setup, show its name and display count. Omit redundant "Current setu
 "Best match", and the normal automatic-mode label; paused matching remains explicit
 and offers Resume automatic matching.
 
-Use the backend's preferred Sequential strategy for new plans. Ambiguous
+Use the backend's preferred Sequential strategy, in groups of three, for new plans.
+Switching an existing plan to Sequential keeps a chosen group size above one. Ambiguous
 single-display imports use groups of three while preserving workspace total and
 persistence. Explicit saved strategies still win; the panel must not independently
 infer or migrate workspace intent.
@@ -221,6 +222,30 @@ in the keyboard field order, and Hyprland's terminology.
   ranges, so sliders would imply limits that do not exist), and the ICC path.
 
 Preserve canvas dragging, fine arrow movement, and snapping.
+
+Closing the gaps with Omarchy's built-in Display panel, 2026-11-01:
+
+- **Extend | Mirror** sits in the stage header, in compact and on the Layout page,
+  when a connected built-in display (eDP, LVDS, DSI) is on and at least one connected
+  external is on. It edits `mirror_of` on the externals through `edit_profile`, one
+  output at a time, so the daemon validates each step. On a clean draft the click then
+  starts the normal draft preview with Keep/Revert; on a dirty draft it only joins the
+  draft, so unrelated edits are never applied with it. Mirrored outputs keep their x
+  and y in the draft, so Extend restores them; the panel also remembers them for the
+  session, because Keep reloads the draft from Hyprland. An arrangement that is
+  neither selects no chip and leaves both available. Keyboard: `m` on the Layout page,
+  the top row in compact. The TUI has no one-click equivalent; it edits Mirror per
+  display.
+- `h`/`j`/`k`/`l` act as arrows wherever arrows navigate, never in a text field.
+  `Ctrl` and `Alt` work with the letters on the canvas. `Shift`+letter stays the TUI's
+  500px jump and `l` on Profiles stays Load.
+- Right-clicking a canvas card opens a rotate menu with the ROTATION field's choices
+  (Auto too, where the display offers it), the current one checked. It uses
+  the same edit as the field, and Esc closes it first. Off and mirrored displays have
+  no card; their rotation is in the inspector.
+- With one display in the draft and one connected, nothing can be arranged: dragging,
+  movement keys, Position, Place beside, Mirror and workspace monitor reordering go
+  away. Rotation stays in the inspector and on right-click.
 
 ### Display states
 
@@ -424,6 +449,58 @@ shrink the canvas and scroll the inspector while keeping the footer visible. Tes
 a 1366x768 logical desktop, fractional scaling, enlarged fonts, long names, and
 keyboard-only use. The TUI counterpart targets 80x24 with the same essential
 actions available; matching appearance cannot justify inaccessible controls.
+
+## Languages
+
+Decided 2026-11-01: the panel speaks every language Omarchy ships and follows
+Setup > Language live. Strings live in `i18n/<code>.json`, read through Omarchy's
+`Commons.Translations`. Its fallback runs from the language to its base language
+(`pt-BR` to `pt`) to English, one string at a time.
+
+- `Strings.js` is the one entry point: `Strings.t(key, english, values...)` and
+  `Strings.tn(key, count, one, other, values...)`, with `%1` tokens filled in a
+  single pass, so a profile name holding `%1` is left alone. The English sits
+  beside each key, and `i18n/en.json` has to match it. Without
+  `Commons.Translations` that English is the answer: naming the type in a QML
+  file stops the file loading on an older Omarchy, so only `StringsSource.qml`
+  names it, and `Strings.js` loads that file where failing is harmless.
+- Model.js, IdentifyModel.js and WorkspacePicker.js are `.pragma library` scripts
+  that `.import "Strings.js"`. They cannot reach it through the QML file importing
+  them, because Qt caches that lookup per script by import position, which breaks
+  as soon as two files import in a different order. Node tests load them through
+  `tests/script.js`. Bindings that reach a string re-render on a language change,
+  even through these scripts. Text stored when something happens, such as an
+  error, keeps its language until it is replaced.
+- Keep strings whole and give each plural its own entry; never glue fragments.
+  Say what a string means in the code, not in the catalog: an `Off` for a display,
+  for VRR and for a workspace strategy are separate keys, because many languages
+  inflect them differently.
+- Stay literal: Hyprland and config values, connectors, profile names, resolutions
+  and refresh rates, scale values (`1.33x`), units, key names, commands, product
+  names and color standards. Counts, brightness and text size use the language's
+  digits; values that describe a mode stay as Hyprland writes them.
+- Right-to-left languages mirror through the shell's panels, and the preview
+  confirmation mirrors itself because it has its own window. The canvas is physical
+  space, so it does not: Left moves a display left, whatever the text direction.
+- Daemon text stays in English. A translated client around it is still accurate,
+  and the two clients keep one set of daemon messages.
+
+TUI parity: the TUI is English only. There is no companion change; the English text
+and terminology are unchanged, apart from `1 second` where the panel used to print
+`1 seconds`, and `Interleaved` where a profile summary printed `Interleave`.
+
+## Shell compatibility
+
+Decided 2026-11-01: the panel runs on Omarchy 4.0.6 and later, because QML type errors
+appear only when a file loads and take the whole widget or service with them
+(#44). Use a Commons or Ui name only if 4.0.6 has it; `tests/shell-compat.test.js`
+checks this against `tests/shell-baseline.json`. Read newer singleton members through
+`||`, like `Style.bar.iconSize || Style.bar.iconFont`. For anything else, keep a
+private component: `PaintedGlyph` stands in for `OpticalGlyph.paintedSize`, which 4.0
+lacks, and `SurfaceRemap` for `ScreenMoveRemap`, which later shells removed. It stays
+because Hyprland before 0.57 needs it, and on 0.57 and later it only blinks the
+confirmation once. `manifest.json` has no minimum shell field: neither shell reads one.
+On 4.0 the panel is English, as it has no `Commons.Translations`.
 
 ## Integration and implementation order
 

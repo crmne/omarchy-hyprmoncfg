@@ -1,9 +1,9 @@
 const test = require("node:test")
 const assert = require("node:assert/strict")
-const fs = require("node:fs")
+const { fs } = require("./english")
 const path = require("node:path")
 const vm = require("node:vm")
-const Model = require("../Model.js")
+const Model = require("./script")("Model.js")
 
 const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
 
@@ -74,7 +74,7 @@ test("placement uses the same anchor and positions as Alt+arrow snapping", () =>
   ] }
   assert.equal(Model.snapAnchorName(profile, "b"), "DP-1")
   assert.equal(Model.snapAnchorName(profile, "c"), "", "an off display has no placement")
-  assert.deepEqual(Model.placementOptions.map(o => o.value), ["left", "right", "up", "down"])
+  assert.deepEqual(Model.placementOptions().map(o => o.value), ["left", "right", "up", "down"])
   assert.deepEqual(Model.snapOutputPosition(profile, "b", "right"), { x: 2560, y: 180 })
   assert.deepEqual(Model.snapOutputPosition(profile, "b", "down"), { x: 320, y: 1440 })
 })
@@ -134,7 +134,7 @@ test("keyboard: Enter on a segmented field advances it; Position focuses exact e
 })
 
 test("the inspector wires every field into keyboard order and scroll-into-view", () => {
-  assert.match(qml, /readonly property var displayKeyboardFields: \[0, 1, 23, 2, 5, 6, 22, 7, 8, 21, 9\]/)
+  assert.match(qml, /readonly property var displayKeyboardFields: root\.arrangeable\n\s+\? \[0, 1, 23, 2, 5, 6, 22, 7, 8, 21, 9\] : \[0, 1, 23, 2, 5, 6, 22\]/)
   assert.match(qml, /readonly property var colorKeyboardFields: \[3, 4, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20\]/)
   const list = qml.match(/\? \[(displayEnabledToggle[\s\S]*?)\]\[root\.keyboardInspectorField\]/)[1]
     .split(",").map(s => s.trim())

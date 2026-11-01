@@ -2,6 +2,7 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "Strings.js" as Strings
 
 Column {
   id: root
@@ -32,7 +33,7 @@ Column {
       anchors.right: brightnessValue.left
       anchors.rightMargin: Style.space(8)
       anchors.verticalCenter: parent.verticalCenter
-      text: "Brightness"
+      text: Strings.t("brightness.title", "Brightness")
       font.capitalization: Font.AllUppercase
       elide: Text.ElideRight
       foreground: root.foreground
@@ -44,7 +45,7 @@ Column {
       id: brightnessValue
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
-      text: root.loading ? "…" : (root.available ? root.value + "%" : "Unavailable")
+      text: root.loading ? "…" : (root.available ? Strings.number(root.value) + "%" : Strings.t("brightness.unavailable", "Unavailable"))
       color: root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
@@ -55,7 +56,7 @@ Column {
   Text {
     textFormat: Text.PlainText
     width: parent.width
-    text: "Selected display · " + root.displayLabel
+    text: root.displayLabel
     color: root.dim
     font.family: root.fontFamily
     font.pixelSize: Style.font.caption
@@ -94,7 +95,7 @@ Column {
       visible: !root.available
       anchors.centerIn: parent
       width: Math.max(0, parent.width - Style.space(12))
-      text: root.loading ? "Reading selected display…" : "Brightness unavailable for this display"
+      text: root.loading ? Strings.t("brightness.reading", "Reading selected display…") : Strings.t("brightness.unavailableHint", "Brightness unavailable for this display")
       color: root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption

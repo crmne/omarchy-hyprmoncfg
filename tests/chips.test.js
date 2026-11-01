@@ -1,8 +1,8 @@
 const test = require("node:test")
 const assert = require("node:assert/strict")
-const fs = require("node:fs")
+const { fs } = require("./english")
 const path = require("node:path")
-const Model = require("../Model.js")
+const Model = require("./script")("Model.js")
 
 const read = name => fs.readFileSync(path.join(__dirname, "..", name), "utf8")
 const chip = (x, owner, y = 10) => ({ x, y, width: 16, height: 16, owner })

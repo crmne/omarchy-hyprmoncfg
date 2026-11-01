@@ -3,6 +3,7 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "Model.js" as Model
+import "Strings.js" as Strings
 
 // Direction A: hardware facts as a flat definition list under a section
 // header. Identify, the only action here, sits on the header line so the six
@@ -32,7 +33,7 @@ Item {
       id: headerLabel
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
-      text: "HARDWARE"
+      text: Strings.t("monitorInfo.hardware", "HARDWARE")
       foreground: root.foreground
       fontFamily: root.fontFamily
     }
@@ -41,14 +42,14 @@ Item {
       id: identifyButton
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
-      text: "Identify"
+      text: Strings.t("monitorInfo.identify", "Identify")
       bordered: true
       foreground: root.foreground
       fontFamily: root.fontFamily
       fontSize: Style.font.caption
       horizontalPadding: Style.space(8)
       verticalPadding: Style.space(3)
-      tooltipText: "Identify this display"
+      tooltipText: Strings.t("monitorInfo.identifyTooltip", "Identify this display")
       focusable: true
       enabled: root.canIdentify
       onClicked: root.identifyRequested()
@@ -74,6 +75,7 @@ Item {
           textFormat: Text.PlainText
           width: Math.min(parent.width * 0.4, Style.space(112))
           text: modelData.label
+          wrapMode: Text.Wrap
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.bodySmall
@@ -82,6 +84,7 @@ Item {
           textFormat: Text.PlainText
           width: parent.width - parent.children[0].width - parent.spacing
           text: modelData.value
+          horizontalAlignment: Text.AlignLeft
           wrapMode: Text.Wrap
           color: root.foreground
           font.family: root.fontFamily

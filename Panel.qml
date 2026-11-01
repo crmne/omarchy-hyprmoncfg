@@ -9,6 +9,7 @@ import qs.Commons as Commons
 import qs.Ui
 import "Model.js" as Model
 import "WorkspacePicker.js" as Picker
+import "Strings.js" as Strings
 
 Panel {
   id: root
@@ -56,12 +57,12 @@ Panel {
   property var pickerStatus: null
   readonly property bool pickerOfferVisible: !root.pickerStatus || !root.pickerStatus.enabled
   readonly property string pickerBlockedReason: root.editorPreviewBlocked || root.identifyBlockedByPreview
-    ? "Finish the display preview before changing the bar."
+    ? Strings.t("picker.blockedPreview", "Finish the display preview before changing the bar.")
     : root.draftDirty || root.editPending || root.creatingProfile
-      ? "Save or discard your changes before changing the bar."
-      : root.installing || root.serviceActionPending ? "Wait for the current operation to finish." : ""
+      ? Strings.t("picker.blockedDraft", "Save or discard your changes before changing the bar.")
+      : root.installing || root.serviceActionPending ? Strings.t("picker.blockedBusy", "Wait for the current operation to finish.") : ""
   readonly property var pickerOffer: pickerProbe.running
-    ? ({ action: "", label: "Checking…", description: "Workspaces grouped by monitor in your bar.", enabled: false })
+    ? ({ action: "", label: Strings.t("picker.checking", "Checking…"), description: Strings.t("picker.grouped", "Workspaces grouped by monitor in your bar."), enabled: false })
     : Picker.offer(root.pickerStatus, Array.isArray(root.document.workspace_plan),
         Array.isArray(root.document.workspace_plan) && root.document.workspace_plan.some(function(group) { return group.workspaces && group.workspaces.length > 0 }),
         root.pickerBlockedReason !== "")
@@ -166,6 +167,14 @@ Panel {
   // ---- Content-sized panel. The math lives in Model.js; QML only feeds it
   // measured content heights and binds to the result.
   readonly property real sizingUnit: Style.spaceReal(1)
+  // Extend | Mirror, offered above the stage for a laptop with an external.
+  readonly property var displayMode: Model.displayModeState(root.draftProfile, root.editorDocument.displays)
+  readonly property bool displayModeEnabled: root.managedChecked && root.editorReady && !root.editPending
+    && !root.editorPreviewBlocked
+  // With one display there is nothing to arrange; rotation stays reachable.
+  readonly property bool rotatable: root.managedChecked && root.editorReady && !root.editPending
+    && root.previewTransaction === ""
+  readonly property bool arrangeable: !Model.singleDisplay(root.draftProfile, root.editorDocument.displays)
   readonly property bool layoutOffRow: Model.nonSpatialDisplays(root.daemonPreview && root.daemonPreview.profile
     ? root.daemonPreview.profile : root.draftProfile, root.editorDocument.displays, false, root.displayNotes).length > 0
   readonly property var profileBounds: Model.layoutBounds(Model.profileLayoutDisplays(
@@ -179,6 +188,7 @@ Panel {
     page: root.activePage,
     bounds: root.layoutBounds,
     offRow: root.layoutOffRow,
+    modeRow: root.displayMode.available,
     chromeHeight: editorNav.height + Style.space(20) + editorFooter.height
       + (previewBanner.visible ? previewBanner.height + Style.space(8) : 0),
     // The active inspector page sets the height, so the Color tab grows the panel
@@ -226,21 +236,37 @@ Panel {
     NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
   }
 
+  // The hidden expanded editor lays out at the compact width, where wrapped
+  // hardware facts measure screen-tall. Its heights only settle once the new
+  // width lands, so a mode switch keeps jumping until then instead of easing
+  // down from the stale height.
+  property bool panelSizeSettling: false
+  Timer {
+    id: panelSettleTimer
+    interval: 100
+    onTriggered: root.panelSizeSettling = false
+  }
+
   function applyPanelSize(modeChanged) {
+    if (modeChanged === true) {
+      root.panelSizeSettling = true
+      panelSettleTimer.restart()
+    }
     var target = root.panelLayout
     var first = root.appliedPanelWidth <= 0
     if (!first && !Model.panelResizeAllowed({
         open: root.opened && root.expanded,
-        modeChanged: modeChanged === true,
+        modeChanged: root.panelSizeSettling,
         dragging: root.canvasDragging,
         pointerInside: panelPointer.hovered,
         barPosition: root.bar ? String(root.bar.position || "top") : "top",
         widthChanged: Math.round(target.width) !== Math.round(root.appliedPanelWidth)
       })) return
     // Mode switches and first layout jump; everything else eases.
-    root.panelSizeAnimated = !first && modeChanged !== true && root.opened && root.expanded
+    root.panelSizeAnimated = !first && !root.panelSizeSettling && root.opened && root.expanded
     root.appliedPanelWidth = target.width
-    root.appliedPanelHeight = target.height
+    // The new width re-measures content and can re-enter; take the height after it.
+    root.appliedPanelHeight = root.panelLayout.height
   }
 
   onPanelLayoutChanged: root.applyPanelSize(false)
@@ -310,25 +336,25 @@ Panel {
     && root.connectedDisplayCount > 0 && !root.exactDisplayProfile
     && !root.daemonPreview && root.previewTransaction === "" && !root.previewPending
   readonly property string profileStatusTitle: {
-    if (!root.managedChecked) return "Not managed by hyprmoncfg"
-    if (root.displaysConnecting) return "Displays connecting…"
-    if (!root.documentReady) return root.serviceActionPending ? "Starting hyprmoncfg…" : "Loading profile…"
+    if (!root.managedChecked) return Strings.t("status.notManaged", "Not managed by hyprmoncfg")
+    if (root.displaysConnecting) return Strings.t("status.displaysConnecting", "Displays connecting…")
+    if (!root.documentReady) return root.serviceActionPending ? Strings.t("status.starting", "Starting hyprmoncfg…") : Strings.t("status.loadingProfile", "Loading profile…")
     if (root.pendingProfileName !== "") return root.pendingProfileName
     if (!root.profileAutomatic && root.displayedProfile !== "") return root.displayedProfile
     if (root.profileAutomatic && root.exactDisplayProfileName !== "") return root.exactDisplayProfileName
-    if (root.profileAutomatic && root.connectedDisplayCount > 0) return "New display setup"
-    return "Custom layout"
+    if (root.profileAutomatic && root.connectedDisplayCount > 0) return Strings.t("status.newSetup", "New display setup")
+    return Strings.t("status.customLayout", "Custom layout")
   }
   readonly property string profileStatusSubtitle: {
-    if (!root.managedChecked) return "Turn on management for automatic profiles"
-    if (root.displaysConnecting) return "Waiting for display information; keeping the current view"
-    if (!root.documentReady) return "Reading the active display layout"
-    var displays = root.connectedDisplayCount === 1 ? "1 display" : root.connectedDisplayCount + " displays"
-    if (root.pendingProfileName !== "") return displays + " · Awaiting confirmation"
-    if (!root.profileAutomatic) return "Automatic matching is paused"
+    if (!root.managedChecked) return Strings.t("status.turnOnManagement", "Turn on management for automatic profiles")
+    if (root.displaysConnecting) return Strings.t("status.waitingDisplays", "Waiting for display information; keeping the current view")
+    if (!root.documentReady) return Strings.t("status.readingLayout", "Reading the active display layout")
+    var displays = Strings.tn("status.displayCount", root.connectedDisplayCount, "%1 display", "%1 displays")
+    if (root.pendingProfileName !== "") return Strings.t("status.awaitingConfirmation", "%1 · Awaiting confirmation", displays)
+    if (!root.profileAutomatic) return Strings.t("status.matchingPaused", "Automatic matching is paused")
     if (root.exactDisplayProfileName !== "") return displays
-    if (root.connectedDisplayCount > 0) return "No saved profile matches these displays"
-    return "No connected displays"
+    if (root.connectedDisplayCount > 0) return Strings.t("status.noProfileMatch", "No saved profile matches these displays")
+    return Strings.t("status.noDisplays", "No connected displays")
   }
   readonly property bool daemonUnmanaged: !!(root.document && root.document.daemon && root.document.daemon.unmanaged)
   readonly property bool managedChecked: serviceActionPending
@@ -352,23 +378,23 @@ Panel {
       rows.push({
         id: "restart-service",
         icon: "󰑓",
-        title: "Restart hyprmoncfg",
-        subtitle: "Try the background service again"
+        title: Strings.t("daemon.restartService", "Restart hyprmoncfg"),
+        subtitle: Strings.t("daemon.tryAgain", "Try the background service again")
       })
     else if (root.daemonOutdated)
       rows.push({
         id: "restart-service",
         icon: "󰑓",
-        title: "Restart daemon",
-        subtitle: root.runningVersion === "" ? "Unknown daemon build; check service"
-          : "Running " + root.runningVersion + ", installed " + root.installedRelease
+        title: Strings.t("daemon.restart", "Restart daemon"),
+        subtitle: root.runningVersion === "" ? Strings.t("daemon.unknownBuild", "Unknown daemon build; check service")
+          : Strings.t("daemon.versionMismatch", "Running %1, installed %2", root.runningVersion, root.installedRelease)
       })
     if (root.canSwitchToBinary)
       rows.push({
         id: "switch-to-binary",
         icon: "󰏗",
-        title: "Switch to prebuilt package",
-        subtitle: "Faster updates, no compilation"
+        title: Strings.t("daemon.switchPackage", "Switch to prebuilt package"),
+        subtitle: Strings.t("daemon.switchPackageHint", "Faster updates, no compilation")
       })
     return rows
   }
@@ -408,7 +434,7 @@ Panel {
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property var selectedOutput: Model.outputByKey(root.draftProfile, root.selectedOutputKey)
   readonly property string profileDefaultsLabel: root.sourceProfile !== ""
-    ? root.sourceProfile : "loaded layout"
+    ? root.sourceProfile : Strings.t("reset.loadedLayout", "loaded layout")
   readonly property var selectedOutputMetadata: Model.editorMetadata(root.editorDocument.displays, root.selectedOutputKey)
   readonly property bool identifyAvailable: !!root.previewCoordinator
     && typeof root.previewCoordinator.identifyDisplays === "function"
@@ -462,17 +488,18 @@ Panel {
     return index < order.length ? String(order[index] || "") : ""
   }
   readonly property var pageOptions: [
-    { value: "layout", label: "1  Layout" },
-    { value: "workspaces", label: "2  Workspaces" },
-    { value: "profiles", label: "3  Profiles" }
+    { value: "layout", label: "1  " + Strings.t("tab.layout", "Layout") },
+    { value: "workspaces", label: "2  " + Strings.t("tab.workspaces", "Workspaces") },
+    { value: "profiles", label: "3  " + Strings.t("tab.profiles", "Profiles") }
   ]
   readonly property var inspectorOptions: [
-    { value: "display", label: "Display" },
-    { value: "color", label: "Color" }
+    { value: "display", label: Strings.t("tab.display", "Display") },
+    { value: "color", label: Strings.t("tab.color", "Color") }
   ]
   // Field 21 is Place beside nearest, 22 is Flipped (part of the transform).
   // Field 23 (Refresh) was added after 21 and 22; it sits right after Resolution.
-  readonly property var displayKeyboardFields: [0, 1, 23, 2, 5, 6, 22, 7, 8, 21, 9]
+  readonly property var displayKeyboardFields: root.arrangeable
+    ? [0, 1, 23, 2, 5, 6, 22, 7, 8, 21, 9] : [0, 1, 23, 2, 5, 6, 22]
   property int placementCursor: 0
   readonly property var selectedDisplayModes: Model.displayModes(root.editorDocument.displays,
     root.selectedOutputKey, root.selectedOutput ? Model.outputMode(root.selectedOutput) : "")
@@ -480,9 +507,9 @@ Panel {
     root.selectedOutput ? Model.modeResolution(Model.outputMode(root.selectedOutput)) : "")
   readonly property var colorKeyboardFields: [3, 4, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
   readonly property var vrrOptions: [
-    { value: "0", label: "Off" },
-    { value: "1", label: "On" },
-    { value: "2", label: "Fullscreen" }
+    { value: "0", label: Strings.t("option.vrrOff", "Off") },
+    { value: "1", label: Strings.t("option.vrrOn", "On") },
+    { value: "2", label: Strings.t("option.vrrFullscreen", "Fullscreen") }
   ]
   readonly property var bitdepthOptions: [
     { value: "8", label: "8-bit" },
@@ -490,24 +517,24 @@ Panel {
   ]
   readonly property var colorManagementOptions: [
     { value: "srgb", label: "sRGB (SDR)" },
-    { value: "auto", label: "Automatic" },
+    { value: "auto", label: Strings.t("option.colorAutomatic", "Automatic") },
     { value: "wide", label: "BT.2020 (SDR)" },
     { value: "hdr", label: "BT.2020 + PQ (HDR)" },
-    { value: "hdredid", label: "EDID primaries + PQ" },
+    { value: "hdredid", label: Strings.t("option.colorEdidPq", "EDID primaries + PQ") },
     { value: "dcip3", label: "DCI-P3" },
     { value: "dp3", label: "Display P3" },
     { value: "adobe", label: "Adobe RGB" },
-    { value: "edid", label: "EDID primaries (SDR)" }
+    { value: "edid", label: Strings.t("option.colorEdid", "EDID primaries (SDR)") }
   ]
   readonly property var sdrEotfOptions: [
-    { value: "default", label: "Default" },
+    { value: "default", label: Strings.t("option.eotfDefault", "Default") },
     { value: "gamma22", label: "Gamma 2.2" },
     { value: "srgb", label: "sRGB" }
   ]
   readonly property var triStateOptions: [
-    { value: "-1", label: "Force off" },
-    { value: "0", label: "Auto-detect" },
-    { value: "1", label: "Force on" }
+    { value: "-1", label: Strings.t("option.forceOff", "Force off") },
+    { value: "0", label: Strings.t("option.autoDetect", "Auto-detect") },
+    { value: "1", label: Strings.t("option.forceOn", "Force on") }
   ]
 
   onBrightnessConnectorChanged: {
@@ -675,7 +702,7 @@ Panel {
   function install(switchToBinary) {
     if (root.installing) return
     if (root.runtimeDir === "") {
-      root.lastError = "Could not find the user runtime directory."
+      root.lastError = Strings.t("error.runtimeDir", "Could not find the user runtime directory.")
       return
     }
     root.installingBinary = switchToBinary === true
@@ -725,7 +752,7 @@ Panel {
       root.editPending = false
       root.editorLoading = false
 
-      root.lastError = "hyprmoncfg is reconnecting. Try again in a moment."
+      root.lastError = Strings.t("error.reconnecting", "hyprmoncfg is reconnecting. Try again in a moment.")
       return ""
     }
     root.requestSequence++
@@ -788,7 +815,7 @@ Panel {
   function updateEditor(value, preserveSelection) {
     if (!Model.validEditorDocument(value)) {
       root.editorLoading = false
-      root.lastError = "hyprmoncfg returned an invalid editor state."
+      root.lastError = Strings.t("error.invalidEditor", "hyprmoncfg returned an invalid editor state.")
       return
     }
     root.editorDocument = value
@@ -831,13 +858,70 @@ Panel {
     root.send("edit_profile", { profile: root.draftProfile, edit: edit })
   }
 
+  // edit_profile takes one output at a time, so a change spanning displays is
+  // a chain: each reply carries the draft the next edit starts from. editPending
+  // holds for the whole chain, and any end to it drops what was left.
+  property var outputEditQueue: []
+  property bool applyAfterOutputEdits: false
+  onEditPendingChanged: if (!root.editPending) {
+    root.outputEditQueue = []
+    root.applyAfterOutputEdits = false
+  }
+
+  function editOutputs(edits, applyAfter) {
+    if (edits.length === 0 || !root.managedChecked || !root.editorReady || root.editPending
+        || root.previewTransaction !== "") return
+    root.outputEditQueue = edits.slice(1)
+    root.applyAfterOutputEdits = applyAfter === true
+    root.editDraft(edits[0])
+  }
+
+  function finishOutputEdit() {
+    var queued = root.outputEditQueue
+    var applyAfter = root.applyAfterOutputEdits
+    root.editPending = false
+    if (queued.length > 0) root.editOutputs(queued, applyAfter)
+    else if (applyAfter) root.applyDraft()
+  }
+
+  // Where the externals sat before Mirror, for Extend after a Keep has reloaded
+  // the draft from Hyprland. Session state, never saved.
+  property var mirrorArrangement: ({})
+
+  // A clean draft goes straight to the preview guard's Keep/Revert; a dirty one
+  // only gains the change, so unrelated edits are never applied with it.
+  function setDisplayMode(mode) {
+    if (!root.displayMode.available || mode === root.displayMode.mode || !root.displayModeEnabled) return
+    var displays = root.editorDocument.displays
+    var edits = Model.displayModeEdits(root.draftProfile, displays, mode, root.mirrorArrangement)
+    if (edits.length === 0) return
+    root.mirrorArrangement = mode === "mirror"
+      ? Model.mirrorArrangement(root.draftProfile, displays, root.mirrorArrangement) : ({})
+    root.editOutputs(edits, !root.draftDirty)
+  }
+
+  function toggleDisplayMode() {
+    root.setDisplayMode(root.displayMode.mode === "mirror" ? "extend" : "mirror")
+  }
+
+  function openRotateMenu(key, item, x, y) {
+    rotateMenu.targetKey = key
+    rotateMenu.openAt(item, x, y)
+  }
+
+  function rotateOutput(key, value) {
+    var output = Model.outputByKey(root.draftProfile, key)
+    if (!output || value === Model.rotationFieldValue(output)) return
+    root.editOutput(Model.rotationEdit(output, value), key)
+  }
+
   function editOutput(fields, key) {
     var edit = fields || {}
     edit.output_key = String(key || root.selectedOutputKey)
     var output = Model.outputByKey(root.draftProfile, edit.output_key)
     if (edit.enabled === false && output && output.enabled !== false
         && Model.enabledOutputCount(root.draftProfile) <= 1) {
-      root.lastError = "At least one display must stay enabled."
+      root.lastError = Strings.t("error.keepOneEnabled", "At least one display must stay enabled.")
       return
     }
     root.editDraft(edit)
@@ -898,8 +982,8 @@ Panel {
       root.selectedOutputKey, field)
   }
 
-  function outputFieldResetTooltip(label) {
-    return "Reset " + label + " to the value saved in " + root.profileDefaultsLabel
+  function outputFieldResetTooltip(key, english) {
+    return Strings.t(key, english, root.profileDefaultsLabel)
   }
 
   function resetOutputField(field) {
@@ -985,9 +1069,9 @@ Panel {
 
   function nudgeSelectedOutput(dx, dy) {
     var output = root.selectedOutput
-    if (!output || !root.managedChecked || root.editPending || root.previewTransaction !== "") return
+    if (!output || !root.arrangeable || !root.managedChecked || root.editPending || root.previewTransaction !== "") return
     if (String(output.mirror_of || "") !== "") {
-      root.lastError = String(output.name || "This display") + " mirrors another display and follows it."
+      root.lastError = Strings.t("error.mirrorsAnother", "%1 mirrors another display and follows it.", String(output.name || Strings.t("error.thisDisplay", "This display")))
       return
     }
     root.editOutput({
@@ -997,10 +1081,10 @@ Panel {
   }
 
   function snapSelectedOutput(direction) {
-    if (!root.managedChecked || root.editPending || root.previewTransaction !== "") return
+    if (!root.arrangeable || !root.managedChecked || root.editPending || root.previewTransaction !== "") return
     var position = Model.snapOutputPosition(root.draftProfile, root.selectedOutputKey, direction)
     if (!position) {
-      root.lastError = "No other enabled display is available for snapping."
+      root.lastError = Strings.t("error.noSnapTarget", "No other enabled display is available for snapping.")
       return
     }
     root.editOutput({ x: position.x, y: position.y })
@@ -1085,7 +1169,7 @@ Panel {
       String(output.supports_hdr || 0), delta, wrap))
     else if (field === 21) {
       // Arrows walk the four placement choices; Enter applies the one under the cursor.
-      root.placementCursor = root.bounded(root.placementCursor + delta, 0, Model.placementOptions.length - 1)
+      root.placementCursor = root.bounded(root.placementCursor + delta, 0, Model.placementOptions().length - 1)
       return
     } else if (field === 22) {
       // Beside Auto the toggle is the rotation lock, not Flipped.
@@ -1109,7 +1193,7 @@ Panel {
     else if (field === 2) scaleField.more.open()
     else if (field === 3 || field === 5 || field === 6 || field === 14
         || field === 18 || field === 19 || field === 22 || field === 23) root.adjustInspectorField(1, true)
-    else if (field === 21) root.snapSelectedOutput(Model.placementOptions[root.placementCursor].value)
+    else if (field === 21) root.snapSelectedOutput(Model.placementOptions()[root.placementCursor].value)
     else if (field === 4) colorManagementDropdown.open()
     else if (field === 7) positionXField.input.forceActiveFocus()
     else if (field === 8) positionYField.input.forceActiveFocus()
@@ -1139,6 +1223,7 @@ Panel {
     var workspaceSettings = (root.draftProfile || {}).workspaces || {}
     root.manualWorkspaceRulesInitialized = String(workspaceSettings.strategy || "") === "manual"
       && workspaceSettings.rules instanceof Array && workspaceSettings.rules.length > 0
+    root.mirrorArrangement = ({})
     root.sourceProfile = root.selectedSavedProfileName
     root.saveName = root.selectedSavedProfileName
     root.selectedOutputKey = Model.initialOutputKey(root.draftProfile, root.editorDocument.displays)
@@ -1153,7 +1238,7 @@ Panel {
     var name = String(root.selectedSavedProfileName || "")
     if (name === "" || root.previewTransaction !== "" || root.previewPending) return
     if (root.draftDirty || root.editPending) {
-      root.lastError = "Save or discard your edits before deleting a profile."
+      root.lastError = Strings.t("error.editsBeforeDelete", "Save or discard your edits before deleting a profile.")
       return
     }
     root.deleteProfileName = name
@@ -1171,7 +1256,7 @@ Panel {
   function beginExecEdit() {
     if (!root.selectedSavedProfile) return
     if (root.draftDirty || root.editPending) {
-      root.lastError = "Save or discard your edits before editing a profile command."
+      root.lastError = Strings.t("error.editsBeforeCommand", "Save or discard your edits before editing a profile command.")
       return
     }
     root.execDraft = String(root.selectedSavedProfile.exec || "")
@@ -1276,7 +1361,7 @@ Panel {
     if (name === "") {
       // The button stays clickable without a name, so say why nothing
       // happened and put the cursor where the name goes.
-      root.lastError = "Give this layout a profile name before previewing it."
+      root.lastError = Strings.t("error.nameBeforePreview", "Give this layout a profile name before previewing it.")
       Qt.callLater(function() { profileNameInput.forceActiveFocus() })
       return
     }
@@ -1287,7 +1372,7 @@ Panel {
           Model.namedProfile(root.draftProfile, name), 30)) {
         root.previewPending = false
         root.lastError = String(root.previewCoordinator.errorMessage
-          || "Could not open the display confirmation.")
+          || Strings.t("error.openConfirmation", "Could not open the display confirmation."))
       }
       return
     }
@@ -1308,7 +1393,7 @@ Panel {
       if (!root.previewCoordinator.startDraftApply(profile, 30)) {
         root.previewPending = false
         root.lastError = String(root.previewCoordinator.errorMessage
-          || "Could not open the display confirmation.")
+          || Strings.t("error.openConfirmation", "Could not open the display confirmation."))
       }
       return
     }
@@ -1336,7 +1421,9 @@ Panel {
     }
     if (root.previewTransaction !== "") return
     if (root.activePage === "layout") {
-      if (root.keyboardLayoutPane === "canvas") root.nudgeSelectedOutput(dx * 100, dy * 100)
+      // The key catcher swaps Left and Right for right-to-left text, but the
+      // canvas is physical space: Left always moves a display left.
+      if (root.keyboardLayoutPane === "canvas") root.nudgeSelectedOutput((Strings.rightToLeft() ? -dx : dx) * 100, dy * 100)
       else if (dy !== 0) root.moveInspectorCursor(dy)
       else if (dx !== 0) root.adjustInspectorField(dx)
     } else if (root.activePage === "profiles") {
@@ -1421,7 +1508,8 @@ Panel {
     }
 
     if (root.activePage === "layout") {
-      if (key === "0") root.editOutput({ x: 0, y: 0 })
+      if (key === "0") { if (root.arrangeable) root.editOutput({ x: 0, y: 0 }) }
+      else if (key === "m") root.toggleDisplayMode()
       else if (key === "[") root.selectOutput(-1)
       else if (key === "]") root.selectOutput(1)
       else if (root.keyboardLayoutPane === "canvas" && key === "H") root.nudgeSelectedOutput(-500, 0)
@@ -1450,7 +1538,7 @@ Panel {
       if (!root.previewCoordinator.startSavedProfilePreview(selected, 30)) {
         root.previewPending = false
         root.lastError = String(root.previewCoordinator.errorMessage
-          || "Could not open the display confirmation.")
+          || Strings.t("error.openConfirmation", "Could not open the display confirmation."))
       }
       return
     }
@@ -1462,7 +1550,7 @@ Panel {
 
   function activateSelectedSavedProfile() {
     if (root.draftDirty || root.editPending) {
-      root.lastError = "Save or discard your edits before using another profile."
+      root.lastError = Strings.t("error.editsBeforeUse", "Save or discard your edits before using another profile.")
       return
     }
     var selected = String(root.selectedSavedProfileName || "")
@@ -1617,7 +1705,7 @@ Panel {
   function handleMessage(line) {
     var envelope = Model.parseEnvelope(line)
     if (!envelope) {
-      root.lastError = "hyprmoncfg returned an invalid IPC message."
+      root.lastError = Strings.t("error.invalidIpc", "hyprmoncfg returned an invalid IPC message.")
       return
     }
     if (envelope.type === "event") {
@@ -1648,7 +1736,7 @@ Panel {
       if (method === "preview" || method === "commit" || method === "revert") root.previewPending = false
       if (method === "set_profile_auto") root.profileModePending = false
       if (method === "set_rotation") root.rotationLockPending = false
-      root.lastError = String(envelope.error.message || "hyprmoncfg request failed")
+      root.lastError = String(envelope.error.message || Strings.t("error.requestFailed", "hyprmoncfg request failed"))
       if (envelope.error.code === "compositor_busy") {
         root.displaysConnecting = true
         root.statusRetry = true
@@ -1683,13 +1771,13 @@ Panel {
       var result = envelope.result || {}
       if (!result.profile || !(result.profile.outputs instanceof Array)) {
         root.editPending = false
-        root.lastError = "hyprmoncfg returned an invalid edited profile."
+        root.lastError = Strings.t("error.invalidProfile", "hyprmoncfg returned an invalid edited profile.")
         return
       }
       root.draftProfile = result.profile
       root.workspacePlan = result.workspace_plan instanceof Array ? result.workspace_plan : []
-      root.editPending = false
       root.draftDirty = true
+      root.finishOutputEdit()
       Qt.callLater(function() {
         root.normalizeWorkspaceCursor()
         if (root.activePage === "workspaces") root.ensureManualWorkspaceRules()
@@ -1728,7 +1816,10 @@ Panel {
 
   function adjustCompactTopRow(deltaSteps) {
     var row = Model.compactTopRow(root.compactTopRows, root.cursorIndex)
-    if (row === "textsize") root.adjustTextSize(deltaSteps)
+    // The chips sit on the canvas, which doesn't mirror, but the key catcher
+    // swaps Left and Right for right-to-left text.
+    if (row === "displaymode") root.setDisplayMode((Strings.rightToLeft() ? -deltaSteps : deltaSteps) < 0 ? "extend" : "mirror")
+    else if (row === "textsize") root.adjustTextSize(deltaSteps)
     else if (row === "terminal") root.adjustTerminalSize(deltaSteps)
   }
 
@@ -1780,7 +1871,8 @@ Panel {
   readonly property bool terminalSizeAvailable: terminalSize > 0
   readonly property string bundledTerminalSizeCommand:
     decodeURIComponent(String(Qt.resolvedUrl("bin/omarchy-terminal-font-size")).replace(/^file:\/\//, ""))
-  readonly property var compactTopRows: Model.compactTopRows(textSizeAvailable, terminalSizeAvailable)
+  readonly property var compactTopRows: Model.compactTopRows(textSizeAvailable, terminalSizeAvailable,
+    root.compatible && root.displayMode.available)
   onCompactTopRowsChanged: {
     if (root.cursorIndex < -root.compactTopRows.length) root.cursorIndex = -root.compactTopRows.length
   }
@@ -1826,7 +1918,10 @@ Panel {
       root.install()
       return
     }
-    if (root.cursorIndex < 0) return
+    if (root.cursorIndex < 0) {
+      if (Model.compactTopRow(root.compactTopRows, root.cursorIndex) === "displaymode") root.toggleDisplayMode()
+      return
+    }
     if (root.cursorIndex === 0) {
       root.setManaged(!root.managedChecked)
       return
@@ -1876,6 +1971,7 @@ Panel {
   }
 
   onOpenedChanged: {
+    if (!opened && rotateMenu.visible) rotateMenu.close()
     if (opened) {
       root.cursorIndex = 0
       root.cursorActive = false
@@ -1968,8 +2064,8 @@ Panel {
         installPoll.stop()
         installTimeout.stop()
         root.lastError = String(versionOutput.text || "").trim() === "130"
-          ? "Installation was canceled."
-          : "Installation did not finish. Check the Omarchy terminal and try again."
+          ? Strings.t("install.canceled", "Installation was canceled.")
+          : Strings.t("install.unfinished", "Installation did not finish. Check the Omarchy terminal and try again.")
         return
       }
 
@@ -1977,7 +2073,7 @@ Panel {
         root.installing = false
         installPoll.stop()
         installTimeout.stop()
-        root.lastError = "The update finished, but hyprmoncfg 1.24.0 or newer is still required."
+        root.lastError = Strings.t("install.versionStillRequired", "The update finished, but hyprmoncfg %1 or newer is still required.", "1.24.0")
         return
       }
 
@@ -2047,7 +2143,7 @@ Panel {
       if (!root.installing) return
       if (exitCode !== 0) {
         root.installing = false
-        root.lastError = "Could not prepare the hyprmoncfg update."
+        root.lastError = Strings.t("install.prepareFailed", "Could not prepare the hyprmoncfg update.")
         return
       }
       installerProcess.command = Model.installProcessArgs(root.installingBinary)
@@ -2076,7 +2172,7 @@ Panel {
       if (exitCode !== 0) {
         root.serviceActionPending = false
         root.serviceAction = ""
-        var fallback = action === "disable" ? "Could not return display management to Omarchy." : "Could not start hyprmoncfg."
+        var fallback = action === "disable" ? Strings.t("error.returnManagement", "Could not return display management to Omarchy.") : Strings.t("error.startFailed", "Could not start hyprmoncfg.")
         root.lastError = String(serviceStderr.text || fallback).trim()
       } else if (action === "disable") {
         root.checkServiceState()
@@ -2255,7 +2351,7 @@ Panel {
       if (!root.installing) return
       root.installing = false
       installPoll.stop()
-      root.lastError = "Installation is still waiting. Check the Omarchy terminal and try again."
+      root.lastError = Strings.t("install.waiting", "Installation is still waiting. Check the Omarchy terminal and try again.")
     }
   }
 
@@ -2286,7 +2382,7 @@ Panel {
       if (!root.serviceActionPending) return
       root.serviceActionPending = false
       root.serviceAction = ""
-      root.lastError = "Could not confirm the automatic switching state."
+      root.lastError = Strings.t("error.confirmSwitching", "Could not confirm the automatic switching state.")
       root.checkServiceState()
     }
   }
@@ -2343,6 +2439,10 @@ Panel {
     x: origin.x - base.x; y: origin.y - base.y
     width: origin.width; height: origin.height
   }
+  // Shift+h/j/k/l stay the TUI's 500px jump, so only Ctrl and Alt gain letters.
+  readonly property bool canvasKeysEnabled: root.opened && root.expanded && root.activePage === "layout"
+    && root.keyboardLayoutPane === "canvas" && root.arrangeable
+    && !root.keyboardHelpOpen && !root.execEditing && !keyCatcher.blocked
   KeyboardPanel {
     id: panel
     anchorItem: root.workspaceLaunchOrigin ? workspaceLaunchAnchor : root.anchorItem
@@ -2364,74 +2464,62 @@ Panel {
 
       Shortcut {
         sequence: "Shift+Left"
-        enabled: root.opened && root.expanded && root.activePage === "layout"
-          && root.keyboardLayoutPane === "canvas" && !root.keyboardHelpOpen && !root.execEditing && !keyCatcher.blocked
+        enabled: root.canvasKeysEnabled
         onActivated: root.nudgeSelectedOutput(-10, 0)
       }
       Shortcut {
         sequence: "Shift+Right"
-        enabled: root.opened && root.expanded && root.activePage === "layout"
-          && root.keyboardLayoutPane === "canvas" && !root.keyboardHelpOpen && !root.execEditing && !keyCatcher.blocked
+        enabled: root.canvasKeysEnabled
         onActivated: root.nudgeSelectedOutput(10, 0)
       }
       Shortcut {
         sequence: "Shift+Up"
-        enabled: root.opened && root.expanded && root.activePage === "layout"
-          && root.keyboardLayoutPane === "canvas" && !root.keyboardHelpOpen && !root.execEditing && !keyCatcher.blocked
+        enabled: root.canvasKeysEnabled
         onActivated: root.nudgeSelectedOutput(0, -10)
       }
       Shortcut {
         sequence: "Shift+Down"
-        enabled: root.opened && root.expanded && root.activePage === "layout"
-          && root.keyboardLayoutPane === "canvas" && !root.keyboardHelpOpen && !root.execEditing && !keyCatcher.blocked
+        enabled: root.canvasKeysEnabled
         onActivated: root.nudgeSelectedOutput(0, 10)
       }
       Shortcut {
-        sequence: "Ctrl+Left"
-        enabled: root.opened && root.expanded && root.activePage === "layout"
-          && root.keyboardLayoutPane === "canvas" && !root.keyboardHelpOpen && !root.execEditing && !keyCatcher.blocked
+        sequences: ["Ctrl+Left", "Ctrl+H"]
+        enabled: root.canvasKeysEnabled
         onActivated: root.nudgeSelectedOutput(-1, 0)
       }
       Shortcut {
-        sequence: "Ctrl+Right"
-        enabled: root.opened && root.expanded && root.activePage === "layout"
-          && root.keyboardLayoutPane === "canvas" && !root.keyboardHelpOpen && !root.execEditing && !keyCatcher.blocked
+        sequences: ["Ctrl+Right", "Ctrl+L"]
+        enabled: root.canvasKeysEnabled
         onActivated: root.nudgeSelectedOutput(1, 0)
       }
       Shortcut {
-        sequence: "Ctrl+Up"
-        enabled: root.opened && root.expanded && root.activePage === "layout"
-          && root.keyboardLayoutPane === "canvas" && !root.keyboardHelpOpen && !root.execEditing && !keyCatcher.blocked
+        sequences: ["Ctrl+Up", "Ctrl+K"]
+        enabled: root.canvasKeysEnabled
         onActivated: root.nudgeSelectedOutput(0, -1)
       }
       Shortcut {
-        sequence: "Ctrl+Down"
-        enabled: root.opened && root.expanded && root.activePage === "layout"
-          && root.keyboardLayoutPane === "canvas" && !root.keyboardHelpOpen && !root.execEditing && !keyCatcher.blocked
+        sequences: ["Ctrl+Down", "Ctrl+J"]
+        enabled: root.canvasKeysEnabled
         onActivated: root.nudgeSelectedOutput(0, 1)
       }
       Shortcut {
-        sequence: "Alt+Left"
-        enabled: root.opened && root.expanded && root.activePage === "layout"
-          && root.keyboardLayoutPane === "canvas" && !root.keyboardHelpOpen && !root.execEditing && !keyCatcher.blocked
+        sequences: ["Alt+Left", "Alt+H"]
+        enabled: root.canvasKeysEnabled
         onActivated: root.snapSelectedOutput("left")
       }
       Shortcut {
-        sequence: "Alt+Right"
-        enabled: root.opened && root.expanded && root.activePage === "layout"
-          && root.keyboardLayoutPane === "canvas" && !root.keyboardHelpOpen && !root.execEditing && !keyCatcher.blocked
+        sequences: ["Alt+Right", "Alt+L"]
+        enabled: root.canvasKeysEnabled
         onActivated: root.snapSelectedOutput("right")
       }
       Shortcut {
-        sequence: "Alt+Up"
-        enabled: root.opened && root.expanded && root.activePage === "layout"
-          && root.keyboardLayoutPane === "canvas" && !root.keyboardHelpOpen && !root.execEditing && !keyCatcher.blocked
+        sequences: ["Alt+Up", "Alt+K"]
+        enabled: root.canvasKeysEnabled
         onActivated: root.snapSelectedOutput("up")
       }
       Shortcut {
-        sequence: "Alt+Down"
-        enabled: root.opened && root.expanded && root.activePage === "layout"
-          && root.keyboardLayoutPane === "canvas" && !root.keyboardHelpOpen && !root.execEditing && !keyCatcher.blocked
+        sequences: ["Alt+Down", "Alt+J"]
+        enabled: root.canvasKeysEnabled
         onActivated: root.snapSelectedOutput("down")
       }
       Shortcut {
@@ -2446,7 +2534,7 @@ Panel {
       id: keyCatcher
       anchors.fill: parent
       property bool returnPressed: false
-      blocked: root.execEditing || profileActions.visible || deleteConfirmation.visible
+      blocked: root.execEditing || profileActions.visible || rotateMenu.visible || deleteConfirmation.visible
         || profileNameInput.activeFocus
         || positionXField.input.activeFocus || positionYField.input.activeFocus
         || workspaceCountField.field.activeFocus || workspaceGroupSizeField.field.activeFocus
@@ -2525,7 +2613,7 @@ Panel {
               Text {
                 textFormat: Text.PlainText
                 width: parent.width
-                text: root.workspaceOnly ? "Workspaces" : "Display"
+                text: root.workspaceOnly ? Strings.t("tab.workspaces", "Workspaces") : Strings.t("common.display", "Display")
                 color: root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.title
@@ -2537,6 +2625,7 @@ Panel {
                 textFormat: Text.PlainText
                 width: parent.width
                 text: "hyprmoncfg"
+                horizontalAlignment: Text.AlignLeft
                 font.capitalization: Font.AllUppercase
                 color: root.dim
                 font.family: root.fontFamily
@@ -2552,7 +2641,7 @@ Panel {
               visible: root.compatible && !root.workspaceOnly
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
-              text: "Expand"
+              text: Strings.t("action.expand", "Expand")
               iconText: "󰊓"
               bordered: true
               foreground: root.foreground
@@ -2586,7 +2675,8 @@ Panel {
           // The keyboard cursor's row is scrolled into view.
           currentField: !root.cursorActive ? null
             : (root.cursorIndex < 0
-              ? (Model.compactTopRow(root.compactTopRows, root.cursorIndex) === "terminal" ? compactTerminalSize : compactTextSize)
+              ? ({ displaymode: compactDisplayMode, terminal: compactTerminalSize, textsize: compactTextSize })[
+                  Model.compactTopRow(root.compactTopRows, root.cursorIndex)] || null
               : (root.cursorIndex === 0 ? compactManagedToggle
                 : compactActionRows.itemAt(root.cursorIndex - 1)))
 
@@ -2606,8 +2696,8 @@ Panel {
                 textFormat: Text.PlainText
                 width: parent.width
                 text: root.installed
-                  ? "Update hyprmoncfg to use the visual editor."
-                  : "Install hyprmoncfg to manage monitor layouts."
+                  ? Strings.t("install.updateHint", "Update hyprmoncfg to use the visual editor.")
+                  : Strings.t("install.installHint", "Install hyprmoncfg to manage monitor layouts.")
                 color: root.dim
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body
@@ -2618,8 +2708,8 @@ Panel {
               Button {
                 width: parent.width
                 text: root.installing
-                  ? (root.installed ? "Updating hyprmoncfg…" : "Installing hyprmoncfg…")
-                  : (root.installed ? "Update hyprmoncfg" : "Install hyprmoncfg")
+                  ? (root.installed ? Strings.t("install.updating", "Updating hyprmoncfg…") : Strings.t("install.installing", "Installing hyprmoncfg…"))
+                  : (root.installed ? Strings.t("install.update", "Update hyprmoncfg") : Strings.t("install.install", "Install hyprmoncfg"))
                 iconText: root.installed ? "󰚰" : "󰏔"
                 iconSpinning: root.installing
                 selected: !root.installed
@@ -2641,7 +2731,8 @@ Panel {
               EditorPane {
                 width: parent.width
                 // Fit the arrangement's aspect within the compact clamps.
-                height: Model.compactStageHeight(root.layoutBounds, width, root.sizingUnit, root.layoutOffRow)
+                height: Model.compactStageHeight(root.layoutBounds, width, root.sizingUnit, root.layoutOffRow,
+                  root.displayMode.available)
                 title: ""
                 meta: ""
                 active: true
@@ -2665,16 +2756,33 @@ Panel {
                   selectedKey: root.selectedOutputKey
                   interactive: false
                   selectable: root.editorReady
-                  movable: root.managedChecked && root.editorReady && !root.editPending && root.previewTransaction === ""
+                  movable: root.rotatable && root.arrangeable
+                  rotatable: root.rotatable
                   detailed: true
                   framed: true
                   foreground: root.foreground
                   dim: root.dim
                   accent: Commons.Color.accent
                   fontFamily: root.fontFamily
+                  headerHeight: root.displayMode.available ? compactDisplayMode.implicitHeight + Style.space(14) : 0
                   onOutputSelected: function(key) { root.selectedOutputKey = key }
                   onOutputMoved: function(key, x, y, snapDistance) {
                     root.editOutput({ x: x, y: y, snap_distance: snapDistance }, key)
+                  }
+                  onOutputContextRequested: function(key, item, x, y) { root.openRotateMenu(key, item, x, y) }
+
+                  DisplayModeSwitch {
+                    id: compactDisplayMode
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: Style.space(7)
+                    visible: root.displayMode.available
+                    enabled: root.displayModeEnabled
+                    value: root.displayMode.mode
+                    hasCursor: root.cursorActive && Model.compactTopRow(root.compactTopRows, root.cursorIndex) === "displaymode"
+                    foreground: root.foreground
+                    fontFamily: root.fontFamily
+                    onChanged: function(value) { root.setDisplayMode(value) }
                   }
                 }
               }
@@ -2709,8 +2817,8 @@ Panel {
                       textFormat: Text.PlainText
                       width: parent.width
                       text: root.previewTransaction !== ""
-                        ? (root.previewKind === "profile" ? "Keep this profile?" : "Keep this layout?")
-                        : (root.editPending ? "Checking layout…" : "Layout changed")
+                        ? (root.previewKind === "profile" ? Strings.t("preview.keepProfileTitle", "Keep this profile?") : Strings.t("preview.keepLayoutTitle", "Keep this layout?"))
+                        : (root.editPending ? Strings.t("status.checkingLayout", "Checking layout…") : Strings.t("status.layoutChanged", "Layout changed"))
                       color: root.foreground
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.bodySmall
@@ -2722,7 +2830,7 @@ Panel {
                       textFormat: Text.PlainText
                       visible: root.previewTransaction !== ""
                       width: parent.width
-                      text: root.previewSeconds + " seconds to decide"
+                      text: Strings.tn("preview.secondsToDecide", root.previewSeconds, "%1 second to decide", "%1 seconds to decide")
                       color: root.dim
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.caption
@@ -2732,7 +2840,7 @@ Panel {
 
                   Button {
                     id: compactDiscardDraft
-                    text: root.previewTransaction !== "" ? "Revert" : "Discard"
+                    text: root.previewTransaction !== "" ? Strings.t("action.revert", "Revert") : Strings.t("action.discard", "Discard")
                     bordered: true
                     enabled: root.previewTransaction !== ""
                       ? !root.previewPending
@@ -2751,8 +2859,8 @@ Panel {
                   Button {
                     id: compactApplyDraft
                     text: root.previewTransaction !== ""
-                      ? "Keep"
-                      : (root.sourceProfile !== "" ? "Preview" : "Finish in editor")
+                      ? Strings.t("action.keep", "Keep")
+                      : (root.sourceProfile !== "" ? Strings.t("action.preview", "Preview") : Strings.t("action.finishInEditor", "Finish in editor"))
                     selected: true
                     bordered: true
                     enabled: !root.editPending && !root.previewPending
@@ -2771,7 +2879,7 @@ Panel {
                 }
               }
 
-              PanelSeparator { visible: root.brightnessConnector !== "" || root.compactTopRows.length > 0; foreground: root.foreground }
+              PanelSeparator { visible: root.brightnessConnector !== "" || root.textSizeAvailable || root.terminalSizeAvailable; foreground: root.foreground }
 
               BrightnessControl {
                 visible: root.brightnessConnector !== ""
@@ -2793,7 +2901,7 @@ Panel {
                 }
               }
 
-              PanelSeparator { visible: root.compactTopRows.length > 0 && root.brightnessConnector !== ""; foreground: root.foreground }
+              PanelSeparator { visible: (root.textSizeAvailable || root.terminalSizeAvailable) && root.brightnessConnector !== ""; foreground: root.foreground }
 
               TextSizeControl {
                 id: compactTextSize
@@ -2818,7 +2926,7 @@ Panel {
                 visible: root.terminalSizeAvailable
                 width: parent.width
                 bar: root.bar
-                title: "TERMINAL"
+                title: Strings.t("terminal.title", "TERMINAL")
                 stops: Model.terminalSizeStops
                 unit: "pt"
                 baseSize: root.terminalSize
@@ -2842,7 +2950,7 @@ Panel {
                 spacing: Style.space(6)
 
                 PanelSectionHeader {
-                  text: "MONITOR MANAGEMENT"
+                  text: Strings.t("management.title", "MONITOR MANAGEMENT")
                   foreground: root.foreground
                   fontFamily: root.fontFamily
                 }
@@ -2850,15 +2958,15 @@ Panel {
                 Toggle {
                   id: compactManagedToggle
                   width: parent.width
-                  label: "Managed by hyprmoncfg"
+                  label: Strings.t("management.managed", "Managed by hyprmoncfg")
                   description: {
                     if (root.serviceActionPending)
-                      return root.serviceTargetManaged ? "Taking control of display configuration…" : "Handing display control back…"
-                    if (root.serviceBroken) return "The background service could not start"
+                      return root.serviceTargetManaged ? Strings.t("management.takingControl", "Taking control of display configuration…") : Strings.t("management.handingBack", "Handing display control back…")
+                    if (root.serviceBroken) return Strings.t("management.serviceFailed", "The background service could not start")
                     if (root.managedChecked && root.profileAutomatic)
-                      return "Switch layouts on monitor, lid, and resume events"
-                    if (root.managedChecked) return "Owns and applies monitor configuration"
-                    return "Read-only: display configuration is controlled elsewhere"
+                      return Strings.t("management.automaticHint", "Switch layouts on monitor, lid, and resume events")
+                    if (root.managedChecked) return Strings.t("management.ownsHint", "Owns and applies monitor configuration")
+                    return Strings.t("management.readOnly", "Read-only: display configuration is controlled elsewhere")
                   }
                   checked: root.managedChecked
                   enabled: !root.serviceActionPending
@@ -2904,7 +3012,7 @@ Panel {
             opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
 
             PanelSectionHeader {
-              text: "PROFILE"
+              text: Strings.t("profile.header", "PROFILE")
               foreground: root.foreground
               fontFamily: root.fontFamily
             }
@@ -2923,7 +3031,7 @@ Panel {
             Button {
               width: parent.width
               visible: !root.profileAutomatic
-              text: root.profileModePending ? "Resuming automatic matching…" : "Resume automatic matching"
+              text: root.profileModePending ? Strings.t("action.resumingMatching", "Resuming automatic matching…") : Strings.t("action.resumeMatching", "Resume automatic matching")
               selected: true
               bordered: true
               enabled: root.managedChecked && !root.profileModePending
@@ -2936,7 +3044,7 @@ Panel {
             Button {
               width: parent.width
               visible: root.newSetupAvailable
-              text: "Create profile"
+              text: Strings.t("action.createProfile", "Create profile")
               selected: true
               bordered: true
               enabled: root.managedChecked && root.editorReady
@@ -2990,7 +3098,7 @@ Panel {
             visible: root.workspaceOnly
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            text: "Workspaces"
+            text: Strings.t("tab.workspaces", "Workspaces")
             textFormat: Text.PlainText
             font.family: root.fontFamily; font.pixelSize: Style.font.title
             color: root.foreground
@@ -3006,7 +3114,7 @@ Panel {
               visible: root.workspaceOnly
               anchors.verticalCenter: parent.verticalCenter
               text: "hyprmoncfg"
-              tooltipText: "Open display settings"
+              tooltipText: Strings.t("header.openDisplaySettings", "Open display settings")
               focusable: true
               implicitHeight: identifyAllButton.implicitHeight
               bordered: true
@@ -3019,7 +3127,7 @@ Panel {
             Button {
               id: identifyAllButton
               anchors.verticalCenter: parent.verticalCenter
-              text: "Identify all"
+              text: Strings.t("header.identifyAll", "Identify all")
               enabled: root.identifyAvailable
               foreground: root.foreground
               fontFamily: root.fontFamily
@@ -3031,7 +3139,7 @@ Panel {
             Button {
               id: keyboardHelpButton
               anchors.verticalCenter: parent.verticalCenter
-              text: "Keys"
+              text: Strings.t("header.keys", "Keys")
               bordered: true
               foreground: root.foreground
               fontFamily: root.fontFamily
@@ -3056,7 +3164,7 @@ Panel {
             Button {
               id: compactButton
               anchors.verticalCenter: parent.verticalCenter
-              text: root.workspaceOnly ? "Close" : "Compact"
+              text: root.workspaceOnly ? Strings.t("action.close", "Close") : Strings.t("header.compact", "Compact")
               implicitHeight: identifyAllButton.implicitHeight
               bordered: true
               foreground: root.foreground
@@ -3101,7 +3209,7 @@ Panel {
               Text {
                 textFormat: Text.PlainText
                 width: parent.width
-                text: "Keep this layout?"
+                text: Strings.t("preview.keepLayoutTitle", "Keep this layout?")
                 color: root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body
@@ -3111,7 +3219,7 @@ Panel {
               Text {
                 textFormat: Text.PlainText
                 width: parent.width
-                text: root.previewSeconds + " seconds before the previous layout returns"
+                text: Strings.tn("preview.secondsBeforeReturn", root.previewSeconds, "%1 second before the previous layout returns", "%1 seconds before the previous layout returns")
                 color: root.dim
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
@@ -3121,7 +3229,7 @@ Panel {
             Button {
               id: revertExpandedPreview
               anchors.verticalCenter: parent.verticalCenter
-              text: "Revert"
+              text: Strings.t("action.revert", "Revert")
               bordered: true
               enabled: !root.previewPending
               foreground: root.foreground
@@ -3132,7 +3240,7 @@ Panel {
             Button {
               id: keepExpandedPreview
               anchors.verticalCenter: parent.verticalCenter
-              text: root.previewKind === "draft" ? "Keep & save" : "Keep"
+              text: root.previewKind === "draft" ? Strings.t("action.keepAndSave", "Keep & save") : Strings.t("action.keep", "Keep")
               selected: true
               bordered: true
               enabled: !root.previewPending
@@ -3180,7 +3288,7 @@ Panel {
                 chipTravelEnabled: root.opened
                 reducedMotion: root.reducedMotion
                 resizing: root.panelResizing
-                focusOutline: root.keyboardLayoutPane === "canvas"
+                focusOutline: root.keyboardLayoutPane === "canvas" && root.arrangeable
                 profile: root.draftProfile
                 editorDisplays: root.editorDocument.displays
                 notes: root.displayNotes
@@ -3189,16 +3297,32 @@ Panel {
                 selectedKey: root.selectedOutputKey
                 interactive: false
                 selectable: root.editorReady
-                movable: root.managedChecked && root.editorReady && !root.editPending && root.previewTransaction === ""
+                movable: root.rotatable && root.arrangeable
+                rotatable: root.rotatable
                 detailed: true
                 framed: true
                 foreground: root.foreground
                 dim: root.dim
                 accent: Commons.Color.accent
                 fontFamily: root.fontFamily
+                headerHeight: root.displayMode.available ? layoutDisplayMode.implicitHeight + Style.space(14) : 0
                 onOutputSelected: function(key) { root.selectedOutputKey = key }
                 onOutputMoved: function(key, x, y, snapDistance) {
                   root.editOutput({ x: x, y: y, snap_distance: snapDistance }, key)
+                }
+                onOutputContextRequested: function(key, item, x, y) { root.openRotateMenu(key, item, x, y) }
+
+                DisplayModeSwitch {
+                  id: layoutDisplayMode
+                  anchors.right: parent.right
+                  anchors.top: parent.top
+                  anchors.margins: Style.space(7)
+                  visible: root.displayMode.available
+                  enabled: root.displayModeEnabled
+                  value: root.displayMode.mode
+                  foreground: root.foreground
+                  fontFamily: root.fontFamily
+                  onChanged: function(value) { root.setDisplayMode(value) }
                 }
               }
             }
@@ -3302,8 +3426,8 @@ Panel {
                         anchors.left: parent.left
                         anchors.right: enabledResetAction.visible ? enabledResetAction.left : parent.right
                         anchors.rightMargin: enabledResetAction.visible ? Style.spacing.xxs : 0
-                        label: "Enabled"
-                        description: checked ? "This display participates in the layout" : "Saved as off"
+                        label: Strings.t("field.enabled", "Enabled")
+                        description: checked ? Strings.t("field.enabledHint", "This display participates in the layout") : Strings.t("field.savedOff", "Saved as off")
                         checked: root.selectedOutput ? root.selectedOutput.enabled !== false : false
                         enabled: root.managedChecked && !!root.selectedOutput && !root.editPending
                           && (checked ? Model.enabledOutputCount(root.draftProfile) > 1 : true)
@@ -3321,7 +3445,7 @@ Panel {
                         visible: root.outputFieldChanged("enabled")
                         enabled: displayEnabledToggle.enabled
                         iconText: "󰑐"
-                        tooltipText: root.outputFieldResetTooltip("enabled state")
+                        tooltipText: root.outputFieldResetTooltip("reset.enabled", "Reset enabled state to the value saved in %1")
                         foreground: root.foreground
                         fontFamily: root.fontFamily
                         focusable: true
@@ -3344,7 +3468,7 @@ Panel {
                         popupParent: keyCatcher
                         ownerOpen: root.opened && root.expanded && !inspectorViewport.moving
                         width: parent.width
-                        label: "RESOLUTION"
+                        label: Strings.t("field.resolution", "RESOLUTION")
                         options: Model.resolutionOptions(root.selectedDisplayModes)
                         value: root.selectedOutput ? Model.modeResolution(Model.outputMode(root.selectedOutput)) : ""
                         enabled: !!root.selectedOutput && !root.editPending
@@ -3352,7 +3476,7 @@ Panel {
                         foreground: root.foreground
                         fontFamily: root.fontFamily
                         resetVisible: root.outputFieldChanged("mode")
-                        resetTooltip: root.outputFieldResetTooltip("display mode")
+                        resetTooltip: root.outputFieldResetTooltip("reset.mode", "Reset display mode to the value saved in %1")
                         onChanged: function(value) {
                           var mode = Model.modeForResolution(root.selectedDisplayModes, value,
                             root.selectedOutput ? Number(root.selectedOutput.refresh || 0) : 0)
@@ -3367,7 +3491,7 @@ Panel {
                       width: parent.width
                       enabled: root.managedChecked && !!root.selectedOutput && !root.editPending
                       opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
-                      label: "REFRESH"
+                      label: Strings.t("field.refresh", "REFRESH")
                       // A display can offer more rates than fit on one line.
                       wrap: true
                       options: root.selectedRefreshOptions
@@ -3404,7 +3528,7 @@ Panel {
                       foreground: root.foreground
                       fontFamily: root.fontFamily
                       resetVisible: root.outputFieldChanged("scale")
-                      resetTooltip: root.outputFieldResetTooltip("display scale")
+                      resetTooltip: root.outputFieldResetTooltip("reset.scale", "Reset display scale to the value saved in %1")
                       onChanged: function(value) { root.editOutput({ scale: Number(value) }) }
                       onCustomClosed: Qt.callLater(function() { keyCatcher.forceActiveFocus() })
                       // Go snaps a Blurry typed scale to the closest sharp one.
@@ -3427,7 +3551,7 @@ Panel {
                       foreground: root.foreground
                       fontFamily: root.fontFamily
                       resetVisible: root.outputFieldChanged("vrr")
-                      resetTooltip: root.outputFieldResetTooltip("VRR mode")
+                      resetTooltip: root.outputFieldResetTooltip("reset.vrr", "Reset VRR mode to the value saved in %1")
                       onChanged: function(value) { root.editOutput({ vrr: Number(value) }) }
                       onResetRequested: root.resetOutputField("vrr")
                     }
@@ -3440,14 +3564,14 @@ Panel {
                       enabled: root.managedChecked && !!root.selectedOutput && !root.editPending
                         && Model.transformKnown(transformValue)
                       opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
-                      label: "ROTATION"
+                      label: Strings.t("field.rotation", "ROTATION")
                       detail: !Model.transformKnown(transformValue) ? "transform " + transformValue
                         : Model.rotationDetail(root.selectedOutput, root.rotation)
                       options: Model.rotationFieldOptions(root.selectedRotationAutoSupported)
                       value: Model.rotationFieldValue(root.selectedOutput)
                       hasCursor: root.inspectorHasCursor(6)
                       // Beside Auto the toggle locks rotation; otherwise it flips.
-                      toggleLabel: root.selectedRotationAuto ? "Lock" : "Flipped"
+                      toggleLabel: root.selectedRotationAuto ? Strings.t("field.rotationLock", "Lock") : Strings.t("field.rotationFlipped", "Flipped")
                       toggleChecked: root.selectedRotationAuto
                         ? !!root.rotation && root.rotation.locked === true
                         : Model.transformFlipped(transformValue)
@@ -3467,6 +3591,7 @@ Panel {
                     }
 
                     Grid {
+                      visible: root.arrangeable
                       width: parent.width
                       columns: 2
                       spacing: Style.space(8)
@@ -3477,14 +3602,14 @@ Panel {
                       CoordinateField {
                         id: positionXField
                         width: parent.cellWidth
-                        label: "POSITION X (px)"
+                        label: Strings.t("field.positionX", "POSITION X (px)")
                         value: root.selectedOutput ? Number(root.selectedOutput.x || 0) : 0
                         enabled: !!root.selectedOutput && !root.editPending
                         hasCursor: root.inspectorHasCursor(7)
                         foreground: root.foreground
                         fontFamily: root.fontFamily
                         resetVisible: root.outputFieldChanged("x")
-                        resetTooltip: root.outputFieldResetTooltip("horizontal position")
+                        resetTooltip: root.outputFieldResetTooltip("reset.positionX", "Reset horizontal position to the value saved in %1")
                         onModified: function(value) {
                           var returnToKeyboard = positionXField.input.activeFocus
                           root.editOutput({ x: value })
@@ -3496,14 +3621,14 @@ Panel {
                       CoordinateField {
                         id: positionYField
                         width: parent.cellWidth
-                        label: "POSITION Y (px)"
+                        label: Strings.t("field.positionY", "POSITION Y (px)")
                         value: root.selectedOutput ? Number(root.selectedOutput.y || 0) : 0
                         enabled: !!root.selectedOutput && !root.editPending
                         hasCursor: root.inspectorHasCursor(8)
                         foreground: root.foreground
                         fontFamily: root.fontFamily
                         resetVisible: root.outputFieldChanged("y")
-                        resetTooltip: root.outputFieldResetTooltip("vertical position")
+                        resetTooltip: root.outputFieldResetTooltip("reset.positionY", "Reset vertical position to the value saved in %1")
                         onModified: function(value) {
                           var returnToKeyboard = positionYField.input.activeFocus
                           root.editOutput({ y: value })
@@ -3518,15 +3643,15 @@ Panel {
                     SegmentedField {
                       id: placementField
                       readonly property string anchorName: Model.snapAnchorName(root.draftProfile, root.selectedOutputKey)
-                      visible: anchorName !== ""
+                      visible: anchorName !== "" && root.arrangeable
                       width: parent.width
                       enabled: root.managedChecked && !!root.selectedOutput && !root.editPending
                       opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
-                      label: "PLACE BESIDE"
+                      label: Strings.t("field.placeBeside", "PLACE BESIDE")
                       detail: anchorName
-                      tooltipText: "Snap next to the nearest display, centred on it"
+                      tooltipText: Strings.t("field.placeBesideHint", "Snap next to the nearest display, centred on it")
                       actions: true
-                      options: Model.placementOptions
+                      options: Model.placementOptions()
                       hasCursor: root.inspectorHasCursor(21)
                       cursorIndex: root.placementCursor
                       foreground: root.foreground
@@ -3536,10 +3661,11 @@ Panel {
 
                     PanelDropdown {
                       id: mirrorDropdown
+                      visible: root.arrangeable
                       popupParent: keyCatcher
                       ownerOpen: root.opened && root.expanded && !inspectorViewport.moving
                       width: parent.width
-                      label: "MIRROR"
+                      label: Strings.t("field.mirror", "MIRROR")
                       options: Model.mirrorOptions(root.draftProfile, root.selectedOutputKey)
                       value: root.selectedOutput ? String(root.selectedOutput.mirror_of || "") : ""
                       enabled: root.managedChecked && !!root.selectedOutput && !root.editPending
@@ -3548,7 +3674,7 @@ Panel {
                       foreground: root.foreground
                       fontFamily: root.fontFamily
                       resetVisible: root.outputFieldChanged("mirror_of")
-                      resetTooltip: root.outputFieldResetTooltip("mirror target")
+                      resetTooltip: root.outputFieldResetTooltip("reset.mirror", "Reset mirror target to the value saved in %1")
                       onChanged: function(value) { root.editOutput({ mirror_of: value }) }
                       onResetRequested: root.resetOutputField("mirror_of")
                     }
@@ -3572,15 +3698,15 @@ Panel {
                         id: bitdepthField
                         width: parent.cellWidth
                         enabled: !!root.selectedOutput && !root.editPending
-                        label: "COLOR DEPTH (BPC)"
-                        tooltipText: "Bits per color component."
+                        label: Strings.t("field.colorDepth", "COLOR DEPTH (BPC)")
+                        tooltipText: Strings.t("field.colorDepthHint", "Bits per color component.")
                         options: Model.optionsWithCurrent(root.bitdepthOptions, root.selectedOutput ? String(root.selectedOutput.bitdepth || 8) : "8")
                         value: root.selectedOutput ? String(root.selectedOutput.bitdepth || 8) : "8"
                         hasCursor: root.inspectorHasCursor(3)
                         foreground: root.foreground
                         fontFamily: root.fontFamily
                         resetVisible: root.outputFieldChanged("bitdepth")
-                        resetTooltip: root.outputFieldResetTooltip("color depth")
+                        resetTooltip: root.outputFieldResetTooltip("reset.colorDepth", "Reset color depth to the value saved in %1")
                         onChanged: function(value) { root.editOutput({ bitdepth: Number(value) }) }
                         onResetRequested: root.resetOutputField("bitdepth")
                       }
@@ -3590,8 +3716,8 @@ Panel {
                         popupParent: keyCatcher
                         ownerOpen: root.opened && root.expanded && !inspectorViewport.moving
                         width: parent.cellWidth
-                        label: "COLOR SPACE / EOTF"
-                        tooltipText: "Color space and electro-optical transfer function."
+                        label: Strings.t("field.colorSpace", "COLOR SPACE / EOTF")
+                        tooltipText: Strings.t("field.colorSpaceHint", "Color space and electro-optical transfer function.")
                         options: root.colorManagementOptions
                         value: root.selectedOutput && String(root.selectedOutput.cm || "") !== ""
                           ? String(root.selectedOutput.cm) : "srgb"
@@ -3600,7 +3726,7 @@ Panel {
                         foreground: root.foreground
                         fontFamily: root.fontFamily
                         resetVisible: root.outputFieldChanged("cm")
-                        resetTooltip: root.outputFieldResetTooltip("color space and EOTF")
+                        resetTooltip: root.outputFieldResetTooltip("reset.colorSpace", "Reset color space and EOTF to the value saved in %1")
                         onChanged: function(value) { root.editOutput({ cm: value }) }
                         onResetRequested: root.resetOutputField("cm")
                       }
@@ -3615,13 +3741,13 @@ Panel {
                       DecimalField {
                         id: sdrBrightnessField
                         width: parent.cellWidth
-                        label: "SDR LUMINANCE SCALE"
+                        label: Strings.t("field.sdrLuminance", "SDR LUMINANCE SCALE")
                         value: root.selectedOutput ? Number(root.selectedOutput.sdr_brightness || 1) : 1
                         decimals: 2
                         enabled: !!root.selectedOutput && !root.editPending
                         hasCursor: root.inspectorHasCursor(10)
                         resetVisible: root.outputFieldChanged("sdr_brightness")
-                        resetTooltip: root.outputFieldResetTooltip("SDR luminance scale")
+                        resetTooltip: root.outputFieldResetTooltip("reset.sdrLuminance", "Reset SDR luminance scale to the value saved in %1")
                         onModified: function(value) { root.editOutput({ sdr_brightness: value }) }
                         onResetRequested: root.resetOutputField("sdr_brightness")
                       }
@@ -3629,13 +3755,13 @@ Panel {
                       DecimalField {
                         id: sdrSaturationField
                         width: parent.cellWidth
-                        label: "SDR SATURATION SCALE"
+                        label: Strings.t("field.sdrSaturation", "SDR SATURATION SCALE")
                         value: root.selectedOutput ? Number(root.selectedOutput.sdr_saturation || 1) : 1
                         decimals: 2
                         enabled: !!root.selectedOutput && !root.editPending
                         hasCursor: root.inspectorHasCursor(11)
                         resetVisible: root.outputFieldChanged("sdr_saturation")
-                        resetTooltip: root.outputFieldResetTooltip("SDR saturation scale")
+                        resetTooltip: root.outputFieldResetTooltip("reset.sdrSaturation", "Reset SDR saturation scale to the value saved in %1")
                         onModified: function(value) { root.editOutput({ sdr_saturation: value }) }
                         onResetRequested: root.resetOutputField("sdr_saturation")
                       }
@@ -3643,13 +3769,13 @@ Panel {
                       DecimalField {
                         id: sdrMinLuminanceField
                         width: parent.cellWidth
-                        label: "SDR BLACK LEVEL (cd/m²)"
+                        label: Strings.t("field.sdrBlack", "SDR BLACK LEVEL (cd/m²)")
                         value: root.selectedOutput ? Number(root.selectedOutput.sdr_min_luminance || 0) : 0
                         decimals: 3
                         enabled: !!root.selectedOutput && !root.editPending
                         hasCursor: root.inspectorHasCursor(12)
                         resetVisible: root.outputFieldChanged("sdr_min_luminance")
-                        resetTooltip: root.outputFieldResetTooltip("SDR black level")
+                        resetTooltip: root.outputFieldResetTooltip("reset.sdrBlack", "Reset SDR black level to the value saved in %1")
                         onModified: function(value) { root.editOutput({ sdr_min_luminance: value }) }
                         onResetRequested: root.resetOutputField("sdr_min_luminance")
                       }
@@ -3657,13 +3783,13 @@ Panel {
                       DecimalField {
                         id: sdrMaxLuminanceField
                         width: parent.cellWidth
-                        label: "SDR WHITE LEVEL (cd/m²)"
+                        label: Strings.t("field.sdrWhite", "SDR WHITE LEVEL (cd/m²)")
                         value: root.selectedOutput ? Number(root.selectedOutput.sdr_max_luminance || 0) : 0
                         decimals: 0
                         enabled: !!root.selectedOutput && !root.editPending
                         hasCursor: root.inspectorHasCursor(13)
                         resetVisible: root.outputFieldChanged("sdr_max_luminance")
-                        resetTooltip: root.outputFieldResetTooltip("SDR white level")
+                        resetTooltip: root.outputFieldResetTooltip("reset.sdrWhite", "Reset SDR white level to the value saved in %1")
                         onModified: function(value) { root.editOutput({ sdr_max_luminance: Math.round(value) }) }
                         onResetRequested: root.resetOutputField("sdr_max_luminance")
                       }
@@ -3674,14 +3800,14 @@ Panel {
                       width: parent.width
                       enabled: !!root.selectedOutput && !root.editPending
                       label: "SDR EOTF"
-                      tooltipText: "SDR electro-optical transfer function."
+                      tooltipText: Strings.t("field.sdrEotfHint", "SDR electro-optical transfer function.")
                       options: Model.optionsWithCurrent(root.sdrEotfOptions, root.selectedOutput && String(root.selectedOutput.sdr_eotf || "") !== "" ? String(root.selectedOutput.sdr_eotf) : "default")
                       value: root.selectedOutput && String(root.selectedOutput.sdr_eotf || "") !== "" ? String(root.selectedOutput.sdr_eotf) : "default"
                       hasCursor: root.inspectorHasCursor(14)
                       foreground: root.foreground
                       fontFamily: root.fontFamily
                       resetVisible: root.outputFieldChanged("sdr_eotf")
-                      resetTooltip: root.outputFieldResetTooltip("SDR EOTF")
+                      resetTooltip: root.outputFieldResetTooltip("reset.sdrEotf", "Reset SDR EOTF to the value saved in %1")
                       onChanged: function(value) { root.editOutput({ sdr_eotf: value }) }
                       onResetRequested: root.resetOutputField("sdr_eotf")
                     }
@@ -3695,14 +3821,14 @@ Panel {
                       DecimalField {
                         id: minLuminanceField
                         width: parent.cellWidth
-                        label: "DISPLAY BLACK (cd/m²)"
-                        tooltipText: "All display luminance values at 0: use EDID."
+                        label: Strings.t("field.displayBlack", "DISPLAY BLACK (cd/m²)")
+                        tooltipText: Strings.t("field.luminanceHint", "All display luminance values at 0: use EDID.")
                         value: root.selectedOutput ? Number(root.selectedOutput.min_luminance || 0) : 0
                         decimals: 3
                         enabled: !!root.selectedOutput && !root.editPending
                         hasCursor: root.inspectorHasCursor(15)
                         resetVisible: root.outputFieldChanged("min_luminance")
-                        resetTooltip: root.outputFieldResetTooltip("display black level")
+                        resetTooltip: root.outputFieldResetTooltip("reset.displayBlack", "Reset display black level to the value saved in %1")
                         onModified: function(value) { root.editOutput({ min_luminance: value }) }
                         onResetRequested: root.resetOutputField("min_luminance")
                       }
@@ -3710,14 +3836,14 @@ Panel {
                       DecimalField {
                         id: maxLuminanceField
                         width: parent.cellWidth
-                        label: "DISPLAY PEAK (cd/m²)"
-                        tooltipText: "All display luminance values at 0: use EDID."
+                        label: Strings.t("field.displayPeak", "DISPLAY PEAK (cd/m²)")
+                        tooltipText: Strings.t("field.luminanceHint", "All display luminance values at 0: use EDID.")
                         value: root.selectedOutput ? Number(root.selectedOutput.max_luminance || 0) : 0
                         decimals: 0
                         enabled: !!root.selectedOutput && !root.editPending
                         hasCursor: root.inspectorHasCursor(16)
                         resetVisible: root.outputFieldChanged("max_luminance")
-                        resetTooltip: root.outputFieldResetTooltip("display peak luminance")
+                        resetTooltip: root.outputFieldResetTooltip("reset.displayPeak", "Reset display peak luminance to the value saved in %1")
                         onModified: function(value) { root.editOutput({ max_luminance: Math.round(value) }) }
                         onResetRequested: root.resetOutputField("max_luminance")
                       }
@@ -3725,14 +3851,14 @@ Panel {
                       DecimalField {
                         id: maxAvgLuminanceField
                         width: parent.cellWidth
-                        label: "MAX FRAME-AVERAGE (cd/m²)"
-                        tooltipText: "All display luminance values at 0: use EDID."
+                        label: Strings.t("field.frameAverage", "MAX FRAME-AVERAGE (cd/m²)")
+                        tooltipText: Strings.t("field.luminanceHint", "All display luminance values at 0: use EDID.")
                         value: root.selectedOutput ? Number(root.selectedOutput.max_avg_luminance || 0) : 0
                         decimals: 0
                         enabled: !!root.selectedOutput && !root.editPending
                         hasCursor: root.inspectorHasCursor(17)
                         resetVisible: root.outputFieldChanged("max_avg_luminance")
-                        resetTooltip: root.outputFieldResetTooltip("maximum frame-average luminance")
+                        resetTooltip: root.outputFieldResetTooltip("reset.frameAverage", "Reset maximum frame-average luminance to the value saved in %1")
                         onModified: function(value) { root.editOutput({ max_avg_luminance: Math.round(value) }) }
                         onResetRequested: root.resetOutputField("max_avg_luminance")
                       }
@@ -3742,15 +3868,15 @@ Panel {
                       id: forceWideField
                       width: parent.width
                       enabled: !!root.selectedOutput && !root.editPending
-                      label: "WCG CAPABILITY"
-                      tooltipText: "Override wide color gamut support."
+                      label: Strings.t("field.wcg", "WCG CAPABILITY")
+                      tooltipText: Strings.t("field.wcgHint", "Override wide color gamut support.")
                       options: Model.optionsWithCurrent(root.triStateOptions, root.selectedOutput ? String(root.selectedOutput.supports_wide_color || 0) : "0")
                       value: root.selectedOutput ? String(root.selectedOutput.supports_wide_color || 0) : "0"
                       hasCursor: root.inspectorHasCursor(18)
                       foreground: root.foreground
                       fontFamily: root.fontFamily
                       resetVisible: root.outputFieldChanged("supports_wide_color")
-                      resetTooltip: root.outputFieldResetTooltip("wide-color-gamut capability")
+                      resetTooltip: root.outputFieldResetTooltip("reset.wcg", "Reset wide-color-gamut capability to the value saved in %1")
                       onChanged: function(value) { root.editOutput({ supports_wide_color: Number(value) }) }
                       onResetRequested: root.resetOutputField("supports_wide_color")
                     }
@@ -3759,14 +3885,14 @@ Panel {
                       id: forceHdrField
                       width: parent.width
                       enabled: !!root.selectedOutput && !root.editPending
-                      label: "HDR CAPABILITY"
+                      label: Strings.t("field.hdr", "HDR CAPABILITY")
                       options: Model.optionsWithCurrent(root.triStateOptions, root.selectedOutput ? String(root.selectedOutput.supports_hdr || 0) : "0")
                       value: root.selectedOutput ? String(root.selectedOutput.supports_hdr || 0) : "0"
                       hasCursor: root.inspectorHasCursor(19)
                       foreground: root.foreground
                       fontFamily: root.fontFamily
                       resetVisible: root.outputFieldChanged("supports_hdr")
-                      resetTooltip: root.outputFieldResetTooltip("HDR capability")
+                      resetTooltip: root.outputFieldResetTooltip("reset.hdr", "Reset HDR capability to the value saved in %1")
                       onChanged: function(value) { root.editOutput({ supports_hdr: Number(value) }) }
                       onResetRequested: root.resetOutputField("supports_hdr")
                     }
@@ -3776,7 +3902,7 @@ Panel {
                       spacing: Style.space(4)
 
                       PanelSectionHeader {
-                        text: "ICC DEVICE PROFILE"
+                        text: Strings.t("field.icc", "ICC DEVICE PROFILE")
                         foreground: root.foreground
                         fontFamily: root.fontFamily
                       }
@@ -3791,7 +3917,7 @@ Panel {
                           anchors.right: iccResetAction.visible ? iccResetAction.left : parent.right
                           anchors.rightMargin: iccResetAction.visible ? Style.spacing.xxs : 0
                           text: root.selectedOutput ? String(root.selectedOutput.icc || "") : ""
-                          placeholderText: "None. Enter an absolute ICC profile path"
+                          placeholderText: Strings.t("field.iccPlaceholder", "None. Enter an absolute ICC profile path")
                           enabled: !!root.selectedOutput && !root.editPending
                           hasCursor: root.inspectorHasCursor(20)
                           foreground: root.foreground
@@ -3811,7 +3937,7 @@ Panel {
                           visible: root.outputFieldChanged("icc")
                           enabled: !!root.selectedOutput && !root.editPending
                           iconText: "󰑐"
-                          tooltipText: root.outputFieldResetTooltip("ICC device profile")
+                          tooltipText: root.outputFieldResetTooltip("reset.icc", "Reset ICC device profile to the value saved in %1")
                           foreground: root.foreground
                           fontFamily: root.fontFamily
                           fontSize: Style.font.body
@@ -3838,8 +3964,8 @@ Panel {
               anchors.top: parent.top
               anchors.bottom: parent.bottom
               width: root.panelLayout.sideWidth
-              title: "Saved Profiles"
-              meta: root.savedProfiles.length + " saved"
+              title: Strings.t("profile.savedTitle", "Saved Profiles")
+              meta: Strings.tn("profile.savedCount", root.savedProfiles.length, "%1 saved", "%1 saved")
               active: true
               foreground: root.foreground
               dim: root.dim
@@ -3853,7 +3979,7 @@ Panel {
 
                 Toggle {
                   width: parent.width
-                  label: "Automatically use the best profile"
+                  label: Strings.t("profile.automatic", "Automatically use the best profile")
                   description: Model.automaticSelectionNote(root.profileAutomatic, root.profileModePending,
                     root.activeProfile, root.recommendedProfile)
                   checked: root.profileAutomatic
@@ -3868,15 +3994,16 @@ Panel {
                 PanelSeparator { foreground: root.foreground }
 
                 Row {
-                  x: Style.space(7)
+                  anchors.left: parent.left
+                  anchors.leftMargin: Style.space(7)
                   width: parent.width - Style.space(46)
                   height: Style.space(22)
                   spacing: Style.space(8)
 
                   Text {
                     textFormat: Text.PlainText
-                    width: parent.width - Style.space(58) - parent.spacing
-                    text: "PROFILE"
+                    width: parent.width - Style.space(84) - parent.spacing
+                    text: Strings.t("profile.header", "PROFILE")
                     color: root.dim
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.caption
@@ -3885,8 +4012,8 @@ Panel {
 
                   Text {
                     textFormat: Text.PlainText
-                    width: Style.space(58)
-                    text: "MATCH"
+                    width: Style.space(84)
+                    text: Strings.t("profile.matchHeader", "MATCH")
                     color: root.dim
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.caption
@@ -3983,7 +4110,8 @@ Panel {
                           Text {
                             textFormat: Text.PlainText
                             width: parent.width
-                            text: String(savedEntry.modelData.name || "Profile")
+                            text: String(savedEntry.modelData.name || Strings.t("common.profile", "Profile"))
+                            horizontalAlignment: Text.AlignLeft
                             color: savedEntry.current || savedEntry.selected ? root.foreground : Qt.lighter(root.dim, 1.25)
                             font.family: root.fontFamily
                             font.pixelSize: Style.font.body
@@ -3995,9 +4123,8 @@ Panel {
                             textFormat: Text.PlainText
                             width: parent.width
                             text: savedEntry.current
-                              ? "Current · " + Number(savedEntry.modelData.output_count || 0)
-                                + (Number(savedEntry.modelData.output_count || 0) === 1 ? " display" : " displays")
-                              : (savedEntry.modelData.exact_display_match ? "Matches these displays" : "Other setup")
+                              ? Strings.tn("profile.currentDisplays", Number(savedEntry.modelData.output_count || 0), "Current · %1 display", "Current · %1 displays")
+                              : (savedEntry.modelData.exact_display_match ? Strings.t("profile.matchesDisplays", "Matches these displays") : Strings.t("profile.otherSetup", "Other setup"))
                             color: root.dim
                             font.family: root.fontFamily
                             font.pixelSize: Style.font.caption
@@ -4008,7 +4135,7 @@ Panel {
                         Text {
                           textFormat: Text.PlainText
                           id: profileMatchText
-                          width: Style.space(58)
+                          width: Style.space(84)
                           horizontalAlignment: Text.AlignRight
                           anchors.verticalCenter: parent.verticalCenter
                           text: Number(modelData.match_score || 0) > 0 ? String(modelData.match_score) : "—"
@@ -4038,7 +4165,7 @@ Panel {
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
                         text: "⋮"
-                        tooltipText: "Profile actions"
+                        tooltipText: Strings.t("profile.actions", "Profile actions")
                         focusable: true
                         onClicked: {
                           root.selectedSavedProfileName = String(savedEntry.modelData.name || "")
@@ -4102,8 +4229,8 @@ Panel {
                 id: profileDetailsPane
                 width: parent.width
                 height: parent.height - profileStagePane.height - parent.spacing
-                title: "Profile Details"
-                meta: root.selectedSavedProfileCurrent ? "Active" : ""
+                title: Strings.t("profile.detailsTitle", "Profile Details")
+                meta: root.selectedSavedProfileCurrent ? Strings.t("profile.active", "Active") : ""
                 foreground: root.foreground
                 dim: root.dim
                 accent: Commons.Color.accent
@@ -4120,16 +4247,16 @@ Panel {
                   spacing: Style.space(4)
 
                   InfoRow {
-                    label: "Name"
+                    label: Strings.t("profile.detailName", "Name")
                     value: root.selectedSavedProfile ? String(root.selectedSavedProfile.name || "—") : "—"
                     valueBold: true
                   }
                   InfoRow {
-                    label: "Updated"
+                    label: Strings.t("profile.detailUpdated", "Updated")
                     value: root.selectedSavedProfile ? Model.profileUpdatedLabel(root.selectedSavedProfile.updated_at) : "—"
                   }
                   InfoRow {
-                    label: "Match"
+                    label: Strings.t("profile.detailMatch", "Match")
                     value: root.selectedSavedSummary
                       ? Model.profileMatchLabel(root.selectedSavedSummary, root.selectedSavedProfileCurrent) : "—"
                     valueAccent: !!root.selectedSavedSummary
@@ -4147,10 +4274,11 @@ Panel {
                   }
 
                   InfoRow {
-                    label: "Displays"
+                    label: Strings.t("profile.detailDisplays", "Displays")
                     value: root.selectedSavedSummary
-                      ? Number(root.selectedSavedSummary.output_count || 0) + " saved · "
-                        + Number(root.selectedSavedSummary.connected_outputs || 0) + " connected"
+                      ? Strings.t("profile.displaysSummary", "%1 · %2",
+                          Strings.tn("profile.savedCount", Number(root.selectedSavedSummary.output_count || 0), "%1 saved", "%1 saved"),
+                          Strings.tn("profile.connectedCount", Number(root.selectedSavedSummary.connected_outputs || 0), "%1 connected", "%1 connected"))
                       : "—"
                   }
 
@@ -4170,23 +4298,23 @@ Panel {
                     ProfileWorkspaceInfoRow {
                       required property var modelData
                       required property int index
-                      label: index === 0 ? "Workspaces" : ""
-                      displayName: String(modelData.name || "Display")
+                      label: index === 0 ? Strings.t("workspace.rowLabel", "Workspaces") : ""
+                      displayName: String(modelData.name || Strings.t("common.display", "Display"))
                       workspaces: String(modelData.workspaces || "—")
                     }
                   }
 
                   InfoRow {
                     visible: root.selectedSavedWorkspaceRows.length === 0
-                    label: "Workspaces"
-                    value: "(not managed)"
+                    label: Strings.t("workspace.rowLabel", "Workspaces")
+                    value: Strings.t("profile.notManaged", "(not managed)")
                   }
 
                   Column {
                     width: parent.width
                     spacing: Style.space(4)
                     Text {
-                      text: "Post-apply command"
+                      text: Strings.t("profile.command", "Post-apply command")
                       textFormat: Text.PlainText
                       color: root.dim
                       font.family: root.fontFamily
@@ -4202,7 +4330,7 @@ Panel {
                         anchors.leftMargin: parent.horizontalPadding
                         anchors.rightMargin: parent.horizontalPadding
                         text: root.selectedSavedProfile && String(root.selectedSavedProfile.exec || "").trim() !== ""
-                          ? String(root.selectedSavedProfile.exec) : "Not set"
+                          ? String(root.selectedSavedProfile.exec) : Strings.t("profile.commandNotSet", "Not set")
                         textFormat: Text.PlainText
                         elide: Text.ElideRight
                         verticalAlignment: Text.AlignVCenter
@@ -4217,7 +4345,7 @@ Panel {
                         && !root.editPending && !root.previewPending && root.previewTransaction === ""
                       foreground: root.foreground
                       fontFamily: root.fontFamily
-                      tooltipText: "Edit post-apply command"
+                      tooltipText: Strings.t("profile.editCommand", "Edit post-apply command")
                       onClicked: root.beginExecEdit()
                     }
                   }
@@ -4241,7 +4369,7 @@ Panel {
               anchors.top: parent.top
               anchors.bottom: parent.bottom
               width: root.panelLayout.sideWidth
-              title: "Workspace Planner"
+              title: Strings.t("workspace.plannerTitle", "Workspace Planner")
               active: true
               foreground: root.foreground
               dim: root.dim
@@ -4258,7 +4386,7 @@ Panel {
                   popupParent: keyCatcher
                   ownerOpen: root.opened && root.expanded
                   width: parent.width
-                  label: "STRATEGY"
+                  label: Strings.t("workspace.strategy", "STRATEGY")
                   options: Model.workspaceStrategyOptions()
                   value: root.workspaceStrategyChoice
                   enabled: root.editorReady && !root.editPending
@@ -4275,7 +4403,7 @@ Panel {
                   id: workspaceCountOffRow
                   visible: root.workspacesOff
                   width: parent.width
-                  label: "Workspaces"
+                  label: Strings.t("workspace.rowLabel", "Workspaces")
                   value: "—"
                 }
 
@@ -4283,7 +4411,7 @@ Panel {
                   id: workspacePersistenceOffRow
                   visible: root.workspacesOff
                   width: parent.width
-                  label: "Persistence"
+                  label: Strings.t("workspace.persistenceHeader", "Persistence")
                   value: "—"
                 }
 
@@ -4297,7 +4425,7 @@ Panel {
                     width: root.workspaceGroupSizeApplicable
                       ? (parent.width - parent.spacing) / 2 : parent.width
                     fieldWidth: width
-                    label: "WORKSPACES"
+                    label: Strings.t("workspace.countHeader", "WORKSPACES")
                     from: 1
                     to: root.workspaceValueMaximum
                     value: String(((root.draftProfile || {}).workspaces || {}).strategy || "") === "manual"
@@ -4321,7 +4449,7 @@ Panel {
                     visible: root.workspaceGroupSizeApplicable
                     width: (parent.width - parent.spacing) / 2
                     fieldWidth: width
-                    label: "GROUP SIZE"
+                    label: Strings.t("workspace.groupSize", "GROUP SIZE")
                     from: 1
                     to: root.workspaceValueMaximum
                     value: Number(((root.draftProfile || {}).workspaces || {}).group_size || 3)
@@ -4345,12 +4473,12 @@ Panel {
                   popupParent: keyCatcher
                   ownerOpen: root.opened && root.expanded
                   width: parent.width
-                  label: "PERSISTENCE"
+                  label: Strings.t("workspace.persistence", "PERSISTENCE")
                   options: root.editorDocument.workspace_persistence_supported !== true
-                    ? [{ value: "unavailable", label: "Requires newer daemon" }]
+                    ? [{ value: "unavailable", label: Strings.t("workspace.requiresNewerDaemon", "Requires newer daemon") }]
                     : root.workspaceStrategy === "manual"
-                      ? [{ value: "custom", label: "Custom (per rule)" }]
-                      : [{ value: "first", label: "First per display" }, { value: "all", label: "All assigned" }]
+                      ? [{ value: "custom", label: Strings.t("workspace.persistenceCustom", "Custom (per rule)") }]
+                      : [{ value: "first", label: Strings.t("workspace.persistenceFirst", "First per display") }, { value: "all", label: Strings.t("workspace.persistenceAll", "All assigned") }]
                   value: root.editorDocument.workspace_persistence_supported !== true ? "unavailable"
                     : root.workspaceStrategy === "manual" ? "custom"
                     : (((root.draftProfile || {}).workspaces || {}).persist_all ? "all" : "first")
@@ -4368,7 +4496,7 @@ Panel {
                 PanelSectionHeader {
                   visible: !root.workspacesOff
                   text: String(((root.draftProfile || {}).workspaces || {}).strategy || "") === "manual"
-                    ? "WORKSPACE → DISPLAY" : "MONITOR ORDER"
+                    ? Strings.t("workspace.assignHeader", "WORKSPACE → DISPLAY") : Strings.t("workspace.orderHeader", "MONITOR ORDER")
                   foreground: root.foreground
                   fontFamily: root.fontFamily
                 }
@@ -4412,6 +4540,7 @@ Panel {
 
                       Button {
                         id: orderLeft
+                        visible: root.arrangeable
                         anchors.verticalCenter: parent.verticalCenter
                         text: "←"
                         bordered: true
@@ -4423,6 +4552,7 @@ Panel {
 
                       Button {
                         id: orderRight
+                        visible: root.arrangeable
                         anchors.verticalCenter: parent.verticalCenter
                         text: "→"
                         bordered: true
@@ -4480,7 +4610,7 @@ Panel {
                         textFormat: Text.PlainText
                         anchors.verticalCenter: parent.verticalCenter
                         width: Style.space(82)
-                        text: "Workspace " + String(modelData.workspace || "?")
+                        text: Strings.t("workspace.row", "Workspace %1", String(modelData.workspace || "?"))
                         color: root.dim
                         font.family: root.fontFamily
                         font.pixelSize: Style.font.bodySmall
@@ -4492,7 +4622,7 @@ Panel {
                         anchors.verticalCenter: parent.verticalCenter
                         width: parent.width - manualWorkspaceLabel.width
                           - manualLeft.width - manualRight.width - parent.spacing * 3
-                        text: String(modelData.display_name || "Display")
+                        text: String(modelData.display_name || Strings.t("common.display", "Display"))
                         color: root.foreground
                         font.family: root.fontFamily
                         font.pixelSize: Style.font.body
@@ -4594,7 +4724,7 @@ Panel {
                 id: workspacePlanPane
                 width: parent.width
                 height: Style.space(40) + Math.max(Style.space(40), workspacePlanRows.implicitHeight)
-                title: "Workspace Plan"
+                title: Strings.t("workspace.planTitle", "Workspace Plan")
                 foreground: root.foreground
                 dim: root.dim
                 accent: Commons.Color.accent
@@ -4617,7 +4747,7 @@ Panel {
                         visible: !root.workspaceOnly
                         width: parent.width
                         labelWidth: Math.min(width * 0.5, Style.space(220))
-                        label: String(modelData.name || "Display")
+                        label: String(modelData.name || Strings.t("common.display", "Display"))
                         value: String(modelData.workspaces || "—")
                         valueAccent: true
                       }
@@ -4625,7 +4755,7 @@ Panel {
                         id: switchRow
                         visible: root.workspaceOnly
                         width: parent.width
-                        label: String(modelData.name || "Display")
+                        label: String(modelData.name || Strings.t("common.display", "Display"))
                         workspaceIds: Picker.workspaceIds(String(modelData.workspaces || ""))
                         switchingEnabled: root.pickerBlockedReason === ""
                         foreground: root.foreground
@@ -4640,7 +4770,7 @@ Panel {
                     visible: root.workspacesOff || root.workspaceRows.length === 0
                     width: parent.width
                     wrapMode: Text.WordWrap
-                    text: root.workspacesOff ? Model.workspaceOffMessage() : "No workspace rules configured"
+                    text: root.workspacesOff ? Model.workspaceOffMessage() : Strings.t("workspace.noRules", "No workspace rules configured")
                     color: root.dim
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.body
@@ -4703,18 +4833,18 @@ Panel {
                     - (footerActions.visible ? footerActions.width + parent.spacing : 0))
                   title: root.lastError !== ""
                     ? root.lastError
-                    : (root.creatingProfile ? "Creating a profile for this setup"
-                      : (root.draftDirty ? "Unsaved display changes"
+                    : (root.creatingProfile ? Strings.t("footer.creating", "Creating a profile for this setup")
+                      : (root.draftDirty ? Strings.t("footer.unsaved", "Unsaved display changes")
                       : (root.activePage === "profiles"
                         ? (root.selectedSavedProfileCurrent
-                          ? "This profile is active"
-                          : "Browsing " + root.selectedSavedProfileName)
+                          ? Strings.t("footer.active", "This profile is active")
+                          : Strings.t("footer.browsing", "Browsing %1", root.selectedSavedProfileName))
                         : root.profileStatusTitle)))
-                  subtitle: root.editPending ? "Checking layout…"
-                    : (root.creatingProfile ? "Name it, arrange the displays, then preview and save."
-                    : (root.draftDirty ? "Changes are previewed safely before they can be saved."
+                  subtitle: root.editPending ? Strings.t("status.checkingLayout", "Checking layout…")
+                    : (root.creatingProfile ? Strings.t("footer.creatingHint", "Name it, arrange the displays, then preview and save.")
+                    : (root.draftDirty ? Strings.t("footer.unsavedHint", "Changes are previewed safely before they can be saved.")
                     : (root.activePage === "profiles"
-                      ? "Preview, then keep to use this profile until displays change."
+                      ? Strings.t("footer.browsingHint", "Preview, then keep to use this profile until displays change.")
                       : root.profileStatusSubtitle)))
                   iconText: root.monitorCount > 1 ? "󰍺" : "󰍹"
                   foreground: root.lastError !== "" ? root.urgent : root.foreground
@@ -4732,7 +4862,7 @@ Panel {
                     height: editorFooter.controlHeight
                     visible: root.newSetupAvailable && !root.draftDirty
                       && !root.creatingProfile && root.activePage !== "profiles"
-                    text: "Create profile"
+                    text: Strings.t("action.createProfile", "Create profile")
                     selected: true
                     bordered: true
                     enabled: root.managedChecked && root.editorReady && !root.editPending
@@ -4746,7 +4876,7 @@ Panel {
                     height: editorFooter.controlHeight
                     visible: !root.profileAutomatic && !root.draftDirty && !root.creatingProfile
                       && root.activePage !== "profiles" && !root.daemonPreview
-                    text: root.profileModePending ? "Resuming…" : "Resume automatic matching"
+                    text: root.profileModePending ? Strings.t("action.resuming", "Resuming…") : Strings.t("action.resumeMatching", "Resume automatic matching")
                     bordered: true
                     enabled: root.managedChecked && !root.profileModePending && !root.previewPending
                     foreground: root.foreground
@@ -4767,7 +4897,7 @@ Panel {
                   height: editorFooter.controlHeight
                   width: Math.min(Style.space(190), parent.width)
                   text: root.saveName
-                  placeholderText: root.creatingProfile ? "Name this display setup" : "New profile name"
+                  placeholderText: root.creatingProfile ? Strings.t("footer.namePlaceholder", "Name this display setup") : Strings.t("footer.newNamePlaceholder", "New profile name")
                   foreground: root.foreground
                   enabled: root.managedChecked
                   onTextEdited: root.saveName = text
@@ -4805,7 +4935,7 @@ Panel {
 
                     Text {
                       textFormat: Text.PlainText
-                      text: "Current profile"
+                      text: Strings.t("footer.currentProfile", "Current profile")
                       color: Style.selectedStateColor(root.foreground, Commons.Color.accent)
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.body
@@ -4820,7 +4950,7 @@ Panel {
                   height: editorFooter.controlHeight
                   visible: root.activePage === "profiles"
                     && !root.selectedSavedProfileCurrent
-                  text: "Use this profile"
+                  text: Strings.t("action.useProfile", "Use this profile")
                   selected: enabled
                   bordered: true
                   enabled: !root.draftDirty && !!root.selectedSavedProfile
@@ -4835,7 +4965,7 @@ Panel {
                   id: discardDraftButton
                   height: editorFooter.controlHeight
                   visible: root.draftDirty || root.creatingProfile
-                  text: "Discard"
+                  text: Strings.t("action.discard", "Discard")
                   bordered: true
                   enabled: !root.editorLoading && !root.editPending
                   foreground: root.foreground
@@ -4847,7 +4977,7 @@ Panel {
                   id: saveDraftButton
                   height: editorFooter.controlHeight
                   visible: root.draftDirty || root.creatingProfile
-                  text: "Preview & save"
+                  text: Strings.t("action.previewAndSave", "Preview & save")
                   selected: true
                   bordered: true
                   enabled: root.managedChecked && !root.editPending && !root.previewPending
@@ -4870,6 +5000,8 @@ Panel {
         visible: root.keyboardHelpOpen
         page: root.activePage
         workspaceOnly: root.workspaceOnly
+        arrangeable: root.arrangeable
+        displayModeAvailable: root.displayMode.available
         foreground: root.foreground
         background: root.bar ? root.bar.background : Commons.Color.background
         accent: Commons.Color.accent
@@ -4911,7 +5043,7 @@ Panel {
 
             Text {
               textFormat: Text.PlainText
-              text: "Post-apply command for " + root.selectedSavedProfileName
+              text: Strings.t("profile.commandFor", "Post-apply command for %1", root.selectedSavedProfileName)
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.subtitle
@@ -4936,7 +5068,7 @@ Panel {
             Text {
               textFormat: Text.PlainText
               width: parent.width
-              text: "Enter saves. Leave empty to clear. Esc discards."
+              text: Strings.t("profile.commandHint", "Enter saves. Leave empty to clear. Esc discards.")
               color: root.dim
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
@@ -4959,10 +5091,10 @@ Panel {
     fontSize: Style.font.body
     property bool available: !root.draftDirty && !root.editPending && !root.previewPending && root.previewTransaction === ""
     actions: [
-      { id: "use", label: "Use this profile", enabled: available && root.managedChecked },
-      { id: "edit", label: "Edit layout", enabled: available },
-      { id: "exec", label: "Edit post-apply command…", enabled: available },
-      { id: "delete", label: "Delete…", enabled: available }
+      { id: "use", label: Strings.t("action.useProfile", "Use this profile"), enabled: available && root.managedChecked },
+      { id: "edit", label: Strings.t("action.editLayout", "Edit layout"), enabled: available },
+      { id: "exec", label: Strings.t("action.editCommandMenu", "Edit post-apply command…"), enabled: available },
+      { id: "delete", label: Strings.t("action.deleteMenu", "Delete…"), enabled: available }
     ]
     onVisibleChanged: if (visible) targetName = root.selectedSavedProfileName
     onClosed: Qt.callLater(function() { keyCatcher.forceActiveFocus() })
@@ -4973,6 +5105,23 @@ Panel {
       else if (action === "exec") root.beginExecEdit()
       else if (action === "delete") root.deleteSelectedSavedProfile()
     }
+  }
+
+  ProfileActionsMenu {
+    id: rotateMenu
+    parent: keyCatcher
+    property string targetKey: ""
+    preferredWidth: Style.space(160)
+    rowHeight: Style.space(36)
+    foreground: root.foreground
+    backgroundColor: root.bar ? root.bar.background : Commons.Color.background
+    accent: Commons.Color.accent
+    fontFamily: root.fontFamily
+    fontSize: Style.font.body
+    actions: Model.rotationMenuActions(Model.outputByKey(root.draftProfile, targetKey),
+      Model.rotationAutoSupported(root.editorDocument.displays, targetKey))
+    onClosed: Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    onChosen: function(value) { root.rotateOutput(targetKey, value) }
   }
 
   FocusScope {
@@ -5004,7 +5153,7 @@ Panel {
         width: parent.width - Style.space(32)
         spacing: Style.space(14)
         Text {
-          text: "Delete profile?"
+          text: Strings.t("profile.deleteTitle", "Delete profile?")
           textFormat: Text.PlainText
           color: root.foreground
           font.family: root.fontFamily
@@ -5014,7 +5163,7 @@ Panel {
         Text {
           width: parent.width
           textFormat: Text.PlainText
-          text: "Delete “" + root.deleteProfileName + "”? Your live layout will not change."
+          text: Strings.t("profile.deleteConfirm", "Delete “%1”? Your live layout will not change.", root.deleteProfileName)
           wrapMode: Text.Wrap
           color: root.foreground
           font.family: root.fontFamily
@@ -5027,7 +5176,7 @@ Panel {
             id: cancelDeleteButton
             KeyNavigation.tab: confirmDeleteButton
             KeyNavigation.backtab: confirmDeleteButton
-            text: "Cancel"
+            text: Strings.t("action.cancel", "Cancel")
             bordered: true
             focusable: true
             foreground: root.foreground
@@ -5038,7 +5187,7 @@ Panel {
             id: confirmDeleteButton
             KeyNavigation.tab: cancelDeleteButton
             KeyNavigation.backtab: cancelDeleteButton
-            text: "Delete profile"
+            text: Strings.t("action.deleteProfile", "Delete profile")
             bordered: true
             focusable: true
             foreground: root.urgent
@@ -5071,7 +5220,7 @@ Panel {
     property string value: ""
     property bool valueAccent: false
     property bool valueBold: false
-    property real labelWidth: Math.min(width * 0.34, Style.space(105))
+    property real labelWidth: Math.min(width * 0.34, Style.space(125))
 
     width: parent ? parent.width : 0
     implicitHeight: Math.max(infoLabel.implicitHeight, infoValue.implicitHeight)
@@ -5097,6 +5246,7 @@ Panel {
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       text: infoRow.value
+      horizontalAlignment: Text.AlignLeft
       color: infoRow.valueAccent ? Commons.Color.accent : root.foreground
       font.family: root.fontFamily
       font.pixelSize: Style.font.bodySmall
@@ -5113,7 +5263,7 @@ Panel {
     property int decimals: 2
     property bool hasCursor: false
     property bool resetVisible: false
-    property string resetTooltip: "Reset to loaded profile value"
+    property string resetTooltip: Strings.t("reset.default", "Reset to loaded profile value")
     property alias input: decimalInput
     signal modified(real value)
     signal resetRequested()

@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const picker = require('../WorkspacePicker.js')
+const picker = require('./script')('WorkspacePicker.js')
 
 test('picker discovery distinguishes missing, disabled and enabled plugins', () => {
   assert.deepEqual(picker.parseStatus('[]'), { installed:false, enabled:false })
@@ -23,7 +23,7 @@ test('previews, dirty drafts and ongoing operations block every picker action', 
     assert.equal(picker.offer(status, true, true, true).enabled, false)
 })
 
-const fs = require('node:fs')
+const { fs } = require('./english')
 const vm = require('node:vm')
 const path = require('node:path')
 function actionHarness(action, blocked = false) {
@@ -34,7 +34,7 @@ function actionHarness(action, blocked = false) {
   const process = {command:[], startDetached:()=>calls.push(Array.from(process.command))}
   const qml = fs.readFileSync(path.join(__dirname, '..', 'Panel.qml'),'utf8')
   const source = qml.match(/^  function activateWorkspacePicker\([\s\S]*?^  }/m)[0]
-  const invoke = vm.runInNewContext('('+source+')', {root, Picker:require('../WorkspacePicker.js'),
+  const invoke = vm.runInNewContext('('+source+')', {root, Picker:require('./script')('WorkspacePicker.js'),
     pickerAction:process, Qt:{callLater:fn=>delayed.push(fn)},
     Util:{shellQuote:s=>"'"+s.replace(/'/g,"'\\''")+"'"}})
   invoke()

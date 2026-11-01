@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const fs = require('node:fs')
+const { fs } = require('./english')
 const path = require('node:path')
 
 test('runtime QML resolves Omarchy colors explicitly alongside QtQuick Color', () => {

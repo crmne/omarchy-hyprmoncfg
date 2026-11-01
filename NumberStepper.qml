@@ -3,6 +3,7 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "Model.js" as Model
+import "Strings.js" as Strings
 
 // Whole-number entry with - and + buttons, in the look of the shell's
 // NumberField, built on KeyField rather than Qt's SpinBox so no Qt text input

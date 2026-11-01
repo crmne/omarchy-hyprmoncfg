@@ -2,6 +2,7 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "Strings.js" as Strings
 
 // Direction B: Keep/Revert shows what is being kept. A miniature stage of the
 // previewed layout sits above the question, so the decision is about the
@@ -9,6 +10,10 @@ import qs.Ui
 // Keys stay in PreviewGuard; this only draws and emits.
 BorderSurface {
   id: root
+
+  // This card has its own window, so no shell panel mirrors it.
+  LayoutMirroring.enabled: Strings.rightToLeft()
+  LayoutMirroring.childrenInherit: true
 
   property string stage: "confirm"
   property string profileName: ""
@@ -75,11 +80,11 @@ BorderSurface {
         anchors.rightMargin: Style.space(12)
         anchors.verticalCenter: parent.verticalCenter
         text: root.stage === "applying"
-          ? "Applying display preview…"
+          ? Strings.t("preview.applying", "Applying display preview…")
           : (root.stage === "error"
-            ? "Couldn’t preview this layout"
-            : (root.saveOnCommit ? "Keep and save this layout?"
-              : (root.draftApply ? "Keep this layout?" : "Keep this profile?")))
+            ? Strings.t("preview.failed", "Couldn’t preview this layout")
+            : (root.saveOnCommit ? Strings.t("preview.keepAndSaveTitle", "Keep and save this layout?")
+              : (root.draftApply ? Strings.t("preview.keepLayoutTitle", "Keep this layout?") : Strings.t("preview.keepProfileTitle", "Keep this profile?"))))
         color: root.stage === "error" ? Commons.Color.urgent : Commons.Color.foreground
         font.family: Style.font.family
         font.pixelSize: Style.font.heading
@@ -105,13 +110,13 @@ BorderSurface {
       textFormat: Text.PlainText
       width: parent.width
       text: root.stage === "applying"
-        ? "This confirmation stays open while your displays reconfigure."
+        ? Strings.t("preview.staysOpen", "This confirmation stays open while your displays reconfigure.")
         : (root.stage === "error"
           ? root.errorMessage
           : (root.actionError !== ""
             ? root.actionError
-            : root.profileName + " · the previous layout returns in " + root.seconds + " seconds"
-              + (root.hasAutoRotation ? "\nAuto rotation resumes after Keep." : "")))
+            : Strings.tn("preview.returnsIn", root.seconds, "%2 · the previous layout returns in %1 second", "%2 · the previous layout returns in %1 seconds", root.profileName)
+              + (root.hasAutoRotation ? "\n" + Strings.t("preview.autoRotationResumes", "Auto rotation resumes after Keep.") : "")))
       color: root.stage === "error" || root.actionError !== "" ? Commons.Color.urgent : Commons.Color.foreground
       opacity: 0.68
       font.family: Style.font.family
@@ -143,7 +148,7 @@ BorderSurface {
       spacing: Style.space(10)
 
       Button {
-        text: root.actionPending ? "Working…" : "Revert"
+        text: root.actionPending ? Strings.t("preview.working", "Working…") : Strings.t("action.revert", "Revert")
         bordered: true
         enabled: !root.actionPending
         foreground: Commons.Color.foreground
@@ -152,7 +157,7 @@ BorderSurface {
       }
 
       Button {
-        text: root.saveOnCommit ? "Keep & save" : "Keep"
+        text: root.saveOnCommit ? Strings.t("action.keepAndSave", "Keep & save") : Strings.t("action.keep", "Keep")
         selected: true
         bordered: true
         enabled: !root.actionPending
@@ -165,7 +170,7 @@ BorderSurface {
     Button {
       visible: root.stage === "error"
       anchors.right: parent.right
-      text: "Close"
+      text: Strings.t("action.close", "Close")
       bordered: true
       foreground: Commons.Color.foreground
       fontFamily: Style.font.family

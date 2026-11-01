@@ -1,9 +1,9 @@
 const test = require("node:test")
 const assert = require("node:assert/strict")
-const fs = require("node:fs")
+const { fs } = require("./english")
 const path = require("node:path")
 const vm = require("node:vm")
-const IdentifyModel = require("../IdentifyModel.js")
+const IdentifyModel = require("./script")("IdentifyModel.js")
 
 function fixture() {
   const output = { key: "monitor-serial", name: "DP-OLD", make: "Dell", model: "Desk", serial: "123" }
@@ -85,7 +85,7 @@ function identificationService() {
     }
   })
   Object.defineProperty(root, "opened", { get: () => root.stage !== "idle" })
-  const context = vm.createContext({ root, IdentifyModel, Model: require("../Model.js"),
+  const context = vm.createContext({ root, IdentifyModel, Model: require("./script")("Model.js"),
     identifyOverlay: overlay, identifyTimeout: timeout, Quickshell: screens,
     backendSocket: { connected: true, flush() {}, write(line) { packets.push(JSON.parse(line)) } },
     previewClock: { start() {}, stop() {} }, Hyprland: { focusedMonitor: null } })

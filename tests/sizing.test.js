@@ -1,8 +1,8 @@
 const test = require("node:test")
 const assert = require("node:assert/strict")
-const fs = require("node:fs")
+const { fs } = require("./english")
 const path = require("node:path")
-const Model = require("../Model.js")
+const Model = require("./script")("Model.js")
 
 // Logical arrangement bounds used by the capture fixtures and common desks.
 const laptop = { width: 1440, height: 960 }                  // 2880x1920 at 2x
@@ -124,6 +124,8 @@ test("the compact stage fits the arrangement between its clamps", () => {
   const wide = Model.compactStageHeight(ultrawide, width, 1)
   assert.equal(wide, Math.round((width - 44) / (3440 / 1440) + 44))
   assert.equal(Model.compactStageHeight(ultrawide, width, 1, true) - wide, Model.panelSizing.offRowHeight)
+  assert.equal(Model.compactStageHeight(ultrawide, width, 1, true, true) - wide, Model.panelSizing.offRowHeight * 2,
+    "Extend | Mirror takes a row of its own above the Off strip")
 })
 
 test("resizing waits for the pointer and never happens mid-drag", () => {
@@ -169,10 +171,17 @@ test("profile thumbnails draw each saved setup from its own outputs", () => {
 test("QML sizes the panel only through the Model functions", () => {
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
   assert.match(qml, /readonly property var panelLayout: Model\.expandedPanelLayout\(\{/)
-  assert.match(qml, /height: Model\.compactStageHeight\(root\.layoutBounds, width, root\.sizingUnit, root\.layoutOffRow\)/)
+  assert.match(qml, /height: Model\.compactStageHeight\(root\.layoutBounds, width, root\.sizingUnit, root\.layoutOffRow,\s+root\.displayMode\.available\)/)
   assert.match(qml, /Model\.panelResizeAllowed\(\{/)
   assert.match(qml, /onCanvasDraggingChanged: root\.applyPanelSize\(false\)/)
   assert.match(qml, /onExpandedChanged: root\.applyPanelSize\(true\)/)
+  const apply = qml.slice(qml.indexOf("function applyPanelSize"), qml.indexOf("onPanelLayoutChanged"))
+  assert.match(apply, /modeChanged: root\.panelSizeSettling/,
+    "corrections after Expand jump and are not held back by the pointer that clicked it")
+  assert.match(apply, /panelSizeAnimated = !first && !root\.panelSizeSettling/,
+    "the panel never eases down from heights measured at the compact width")
+  assert.match(apply, /appliedPanelHeight = root\.panelLayout\.height/,
+    "the height is read after the width lands, not from the layout captured before it")
   assert.match(qml, /HoverHandler \{ id: panelPointer; onHoveredChanged: root\.applyPanelSize\(false\) \}/)
   assert.doesNotMatch(qml, /width: Math\.round\(parent\.width \* 0\./, "no fixed-fraction columns remain")
   const canvas = fs.readFileSync(path.join(__dirname, "..", "DisplayCanvas.qml"), "utf8")
@@ -236,6 +245,6 @@ test("the compact view binds its height and scrolling to the Model", () => {
   assert.match(footer, /text: "Create profile"/)
   assert.match(footer, /"Resume automatic matching"/)
   // The keyboard cursor's row and a newly shown Keep/Revert bar are revealed.
-  assert.match(qml, /currentField: !root\.cursorActive \? null\s+: \(root\.cursorIndex < 0\s+\? \(Model\.compactTopRow\(root\.compactTopRows, root\.cursorIndex\) === "terminal" \? compactTerminalSize : compactTextSize\)\s+: \(root\.cursorIndex === 0 \? compactManagedToggle\s+: compactActionRows\.itemAt\(root\.cursorIndex - 1\)\)\)/)
+  assert.match(qml, /currentField: !root\.cursorActive \? null\s+: \(root\.cursorIndex < 0\s+\? \(\{ displaymode: compactDisplayMode, terminal: compactTerminalSize, textsize: compactTextSize \}\)\[\s+Model\.compactTopRow\(root\.compactTopRows, root\.cursorIndex\)\] \|\| null\s+: \(root\.cursorIndex === 0 \? compactManagedToggle\s+: compactActionRows\.itemAt\(root\.cursorIndex - 1\)\)\)/)
   assert.match(qml, /onVisibleChanged: if \(visible\) Qt\.callLater\(function\(\) \{ compactBody\.reveal\(compactDraftBar\) \}\)/)
 })

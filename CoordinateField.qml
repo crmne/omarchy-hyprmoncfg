@@ -3,6 +3,7 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "Model.js" as Model
+import "Strings.js" as Strings
 
 // Exact entry for a layout coordinate. Positions are four- or five-digit
 // logical pixels that are normally set by dragging, snapping or arrow nudges,
@@ -16,7 +17,7 @@ Column {
   property int value: 0
   property bool hasCursor: false
   property bool resetVisible: false
-  property string resetTooltip: "Reset to loaded profile value"
+  property string resetTooltip: Strings.t("reset.default", "Reset to loaded profile value")
   property color foreground: Commons.Color.popups.text
   property color accent: Commons.Color.accent
   property string fontFamily: Style.font.family

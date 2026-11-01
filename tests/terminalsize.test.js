@@ -1,11 +1,11 @@
 const test = require("node:test")
 const assert = require("node:assert/strict")
-const fs = require("node:fs")
+const { fs } = require("./english")
 const os = require("node:os")
 const path = require("node:path")
 const vm = require("node:vm")
 const { execFileSync, spawnSync } = require("node:child_process")
-const Model = require("../Model.js")
+const Model = require("./script")("Model.js")
 
 const repo = path.join(__dirname, "..")
 const read = name => fs.readFileSync(path.join(repo, name), "utf8")

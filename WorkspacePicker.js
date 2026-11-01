@@ -1,3 +1,6 @@
+.pragma library
+.import "Strings.js" as Strings
+
 var pickerId = "crmne.hyprmoncfg-workspaces"
 
 function parseStatus(text) {
@@ -14,12 +17,12 @@ function parseStatus(text) {
 }
 
 function offer(status, capable, planned, blocked) {
-  if (!status) return { action: "check", label: "Retry", description: "Check whether the workspace picker is installed.", enabled: !blocked }
+  if (!status) return { action: "check", label: Strings.t("picker.retry", "Retry"), description: Strings.t("picker.checkInstalled", "Check whether the workspace picker is installed."), enabled: !blocked }
   if (status.enabled) return { action: "", label: "", description: "", enabled: false }
-  if (!capable) return { action: "", label: "Update required", description: "Update hyprmoncfg to connect the picker to your workspace plan.", enabled: false }
-  if (!planned) return { action: "", label: "Plan required", description: "Apply a workspace plan to group your workspaces in the bar.", enabled: false }
-  return { action: status.installed ? "use" : "install", label: status.installed ? "Use in bar" : "Install picker",
-    description: "A workspace picker that follows your monitor layout.", enabled: !blocked }
+  if (!capable) return { action: "", label: Strings.t("picker.updateRequired", "Update required"), description: Strings.t("picker.updateHint", "Update hyprmoncfg to connect the picker to your workspace plan."), enabled: false }
+  if (!planned) return { action: "", label: Strings.t("picker.planRequired", "Plan required"), description: Strings.t("picker.planHint", "Apply a workspace plan to group your workspaces in the bar."), enabled: false }
+  return { action: status.installed ? "use" : "install", label: status.installed ? Strings.t("picker.useInBar", "Use in bar") : Strings.t("picker.install", "Install picker"),
+    description: Strings.t("picker.benefit", "A workspace picker that follows your monitor layout."), enabled: !blocked }
 }
 
 // Match the picker's physical left-to-right, then top-to-bottom ordering.

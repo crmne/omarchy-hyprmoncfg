@@ -1,9 +1,9 @@
 const test = require("node:test")
 const assert = require("node:assert/strict")
-const fs = require("node:fs")
+const { fs } = require("./english")
 const path = require("node:path")
 const Edit = require("../FieldEdit.js")
-const Model = require("../Model.js")
+const Model = require("./script")("Model.js")
 
 const root = path.join(__dirname, "..")
 const keys = { V: 1, Insert: 2, A: 3, Backspace: 4, Delete: 5, Left: 6, Right: 7, Home: 8, End: 9, Return: 10, Enter: 11, Up: 12, Down: 13 }

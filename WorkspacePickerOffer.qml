@@ -2,10 +2,11 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "Strings.js" as Strings
 
 Item {
   id: root
-  property var offer: ({ label: "Install picker", description: "", enabled: true })
+  property var offer: ({ label: Strings.t("picker.install", "Install picker"), description: "", enabled: true })
   property bool hasCursor: false
   property var previewGroups: []
   property string blockedReason: ""

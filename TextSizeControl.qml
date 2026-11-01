@@ -3,6 +3,7 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "Model.js" as Model
+import "Strings.js" as Strings
 
 // Omarchy's TEXT SIZE control, as in its own Display panel: the same stops, the
 // same notched PanelSlider, the px value right-aligned in the header, applied
@@ -14,7 +15,7 @@ Column {
   id: root
 
   property var bar: null
-  property string title: "TEXT SIZE"
+  property string title: Strings.t("textSize.title", "TEXT SIZE")
   property var stops: Model.textSizeStops
   property string unit: "px"
   // Pending stop while a change is in flight; -1 follows the live size.
@@ -50,7 +51,7 @@ Column {
       textFormat: Text.PlainText
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
-      text: (slider.dragging ? root.stops[Math.round(slider.liveValue)]
+      text: Strings.number(slider.dragging ? root.stops[Math.round(slider.liveValue)]
         : root.previewIndex >= 0 ? root.stops[Math.min(root.previewIndex, root.stops.length - 1)]
         : root.baseSize) + root.unit
       color: root.dim

@@ -1,3 +1,18 @@
+.pragma library
+.import "Strings.js" as Strings
+
+function displayFallback() {
+  return Strings.t("common.display", "Display")
+}
+
+function notReported() {
+  return Strings.t("common.notReported", "Not reported")
+}
+
+function noUsableSignal() {
+  return Strings.t("status.noUsableSignal", "No usable signal")
+}
+
 // Package names are a closed set: never interpolate probe output into a command.
 function installedPackage(output) {
   var names = String(output || "").trim().split(/\s+/)
@@ -93,20 +108,20 @@ function hiddenDisplays(monitors) {
 
   for (var i = 0; i < summaries.length; i++) {
     var monitor = summaries[i] || {}
-    var name = String(monitor.name || "Display")
+    var name = String(monitor.name || displayFallback())
     if (monitor.enabled === false) {
       off.push(name)
     } else if (mirrorTarget(monitor) !== "") {
       mirrored.push(name + " → " + mirrorTarget(monitor))
-    } else if (notes[String(monitor.key || "")] === noUsableSignal) {
+    } else if (notes[String(monitor.key || "")] === noUsableSignal()) {
       noSignal.push(name)
     }
   }
 
   var parts = []
-  if (noSignal.length > 0) parts.push(noUsableSignal + ": " + noSignal.join(", "))
-  if (off.length > 0) parts.push("Off: " + off.join(", "))
-  if (mirrored.length > 0) parts.push("Mirrored: " + mirrored.join(", "))
+  if (noSignal.length > 0) parts.push(Strings.t("status.summaryNoSignal", "%1: %2", noUsableSignal(), noSignal.join(", ")))
+  if (off.length > 0) parts.push(Strings.t("status.summaryOff", "Off: %1", off.join(", ")))
+  if (mirrored.length > 0) parts.push(Strings.t("status.summaryMirrored", "Mirrored: %1", mirrored.join(", ")))
   return parts.join("   ")
 }
 
@@ -115,8 +130,6 @@ function hiddenDisplays(monitors) {
 // but has no mode, and one the daemon runs below its saved settings. Older
 // daemons send no health, so a zero-size mode stands in for no_signal there.
 // Mirrors: the TUI card note.
-var noUsableSignal = "No usable signal"
-
 function displayNotes(monitors) {
   var notes = {}
   var summaries = monitors instanceof Array ? monitors : []
@@ -128,9 +141,9 @@ function displayNotes(monitors) {
       ? monitor.health === "no_signal"
       : !(Number(monitor.width || 0) > 0 && Number(monitor.height || 0) > 0)
     if (modeless) {
-      notes[key] = noUsableSignal
+      notes[key] = noUsableSignal()
     } else if (monitor.fallback && String(monitor.fallback.running || "") !== "") {
-      notes[key] = "Running " + String(monitor.fallback.running)
+      notes[key] = Strings.t("status.runningMode", "Running %1", String(monitor.fallback.running))
     }
   }
   return notes
@@ -140,7 +153,7 @@ function layoutDisplays(monitors, screens) {
   var summaries = monitors instanceof Array ? monitors : []
   var enriched = summaries.filter(drawsOwnImage).map(function(monitor) {
     return {
-      name: String(monitor.name || "Display"),
+      name: String(monitor.name || displayFallback()),
       description: String(monitor.description || ""),
       make: String(monitor.make || ""),
       model: String(monitor.model || ""),
@@ -162,8 +175,8 @@ function displayModelLabel(display, compact) {
   var makeModel = compact === true
     ? String(monitor.model || "").trim()
     : (String(monitor.make || "") + " " + String(monitor.model || "")).trim()
-  var label = makeModel || String(monitor.description || "").trim() || "Unknown display"
-  return monitor.internal === true ? "Internal · " + label : label
+  var label = makeModel || String(monitor.description || "").trim() || Strings.t("common.unknownDisplay", "Unknown display")
+  return monitor.internal === true ? Strings.t("display.internalLabel", "Internal · %1", label) : label
 }
 
 function displayDetailLabel(display) {
@@ -290,13 +303,13 @@ function profileLayoutDisplays(profile, editorDisplays, notes) {
     var output = outputs[i] || {}
     if (output.enabled === false || mirrorTarget(output) !== "") continue
     // A display that is on but shows nothing gets a named row, not a card.
-    if (health[String(output.key || "")] === noUsableSignal) continue
+    if (health[String(output.key || "")] === noUsableSignal()) continue
     var logical = outputLogicalSize(output)
     var metadata = editorMetadata(editorDisplays, output.key)
     var connected = Object.keys(metadata).length > 0
     result.push({
       key: String(output.key || ""),
-      name: String(output.name || "Display"),
+      name: String(output.name || displayFallback()),
       description: String(output.description || ""),
       make: String(output.make || ""),
       model: String(output.model || ""),
@@ -322,13 +335,13 @@ function nonSpatialDisplays(profile, editorDisplays, markDisconnected, notes) {
   for (var i = 0; i < outputs.length; i++) {
     var output = outputs[i] || {}
     var mirror = mirrorTarget(output)
-    var modeless = health[String(output.key || "")] === noUsableSignal
+    var modeless = health[String(output.key || "")] === noUsableSignal()
     if (output.enabled !== false && mirror === "" && !modeless) continue
     var connected = Object.keys(editorMetadata(editorDisplays, output.key)).length > 0
-    var state = markDisconnected && !connected ? "Not connected"
-      : (output.enabled === false ? "Off"
-        : (mirror !== "" ? "Mirrors " + outputName(profile, mirror) : noUsableSignal))
-    result.push({ key: String(output.key || ""), name: String(output.name || "Display"), state: state })
+    var state = markDisconnected && !connected ? Strings.t("display.notConnected", "Not connected")
+      : (output.enabled === false ? Strings.t("display.off", "Off")
+        : (mirror !== "" ? Strings.t("display.mirrorsTarget", "Mirrors %1", outputName(profile, mirror)) : noUsableSignal()))
+    result.push({ key: String(output.key || ""), name: String(output.name || displayFallback()), state: state })
   }
   return result
 }
@@ -348,14 +361,14 @@ function monitorHardwareInfo(output, metadata) {
   var diagonal = validSize ? Math.sqrt(width * width + height * height) / 25.4 : 0
   return {
     basic: [
-      { label: "Connector", value: String(item.name || "Not reported") },
-      { label: "Model", value: displayModelLabel(item, false) },
-      { label: "Max resolution", value: bestWidth > 0 ? bestWidth + "x" + bestHeight : "Not reported" }
+      { label: Strings.t("facts.connector", "Connector"), value: String(item.name || notReported()) },
+      { label: Strings.t("facts.model", "Model"), value: displayModelLabel(item, false) },
+      { label: Strings.t("facts.maxResolution", "Max resolution"), value: bestWidth > 0 ? bestWidth + "x" + bestHeight : notReported() }
     ],
     details: [
-      { label: "Panel size", value: validSize ? Math.round(diagonal) + '" (' + width + "x" + height + "mm)" : "Not reported" },
-      { label: "Type", value: displayType(meta, item) },
-      { label: "Serial", value: String(item.serial || "").trim() || "Not reported" }
+      { label: Strings.t("facts.panelSize", "Panel size"), value: validSize ? Math.round(diagonal) + '" (' + width + "x" + height + "mm)" : notReported() },
+      { label: Strings.t("facts.type", "Type"), value: displayType(meta, item) },
+      { label: Strings.t("facts.serial", "Serial"), value: String(item.serial || "").trim() || notReported() }
     ]
   }
 }
@@ -378,13 +391,13 @@ function displaySummary(output, metadata, plan) {
   if (!isFinite(scale) || scale <= 0) scale = 1
   var workspaces = workspaceText(plan, item.key)
   var panelSize = info.details[0].value
-  var sizeSuffix = panelSize === "Not reported" ? "" : " " + panelSize.split(" ")[0]
+  var sizeSuffix = panelSize === notReported() ? "" : " " + panelSize.split(" ")[0]
   return {
-    connector: String(item.name || "Display"),
+    connector: String(item.name || displayFallback()),
     model: info.basic[1].value + sizeSuffix,
     mode: mode,
-    placement: "Scale " + Number(scale.toFixed(2)) + "x  Position "
-      + Number(item.x || 0) + "," + Number(item.y || 0),
+    placement: Strings.t("display.placement", "Scale %1x  Position %2",
+      Number(scale.toFixed(2)), Strings.isolated(Number(item.x || 0) + "," + Number(item.y || 0))),
     workspaces: workspaces
   }
 }
@@ -414,13 +427,13 @@ function hiddenProfileDisplays(profile) {
   var mirrored = []
   for (var i = 0; i < outputs.length; i++) {
     var output = outputs[i] || {}
-    var name = String(output.name || "Display")
+    var name = String(output.name || displayFallback())
     if (output.enabled === false) off.push(name)
     else if (mirrorTarget(output) !== "") mirrored.push(name + " → " + outputName(profile, mirrorTarget(output)))
   }
   var parts = []
-  if (off.length) parts.push("Off: " + off.join(", "))
-  if (mirrored.length) parts.push("Mirrored: " + mirrored.join(", "))
+  if (off.length) parts.push(Strings.t("status.summaryOff", "Off: %1", off.join(", ")))
+  if (mirrored.length) parts.push(Strings.t("status.summaryMirrored", "Mirrored: %1", mirrored.join(", ")))
   return parts.join("   ")
 }
 
@@ -580,14 +593,14 @@ function snapOutputPosition(profile, selectedKey, direction) {
 
 function outputName(profile, key) {
   var output = outputByKey(profile, key)
-  return output ? String(output.name || key || "Display") : String(key || "Display")
+  return output ? String(output.name || key || displayFallback()) : String(key || displayFallback())
 }
 
 function outputDisplayLabel(profile, key) {
   var output = outputByKey(profile, key)
-  if (!output) return String(key || "Display")
+  if (!output) return String(key || displayFallback())
   var makeModel = (String(output.make || "") + " " + String(output.model || "")).trim()
-  return makeModel || String(output.description || "").trim() || String(output.name || key || "Display")
+  return makeModel || String(output.description || "").trim() || String(output.name || key || displayFallback())
 }
 
 // Profile JSON uses explicit neutral values for some Hyprland defaults and
@@ -774,18 +787,18 @@ function scaleRow(editorDisplays, key, current, info) {
     options: options,
     onMore: onMore,
     sharp: !blurry,
-    moreText: onMore ? label + (blurry ? " ⚠" : "") : "More",
-    detail: blurry ? label + " ⚠ Blurry" : label
+    moreText: onMore ? label + (blurry ? " ⚠" : "") : Strings.t("scale.more", "More"),
+    detail: blurry ? Strings.t("scale.blurryDetail", "%1 ⚠ Blurry", label) : label
   }
 }
 
 // Typed Custom… text, parsed only: the range and sharpness come from Go.
 function parseScaleEntry(text) {
   var raw = String(text === undefined || text === null ? "" : text).trim()
-  if (raw === "") return { error: "scale is required" }
-  if (!/^[+]?(\d+(\.\d+)?|\.\d+)$/.test(raw)) return { error: "scale must be a number" }
+  if (raw === "") return { error: Strings.t("scale.required", "scale is required") }
+  if (!/^[+]?(\d+(\.\d+)?|\.\d+)$/.test(raw)) return { error: Strings.t("scale.notNumber", "scale must be a number") }
   var scale = Number(raw)
-  if (!isFinite(scale)) return { error: "scale must be a number" }
+  if (!isFinite(scale)) return { error: Strings.t("scale.notNumber", "scale must be a number") }
   return { value: scale }
 }
 
@@ -806,16 +819,18 @@ function scaleEntryLines(width, height, text, info) {
   var w = Number(width || 0), h = Number(height || 0)
   if (info.sharp) {
     return { apply: parsed.value, lines: [{ tone: "ok",
-      text: "Sharp: " + w + " / " + shown + " = " + wholePixels(logical[0]) + ", "
-        + h + " / " + shown + " = " + wholePixels(logical[1]) + " logical px." }] }
+      text: Strings.t("scale.sharp", "Sharp: %1, %2 logical px.",
+        w + " / " + shown + " = " + wholePixels(logical[0]),
+        h + " / " + shown + " = " + wholePixels(logical[1])) }] }
   }
   var lines = [{ tone: "warning",
-    text: "⚠ Blurry: final size has fractional px (" + w + " / " + shown + " = " + Number(logical[0]).toFixed(2)
-      + ", " + h + " / " + shown + " = " + Number(logical[1]).toFixed(2) + ")." }]
+    text: Strings.t("scale.blurry", "⚠ Blurry: final size has fractional px (%1, %2).",
+      w + " / " + shown + " = " + Number(logical[0]).toFixed(2),
+      h + " / " + shown + " = " + Number(logical[1]).toFixed(2)) }]
   if (info.closest_logical instanceof Array) {
-    lines.push({ tone: "ok", text: "Closest sharp: " + formatScale(info.closest) + " -> "
-      + wholePixels(info.closest_logical[0]) + " x " + wholePixels(info.closest_logical[1])
-      + " logical px. Enter applies it." })
+    lines.push({ tone: "ok", text: Strings.t("scale.closest", "Closest sharp: %1 -> %2 logical px. Enter applies it.",
+      formatScale(info.closest),
+      wholePixels(info.closest_logical[0]) + " x " + wholePixels(info.closest_logical[1])) })
   }
   return { apply: parsed.value, lines: lines }
 }
@@ -873,7 +888,7 @@ function resolutionOptions(modes) {
 
 function refreshLabel(rate, precision) {
   var number = Number(rate || 0)
-  if (!(number > 0)) return "Auto"
+  if (!(number > 0)) return Strings.t("option.refreshAuto", "Auto")
   return String(Number(number.toFixed(precision))) + "Hz"
 }
 
@@ -930,14 +945,103 @@ function stepResolutionMode(modes, currentMode, delta) {
 }
 
 function mirrorOptions(profile, selectedKey) {
-  var options = [{ value: "", label: "None" }]
+  var options = [{ value: "", label: Strings.t("option.none", "None") }]
   var outputs = profile && profile.outputs instanceof Array ? profile.outputs : []
   for (var i = 0; i < outputs.length; i++) {
     var output = outputs[i] || {}
     if (String(output.key || "") === String(selectedKey || "") || output.enabled === false) continue
-    options.push({ value: String(output.key || ""), label: String(output.name || "Display") })
+    options.push({ value: String(output.key || ""), label: String(output.name || displayFallback()) })
   }
   return options
+}
+
+// Extend or Mirror: the one-click choice for a laptop with an external display,
+// as Omarchy's Display panel offers it. Everything below only describes draft
+// edits; the daemon validates them and the preview guard applies them.
+function displayModeOptions() {
+  return [
+    { value: "extend", label: Strings.t("option.extend", "Extend") },
+    { value: "mirror", label: Strings.t("option.mirror", "Mirror") }
+  ]
+}
+
+function isBuiltInOutput(output, metadata) {
+  return (metadata || {}).internal === true || /^(eDP|LVDS|DSI)-/i.test(String((output || {}).name || ""))
+}
+
+// A saved profile can list displays that are not plugged in; those are not
+// choices here. mode is "" for an arrangement that is neither, such as one of
+// two externals mirroring: both choices then stay available.
+function displayModeState(profile, displays) {
+  var outputs = profile && profile.outputs instanceof Array ? profile.outputs : []
+  var live = displays instanceof Array ? displays : []
+  var builtIn = null
+  var externals = []
+  for (var i = 0; i < outputs.length; i++) {
+    var output = outputs[i] || {}
+    if (output.enabled === false) continue
+    var metadata = editorMetadata(live, output.key)
+    if (live.length > 0 && Object.keys(metadata).length === 0) continue
+    if (!isBuiltInOutput(output, metadata)) externals.push(output)
+    else if (!builtIn) builtIn = output
+  }
+  if (!builtIn || externals.length === 0) return { available: false, mode: "", builtInKey: "", externalKeys: [] }
+  var builtInKey = String(builtIn.key || "")
+  var mirroring = externals.filter(function(item) { return mirrorTarget(item) === builtInKey }).length
+  var independent = externals.filter(function(item) { return mirrorTarget(item) === "" }).length
+  var mode = mirrorTarget(builtIn) !== "" ? ""
+    : (mirroring === externals.length ? "mirror" : (independent === externals.length ? "extend" : ""))
+  return {
+    available: true,
+    mode: mode,
+    builtInKey: builtInKey,
+    externalKeys: externals.map(function(item) { return String(item.key || "") })
+  }
+}
+
+// The output edits, in order, that reach a mode. A mirrored output keeps its
+// x and y in the draft, so clearing mirror_of restores it there; `arrangement`
+// (Model.mirrorArrangement) carries them across a Keep, which reloads the
+// draft from Hyprland. The daemon resolves any overlap that remains.
+function displayModeEdits(profile, displays, mode, arrangement) {
+  var state = displayModeState(profile, displays)
+  if (!state.available || mode === state.mode) return []
+  var saved = arrangement || {}
+  var edits = []
+  var builtIn = outputByKey(profile, state.builtInKey)
+  // A built-in display cannot mirror the external that is about to mirror it.
+  if (mirrorTarget(builtIn) !== "") edits.push({ output_key: state.builtInKey, mirror_of: "" })
+  for (var i = 0; i < state.externalKeys.length; i++) {
+    var key = state.externalKeys[i]
+    var target = mirrorTarget(outputByKey(profile, key))
+    if (mode === "mirror") {
+      if (target !== state.builtInKey) edits.push({ output_key: key, mirror_of: state.builtInKey })
+    } else if (mode === "extend" && target !== "") {
+      var edit = { output_key: key, mirror_of: "" }
+      if (saved[key]) { edit.x = saved[key].x; edit.y = saved[key].y }
+      edits.push(edit)
+    }
+  }
+  return edits
+}
+
+// Where the externals sit before Mirror hides them, for a later Extend.
+function mirrorArrangement(profile, displays, previous) {
+  var state = displayModeState(profile, displays)
+  var result = Object.assign({}, previous || {})
+  for (var i = 0; i < state.externalKeys.length; i++) {
+    var output = outputByKey(profile, state.externalKeys[i])
+    if (mirrorTarget(output) === "")
+      result[state.externalKeys[i]] = { x: Number(output.x || 0), y: Number(output.y || 0) }
+  }
+  return result
+}
+
+// Nothing to arrange: the draft has one output and one is connected. An output
+// that is off or unplugged but still in the draft keeps the arranging controls.
+function singleDisplay(profile, displays) {
+  var outputs = profile && profile.outputs instanceof Array ? profile.outputs : []
+  return outputs.length <= 1 && (displays instanceof Array ? displays : []).length <= 1
 }
 
 function outputOptions(profile) {
@@ -946,7 +1050,7 @@ function outputOptions(profile) {
     var item = output || {}
     return {
       value: String(item.key || ""),
-      label: String(item.name || "Display") + (item.enabled === false ? " · off" : "")
+      label: item.enabled === false ? Strings.t("display.nameOff", "%1 · off", String(item.name || displayFallback())) : String(item.name || displayFallback())
     }
   })
 }
@@ -957,8 +1061,9 @@ function profileOptions(document) {
   for (var i = 0; i < profiles.length; i++) {
     var profile = profiles[i] || {}
     if (Number(profile.connected_enabled_outputs || 0) <= 0) continue
-    var suffix = profile.active ? " · active" : (profile.recommended ? " · best match" : "")
-    options.push({ value: String(profile.name || ""), label: String(profile.name || "Profile") + suffix })
+    var profileName = String(profile.name || Strings.t("common.profile", "Profile"))
+    options.push({ value: String(profile.name || ""), label: profile.active ? Strings.t("profile.nameActive", "%1 · active", profileName)
+      : (profile.recommended ? Strings.t("profile.nameBestMatch", "%1 · best match", profileName) : profileName) })
   }
   return options
 }
@@ -1004,24 +1109,33 @@ function profileWorkspacePlan(editorDocument, name) {
 }
 
 function displayType(metadata, output) {
-  var live = metadata || {}
-  var saved = output || {}
-  return live.internal === true || /^(eDP|LVDS|DSI)-/i.test(String(saved.name || ""))
-    ? "Internal display"
-    : "External display"
+  return isBuiltInOutput(output, metadata)
+    ? Strings.t("facts.internalDisplay", "Internal display")
+    : Strings.t("facts.externalDisplay", "External display")
 }
 
 function onOff(value) {
   return value === true ? "on" : "off"
 }
 
+// A stored strategy by its name in the Strategy control. One this panel does
+// not know, from a newer daemon, is shown as stored.
+function workspaceStrategyLabel(strategy) {
+  var options = workspaceStrategyOptions()
+  for (var i = 0; i < options.length; i++) {
+    if (options[i].value === strategy) return options[i].label
+  }
+  return strategy.charAt(0).toUpperCase() + strategy.slice(1)
+}
+
 function profileWorkspaceSummary(profile) {
   var settings = (profile || {}).workspaces || {}
-  if (!settings.enabled) return "Disabled"
-  var strategy = String(settings.strategy || "manual")
+  if (!settings.enabled) return Strings.t("workspace.disabled", "Disabled")
+  var strategy = workspaceStrategyLabel(String(settings.strategy || "manual"))
   var maximum = Number(settings.max_workspaces || 0)
-  return strategy.charAt(0).toUpperCase() + strategy.slice(1)
-    + (maximum > 0 ? " · " + maximum + " workspaces" : "")
+  return maximum > 0
+    ? Strings.tn("workspace.strategySummary", maximum, "%2 · %1 workspace", "%2 · %1 workspaces", strategy)
+    : strategy
 }
 
 // Prefer a proven live match. If identical saved layouts make it ambiguous,
@@ -1043,22 +1157,25 @@ function profileIsCurrent(summary, document) {
 
 function profileMatchLabel(summary, current) {
   var item = summary || {}
-  var label = (current === undefined ? item.active : current) ? "Active"
-    : (item.recommended ? "Recommended"
-      : (Number(item.match_score || 0) > 0 ? "Partial match" : "No match"))
-  return Number(item.match_score || 0) > 0 ? label + " · score " + Number(item.match_score) : label
+  var label = (current === undefined ? item.active : current) ? Strings.t("match.active", "Active")
+    : (item.recommended ? Strings.t("match.recommended", "Recommended")
+      : (Number(item.match_score || 0) > 0 ? Strings.t("match.partial", "Partial match") : Strings.t("match.none", "No match")))
+  return Number(item.match_score || 0) > 0
+    ? Strings.t("match.withScore", "%1 · score %2", label, Number(item.match_score)) : label
 }
 
-function matchReasonLabel(kind) {
+// One whole phrase per reason and count, because the word for displays agrees
+// with what follows in many languages.
+function matchReasonLabel(kind, count) {
   switch (String(kind || "")) {
-    case "connected": return "connected"
-    case "connected_kept_off": return "connected, kept off"
-    case "not_connected": return "not connected"
-    case "not_connected_kept_off": return "not connected, kept off"
-    case "connected_unknown": return "connected, not in profile"
-    case "lid_closed_kept_off": return "built-in, kept off with the lid closed"
-    case "lid_closed_on": return "built-in, turned off by the closed lid"
-    default: return ""
+    case "connected": return Strings.tn("match.reason.connected", count, "%1 display connected", "%1 displays connected")
+    case "connected_kept_off": return Strings.tn("match.reason.connectedKeptOff", count, "%1 display connected, kept off", "%1 displays connected, kept off")
+    case "not_connected": return Strings.tn("match.reason.notConnected", count, "%1 display not connected", "%1 displays not connected")
+    case "not_connected_kept_off": return Strings.tn("match.reason.notConnectedKeptOff", count, "%1 display not connected, kept off", "%1 displays not connected, kept off")
+    case "connected_unknown": return Strings.tn("match.reason.connectedUnknown", count, "%1 display connected, not in profile", "%1 displays connected, not in profile")
+    case "lid_closed_kept_off": return Strings.tn("match.reason.lidClosedKeptOff", count, "%1 display built-in, kept off with the lid closed", "%1 displays built-in, kept off with the lid closed")
+    case "lid_closed_on": return Strings.tn("match.reason.lidClosedOn", count, "%1 display built-in, turned off by the closed lid", "%1 displays built-in, turned off by the closed lid")
+    default: return Strings.tn("match.reason.unknown", count, "%1 display", "%1 displays")
   }
 }
 
@@ -1067,13 +1184,13 @@ function matchReasonLabel(kind) {
 // it previews the recommended profile instead, and says so; with nothing to
 // pin, it says why the toggle is unavailable. Mirrors panel #20.
 function automaticSelectionNote(automatic, pending, activeProfile, recommendedProfile) {
-  if (pending) return "Updating profile selection mode…"
+  if (pending) return Strings.t("auto.noteUpdating", "Updating profile selection mode…")
   if (automatic && String(activeProfile || "") === "") {
     var recommended = String(recommendedProfile || "")
-    if (recommended !== "") return "Turning this off previews " + recommended + " and keeps it if you confirm"
-    return "Save a profile for these displays to turn this off"
+    if (recommended !== "") return Strings.t("auto.notePreview", "Turning this off previews %1 and keeps it if you confirm", recommended)
+    return Strings.t("auto.noteSave", "Save a profile for these displays to turn this off")
   }
-  return "Matches your connected displays to your saved profiles"
+  return Strings.t("auto.noteMatches", "Matches your connected displays to your saved profiles")
 }
 
 // automaticSelectionCanToggle reports whether the toggle has something to do.
@@ -1090,7 +1207,7 @@ function profileMatchReasonRows(summary) {
     var score = Number(item.match_score || 0)
     var arithmetic = score > 0 ? (points > 0 ? "+" : "") + points + "   " : ""
     return {
-      value: arithmetic + count + (count === 1 ? " display " : " displays ") + matchReasonLabel(reason.kind),
+      value: arithmetic + matchReasonLabel(reason.kind, count),
       positive: points > 0
     }
   })
@@ -1110,9 +1227,9 @@ function profileHiddenDisplayRows(profile) {
     }
   }
   for (var off = 0; off < keptOff.length; off++)
-    rows.push({ label: off === 0 ? "Kept off" : "", value: keptOff[off] })
+    rows.push({ label: off === 0 ? Strings.t("match.keptOff", "Kept off") : "", value: keptOff[off] })
   for (var mirror = 0; mirror < mirrors.length; mirror++)
-    rows.push({ label: mirror === 0 ? "Mirrors" : "", value: mirrors[mirror] })
+    rows.push({ label: mirror === 0 ? Strings.t("match.mirrors", "Mirrors") : "", value: mirrors[mirror] })
   return rows
 }
 
@@ -1231,7 +1348,7 @@ function manualWorkspaceRows(profile) {
   return rules.map(function(rule) {
     var item = rule || {}
     var key = String(item.output_key || "")
-    var label = key !== "" ? outputDisplayLabel(profile, key) : String(item.output_name || "Display")
+    var label = key !== "" ? outputDisplayLabel(profile, key) : String(item.output_name || displayFallback())
     return {
       workspace: String(item.workspace || "?"),
       output_key: key,
@@ -1294,15 +1411,15 @@ function cycleManualWorkspaceRule(rules, profile, rowIndex, delta) {
 // strategy and plan stay intact so choosing a strategy again restores them.
 function workspaceStrategyOptions() {
   return [
-    { value: "off", label: "Off" },
-    { value: "manual", label: "Manual" },
-    { value: "sequential", label: "Sequential" },
-    { value: "interleave", label: "Interleaved" }
+    { value: "off", label: Strings.t("option.strategyOff", "Off") },
+    { value: "manual", label: Strings.t("option.strategyManual", "Manual") },
+    { value: "sequential", label: Strings.t("option.strategySequential", "Sequential") },
+    { value: "interleave", label: Strings.t("option.strategyInterleaved", "Interleaved") }
   ]
 }
 
 function workspaceOffMessage() {
-  return "Off: hyprmoncfg writes no workspace rules."
+  return Strings.t("workspace.offMessage", "Off: hyprmoncfg writes no workspace rules.")
 }
 
 function workspaceStrategyChoice(settings) {
@@ -1314,8 +1431,13 @@ function workspaceStrategyChoice(settings) {
 function workspaceStrategyChanges(settings, choice) {
   var next = String(choice || "manual")
   if (next === "off") return { enabled: false }
+  var current = settings || {}
   var changes = { strategy: next }
-  if (!(settings || {}).enabled) changes.enabled = true
+  if (!current.enabled) changes.enabled = true
+  // A new sequential plan groups three workspaces per display, as the TUI
+  // does; interleaved plans carry a group size of 1 that would otherwise stick.
+  if (next === "sequential" && String(current.strategy || "manual") !== "sequential"
+      && !(Number(current.group_size) > 1)) changes.group_size = 3
   return changes
 }
 
@@ -1326,7 +1448,7 @@ function workspacePlanRows(plan, profile) {
     var workspaces = item.workspaces instanceof Array ? item.workspaces.join(", ") : ""
     return {
       key: String(item.output_key || ""),
-      name: profile ? outputDisplayLabel(profile, item.output_key) : String(item.output_name || "Display"),
+      name: profile ? outputDisplayLabel(profile, item.output_key) : String(item.output_name || displayFallback()),
       workspaces: workspaces || "—"
     }
   })
@@ -1478,7 +1600,7 @@ function stageSize(bounds, unit, options) {
   var height = clampNumber((width - pad) / aspect + pad, o.minHeight, o.maxHeight)
   if (height >= o.maxHeight)
     width = clampNumber((height - pad) * aspect + pad, o.minWidth, o.maxWidth)
-  var extra = o.offRow ? panelSizing.offRowHeight : 0
+  var extra = (o.offRow ? panelSizing.offRowHeight : 0) + (o.modeRow ? panelSizing.offRowHeight : 0)
   return { width: Math.round(width * u), height: Math.round((height + extra) * u), aspect: aspect }
 }
 
@@ -1490,13 +1612,13 @@ function stageHeightForWidth(bounds, width, unit, options) {
   var pad = o.padding * 2
   var designWidth = Math.max(pad + 1, Number(width || 0) / u)
   var height = clampNumber((designWidth - pad) / aspect + pad, o.minHeight, o.maxHeight)
-  var extra = o.offRow ? panelSizing.offRowHeight : 0
+  var extra = (o.offRow ? panelSizing.offRowHeight : 0) + (o.modeRow ? panelSizing.offRowHeight : 0)
   return Math.round((height + extra) * u)
 }
 
-function compactStageHeight(bounds, width, unit, offRow) {
+function compactStageHeight(bounds, width, unit, offRow, modeRow) {
   return stageHeightForWidth(bounds, width, unit,
-    Object.assign({}, panelSizing.compactStage, { offRow: offRow === true }))
+    Object.assign({}, panelSizing.compactStage, { offRow: offRow === true, modeRow: modeRow === true }))
 }
 
 function visibleRowsHeight(count, rowHeight, spacing, visible, unit) {
@@ -1523,7 +1645,7 @@ function expandedPanelLayout(input) {
   var availableWidth = Number(i.availableWidth || 0) > 0 ? Number(i.availableWidth) : Infinity
   var availableHeight = Number(i.availableHeight || 0) > 0 ? Number(i.availableHeight) : Infinity
 
-  var stage = stageSize(i.bounds, u, { offRow: i.offRow === true })
+  var stage = stageSize(i.bounds, u, { offRow: i.offRow === true, modeRow: i.modeRow === true })
   var naturalWidth = Math.max(Math.round(s.minWidth * u), stage.width + gap + inspectorWidth)
   var width = Math.min(naturalWidth, availableWidth)
   var layoutStageWidth = Math.max(Math.round(200 * u), width - gap - inspectorWidth)
@@ -1583,12 +1705,14 @@ function panelResizeAllowed(state) {
 // Rotation and flip are one Hyprland transform (0-3 rotate, 4-7 flipped and
 // rotate). The inspector edits them separately; values outside 0-7 are left
 // untouched so an unknown transform survives readback.
-var rotationOptions = [
-  { value: "0", label: "Normal" },
-  { value: "1", label: "90°" },
-  { value: "2", label: "180°" },
-  { value: "3", label: "270°" }
-]
+function rotationOptions() {
+  return [
+    { value: "0", label: Strings.t("option.rotationNormal", "Normal") },
+    { value: "1", label: "90°" },
+    { value: "2", label: "180°" },
+    { value: "3", label: "270°" }
+  ]
+}
 
 function transformKnown(transform) {
   var t = Number(transform)
@@ -1624,7 +1748,7 @@ function rotationAutoSupported(displays, key) {
 }
 
 function rotationFieldOptions(autoSupported) {
-  return autoSupported ? [{ value: "auto", label: "Auto" }].concat(rotationOptions) : rotationOptions
+  return autoSupported ? [{ value: "auto", label: Strings.t("option.rotationAuto", "Auto") }].concat(rotationOptions()) : rotationOptions()
 }
 
 function rotationFieldValue(output) {
@@ -1644,6 +1768,16 @@ function rotationEdit(output, value) {
   return edit
 }
 
+// The canvas's right-click menu: the ROTATION field's choices, the current one
+// checked. An unknown transform is left alone, as the field leaves it.
+function rotationMenuActions(output, autoSupported) {
+  var known = !!output && transformKnown(Number(output.transform || 0))
+  var current = known ? rotationFieldValue(output) : ""
+  return rotationFieldOptions(autoSupported).map(function(option) {
+    return { id: option.value, label: option.label, checked: option.value === current, enabled: known }
+  })
+}
+
 // The detail beside ROTATION for a panel that turns with the device: its
 // upright rotation when not Normal, and whether turning is held.
 function rotationDetail(output, rotation) {
@@ -1651,11 +1785,13 @@ function rotationDetail(output, rotation) {
   var parts = []
   var transform = Number(output.transform || 0)
   if (transformKnown(transform) && transform !== 0) {
-    var label = rotationOptions[transformRotation(transform)].label
-    parts.push("Upright " + (transformFlipped(transform) ? "flipped " + label : label))
+    var label = rotationOptions()[transformRotation(transform)].label
+    parts.push(transformFlipped(transform)
+      ? Strings.t("rotation.uprightFlipped", "Upright flipped %1", label)
+      : Strings.t("rotation.upright", "Upright %1", label))
   }
-  if (rotation && rotation.locked === true) parts.push("Locked")
-  else if (rotation && rotation.paused === true) parts.push("Upright while folded")
+  if (rotation && rotation.locked === true) parts.push(Strings.t("rotation.locked", "Locked"))
+  else if (rotation && rotation.paused === true) parts.push(Strings.t("rotation.uprightFolded", "Upright while folded"))
   return parts.join(", ")
 }
 
@@ -1664,12 +1800,14 @@ function rotationStatus(document) {
 }
 
 // Directions for "Place beside nearest", identical to Alt+arrow snapping.
-var placementOptions = [
-  { value: "left", label: "Left" },
-  { value: "right", label: "Right" },
-  { value: "up", label: "Above" },
-  { value: "down", label: "Below" }
-]
+function placementOptions() {
+  return [
+    { value: "left", label: Strings.t("option.placeLeft", "Left") },
+    { value: "right", label: Strings.t("option.placeRight", "Right") },
+    { value: "up", label: Strings.t("option.placeAbove", "Above") },
+    { value: "down", label: Strings.t("option.placeBelow", "Below") }
+  ]
+}
 
 // Keep an unreported or unknown current value visible in a closed set instead
 // of silently showing nothing selected.
@@ -1803,8 +1941,9 @@ function steppedTerminalIndex(index, delta) {
 
 // Rows above Management in the compact key model, top to bottom. Cursor
 // indexes below zero count up to them: -1 is the last, -rows.length the first.
-function compactTopRows(textSizeAvailable, terminalSizeAvailable) {
+function compactTopRows(textSizeAvailable, terminalSizeAvailable, displayModeAvailable) {
   var rows = []
+  if (displayModeAvailable) rows.push("displaymode")
   if (textSizeAvailable) rows.push("textsize")
   if (terminalSizeAvailable) rows.push("terminal")
   return rows
@@ -1944,6 +2083,7 @@ if (typeof module !== "undefined") {
     rotationFieldOptions: rotationFieldOptions,
     rotationFieldValue: rotationFieldValue,
     rotationEdit: rotationEdit,
+    rotationMenuActions: rotationMenuActions,
     rotationDetail: rotationDetail,
     rotationStatus: rotationStatus,
     transformKnown: transformKnown,
@@ -1970,6 +2110,11 @@ if (typeof module !== "undefined") {
     formatScale: formatScale,
     scaleOptions: scaleOptions,
     mirrorOptions: mirrorOptions,
+    displayModeOptions: displayModeOptions,
+    displayModeState: displayModeState,
+    displayModeEdits: displayModeEdits,
+    mirrorArrangement: mirrorArrangement,
+    singleDisplay: singleDisplay,
     outputOptions: outputOptions,
     profileOptions: profileOptions,
     savedProfileByName: savedProfileByName,

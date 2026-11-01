@@ -3,6 +3,7 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "Model.js" as Model
+import "Strings.js" as Strings
 
 // Scale the way Omarchy's own Display panel shows it: one row of preset pills
 // (bordered Button, `active` = current) and a trailing More dropdown listing
@@ -30,11 +31,11 @@ Column {
   property bool customAvailable: false
   property var infos: ({})
   // Trigger text for More and the header detail, from Model.scaleRow.
-  property string moreText: "More"
+  property string moreText: Strings.t("scale.more", "More")
   property string detail: ""
   property bool hasCursor: false
   property bool resetVisible: false
-  property string resetTooltip: "Reset to loaded profile value"
+  property string resetTooltip: Strings.t("reset.default", "Reset to loaded profile value")
   property Item popupParent: null
   property bool ownerOpen: true
   property color foreground: Commons.Color.popups.text
@@ -103,7 +104,7 @@ Column {
       id: header
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
-      text: "SCALE"
+      text: Strings.t("scale.title", "SCALE")
       foreground: root.foreground
       fontFamily: root.fontFamily
     }
@@ -136,7 +137,7 @@ Column {
     }
   }
 
-  TextMetrics { id: moreText; font.family: root.fontFamily; font.pixelSize: Style.font.body; text: "More" }
+  TextMetrics { id: moreText; font.family: root.fontFamily; font.pixelSize: Style.font.body; text: Strings.t("scale.more", "More") }
   TextMetrics { id: currentMoreText; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true; text: root.moreText }
   TextMetrics { id: moreChevron; font.family: root.fontFamily; font.pixelSize: Style.font.body; text: "󰅀" }
 
@@ -145,7 +146,7 @@ Column {
     width: parent.width
     spacing: Style.spacing.xs
     // Sized from the trigger's own text, chevron and paddings, so neither
-    // "More" nor the current scale it may carry ever elides.
+    // Strings.t("scale.more", "More") nor the current scale it may carry ever elides.
     readonly property real moreWidth: Math.ceil(Math.max(moreText.advanceWidth, currentMoreText.advanceWidth)
       + moreChevron.advanceWidth + Style.spacing.controlPaddingX + Style.spacing.md + Style.spacing.controlGap
       + Style.normalBorderWidth * 2 + Style.space(2))
@@ -188,7 +189,7 @@ Column {
       triggerText: root.moreText
       active: root.onMore
       hasCursor: root.hasCursor && root.onMore
-      options: root.customAvailable ? root.allOptions.concat([{ value: "custom", label: "Custom…" }]) : root.allOptions
+      options: root.customAvailable ? root.allOptions.concat([{ value: "custom", label: Strings.t("scale.custom", "Custom…") }]) : root.allOptions
       value: root.value
       popupParent: root.popupParent
       ownerOpen: root.ownerOpen
@@ -215,7 +216,7 @@ Column {
 
     Text {
       textFormat: Text.PlainText
-      text: "CUSTOM SCALE"
+      text: Strings.t("scale.customTitle", "CUSTOM SCALE")
       color: Qt.darker(root.foreground, 1.4)
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
@@ -265,7 +266,7 @@ Column {
       width: parent.width
       textFormat: Text.PlainText
       wrapMode: Text.Wrap
-      text: "Enter applies. Esc cancels."
+      text: Strings.t("scale.customHint", "Enter applies. Esc cancels.")
       color: Qt.darker(root.foreground, 1.4)
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption

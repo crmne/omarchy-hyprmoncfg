@@ -2,6 +2,7 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "Strings.js" as Strings
 
 // A small closed set shown all at once, built on the shell's own ButtonGroup
 // so chip spacing, hover, focus, Tab entry and h/l/Enter keys are Omarchy's.
@@ -31,7 +32,7 @@ Column {
   property bool wrap: false
   readonly property bool wrapped: root.wrap && controls.implicitWidth > root.width
   property bool resetVisible: false
-  property string resetTooltip: "Reset to loaded profile value"
+  property string resetTooltip: Strings.t("reset.default", "Reset to loaded profile value")
   // Optional trailing on/off chip in the same row (Rotation's Flipped).
   property string toggleLabel: ""
   property bool toggleChecked: false

@@ -108,7 +108,8 @@ A small background service is what watches for this. It catches hotplug, lid and
 - The companion TUI shares the display-summary conventions; standalone TUI Identify remains pending
 
 - The expanded panel mirrors the TUI shortcuts: `1`/`2`/`3` switch pages, `a` applies, `s` saves, `r` resets, and `?` shows the contextual key guide.
-- On the layout, arrows move the selected display; `Shift`, `Ctrl`, and `Alt` preserve the TUI's fine movement and nearest-display snapping
+- On the layout, arrows or `h`/`j`/`k`/`l` move the selected display; `Shift`, `Ctrl`, and `Alt` on the arrows preserve the TUI's fine movement and nearest-display snapping, `Ctrl` and `Alt` work with the letters too, and `Shift`+`h`/`j`/`k`/`l` is the TUI's 500px jump
+- `h`/`j`/`k`/`l` work wherever arrows navigate, except `l` on Profiles, which loads the selected profile
 - Profile browsing and workspace settings use the same arrow, Enter, load, edit, and delete keys as the TUI
 - Text fields (profile name, positions, colour values, ICC path, post-apply command, workspace counts) take typing, arrows, Home/End, Backspace/Delete, `Ctrl+A` and Enter. They read the clipboard only when you paste with `Ctrl+V` or `Shift+Insert`: `wl-paste` runs for at most two seconds and the panel keeps the first 4096 bytes, as one line without control characters
 
@@ -117,6 +118,9 @@ A small background service is what watches for this. It catches hotplug, lid and
 - Snap-to-edge arrangement, and the displays beside an output move with it when scale, mode or rotation changes its size
 - Per-output scale, checked for whole-pixel sharpness
 - Mirroring, rotation and flips
+- **Extend | Mirror** above the canvas on a laptop with an external display: one click starts the usual preview with Keep and Revert, and Extend puts the externals back where they were (`m` in the expanded Layout view)
+- Right-click a display on the canvas to rotate it
+- With one display connected, the controls for arranging displays step aside; rotation stays
 - On 2-in-1s and tablets, **Auto** rotation that turns the built-in panel with the device, with a rotation lock beside it (needs hyprmoncfg with rotation support and iio-sensor-proxy)
 - Positions by hand or by snapping
 
@@ -170,6 +174,12 @@ Choose **Identify** in the hardware inspector or **Identify all** in the header.
 Hotplug refreshes preserve in-progress edits and input. Stale status/editor replies cannot replace a newer topology or preview state; compositor-busy responses retain the last visible snapshot while bounded retries recover.
 
 Editor refreshes wait for an active preview to finish; choosing Discard still resets the draft from a fresh layout.
+
+## Languages
+
+The panel follows the language picked under Setup > Language, live and without a restart, in all 50 languages Omarchy ships, with their plural forms. Arabic, Hebrew, Persian and Urdu mirror the panel, except the layout canvas, which stays a picture of your desk. On an Omarchy without language support the panel stays in English.
+
+The catalogs are `i18n/<code>.json`, with `i18n/en.json` as the source. Text that comes from the hyprmoncfg daemon, such as an error it reports, stays in English, and so do the bar widget's name and setting in Omarchy's own lists, which come from `manifest.json`.
 
 ## Install
 

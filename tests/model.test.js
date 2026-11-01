@@ -1,8 +1,8 @@
 const test = require("node:test")
 const assert = require("node:assert/strict")
-const fs = require("node:fs")
+const { fs } = require("./english")
 const path = require("node:path")
-const Model = require("../Model.js")
+const Model = require("./script")("Model.js")
 const vm = require("node:vm")
 
 function panelFunction(name, root, globals = {}) {
@@ -44,7 +44,7 @@ test("profile details end with the command and deletion uses native panel contro
   const details = qml.slice(qml.indexOf("id: profileDetailsPane"),qml.indexOf("id: workspacePlanPane"))
   assert.ok(details.indexOf('text: "Post-apply command"') > details.indexOf('value: "(not managed)"'))
   assert.doesNotMatch(qml, /savedEntry.current \? "›/)
-  assert.match(qml, /id: profileMatchText\s+width: Style.space\(58\)\s+horizontalAlignment: Text.AlignRight/)
+  assert.match(qml, /id: profileMatchText\s+width: Style.space\(84\)\s+horizontalAlignment: Text.AlignRight/)
   assert.doesNotMatch(qml, /Controls.Dialog/)
   assert.match(qml, /function open\(\) \{ visible = true; cancelDeleteButton.forceActiveFocus\(\) \}/)
   assert.match(qml, /KeyNavigation.tab: cancelDeleteButton/)
@@ -151,7 +151,7 @@ test("the installed backend requirement matches the manifest and upgrade message
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
   const required = require("../manifest.json").hyprmoncfg.minimumVersion
   assert.equal(qml.match(/Model.versionAtLeast\(versionOutput.text, "([^"]+)"\)/)[1], required)
-  assert.ok(qml.includes("hyprmoncfg " + required + " or newer is still required."))
+  assert.ok(qml.includes('"The update finished, but hyprmoncfg %1 or newer is still required.", "' + required + '"'))
   assert.equal(Model.versionAtLeast("hyprmoncfg 1.23.0", required), false)
   assert.equal(Model.versionAtLeast("hyprmoncfg 1.24.0-rc.0", required), false)
   assert.equal(Model.versionAtLeast("hyprmoncfg " + required, required), true)
@@ -282,7 +282,7 @@ function previewGuard() {
   })
   Object.defineProperty(root, "opened", { get: () => root.stage !== "idle" })
   const socket = { connected: true, write(line) { requests.push(JSON.parse(line)) }, flush() {} }
-  const context = vm.createContext({ root, Model, Picker: require("../WorkspacePicker.js"), IdentifyModel: require("../IdentifyModel.js"), backendSocket: socket,
+  const context = vm.createContext({ root, Model, Picker: require("./script")("WorkspacePicker.js"), IdentifyModel: require("./script")("IdentifyModel.js"), backendSocket: socket,
     identifyOverlay: { clear() {}, show() {} }, Quickshell: { screens: [] },
     identifyTimeout: { restart() {}, stop() {} },
     Hyprland: { focusedMonitor: { name: "eDP-1" } },
@@ -1023,9 +1023,9 @@ test("the panel has management-first compact mode and a TUI-shaped expanded mode
   assert.doesNotMatch(qml, /ScrollView \{/)
   assert.match(qml, /id: compactColumn/)
   assert.match(qml, /id: expandedEditor/)
-  assert.match(qml, /label: "1  Layout"/)
-  assert.match(qml, /label: "2  Workspaces"/)
-  assert.match(qml, /label: "3  Profiles"/)
+  assert.match(qml, /label: "1  " \+ "Layout"/)
+  assert.match(qml, /label: "2  " \+ "Workspaces"/)
+  assert.match(qml, /label: "3  " \+ "Profiles"/)
   // Stages carry no pane title: the drawn screens are the heading.
   assert.match(qml, /id: layoutPane[\s\S]*?title: ""/)
   assert.match(qml, /MonitorInfo \{/)
@@ -1273,10 +1273,10 @@ test("the expanded panel mirrors the TUI's contextual keyboard map", () => {
 
   assert.match(panel, /onTextKey: function\(text\) \{ if \(root\.expanded\) root\.handleExpandedText\(text\) \}/)
   assert.match(panel, /root\.activePage = key === "1" \? "layout"/)
-  assert.match(panel, /root\.nudgeSelectedOutput\(dx \* 100, dy \* 100\)/)
+  assert.match(panel, /root\.nudgeSelectedOutput\(\(Strings\.rightToLeft\(\) \? -dx : dx\) \* 100, dy \* 100\)/)
   assert.match(panel, /sequence: "Shift\+Left"/)
-  assert.match(panel, /sequence: "Ctrl\+Left"/)
-  assert.match(panel, /sequence: "Alt\+Left"/)
+  assert.match(panel, /sequences: \["Ctrl\+Left", "Ctrl\+H"\]/)
+  assert.match(panel, /sequences: \["Alt\+Left", "Alt\+H"\]/)
   assert.match(panel, /root\.snapSelectedOutput\("left"\)/)
   assert.match(panel, /sequence: "L"[\s\S]*root\.loadSelectedSavedProfile\(\)/)
   assert.match(panel, /if \(key === "e"\) root\.beginExecEdit\(\)/)
@@ -1333,8 +1333,8 @@ test("profile details and workspace labels mirror the TUI semantics", () => {
 
   assert.match(panelQml, /Model\.profileMatchLabel\(root\.selectedSavedSummary, root\.selectedSavedProfileCurrent\)/)
   assert.match(panelQml, /model: root\.selectedSavedMatchReasons/)
-  assert.match(panelQml, /Number\(root\.selectedSavedSummary\.output_count \|\| 0\) \+ " saved · "/)
-  assert.match(panelQml, /Number\(root\.selectedSavedSummary\.connected_outputs \|\| 0\) \+ " connected"/)
+  assert.match(panelQml, /"profile\.savedCount", Number\(root\.selectedSavedSummary\.output_count \|\| 0\), "%1 saved"/)
+  assert.match(panelQml, /"profile\.connectedCount", Number\(root\.selectedSavedSummary\.connected_outputs \|\| 0\), "%1 connected"/)
   assert.match(panelQml, /model: root\.selectedSavedWorkspaceRows/)
   assert.match(panelQml, /Model\.outputDisplayLabel\(root\.draftProfile, String\(modelData\)\)/)
   assert.match(panelQml, /label: "ROTATION"\s+detail: !Model\.transformKnown\(transformValue\) \? "transform " \+ transformValue\s+: Model\.rotationDetail\(root\.selectedOutput, root\.rotation\)/)
@@ -1361,11 +1361,11 @@ test("layout dragging uses stationary canvas coordinates in both panel sizes", (
   const panelQml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
   const canvasQml = fs.readFileSync(path.join(__dirname, "..", "DisplayCanvas.qml"), "utf8")
   assert.equal((panelQml.match(/selectable: root\.editorReady/g) || []).length, 2)
-  assert.equal((panelQml.match(/movable: root\.managedChecked && root\.editorReady/g) || []).length, 2)
+  assert.equal((panelQml.match(/movable: root\.rotatable && root\.arrangeable/g) || []).length, 2)
   assert.match(canvasQml, /dragArea\.mapToItem\(canvas, mouse\.x, mouse\.y\)/)
   assert.match(canvasQml, /property bool selectable: interactive/)
   assert.match(canvasQml, /property bool movable: interactive/)
-  assert.match(canvasQml, /if \(!pressed \|\| !root\.movable\) return/)
+  assert.match(canvasQml, /if \(!\(pressedButtons & Qt\.LeftButton\) \|\| !root\.movable\) return/)
   assert.match(canvasQml, /property bool dragStarted: false/)
   assert.match(canvasQml, /var threshold = Style\.space\(6\)/)
   assert.match(canvasQml, /if \(!dragStarted\)/)
@@ -1383,7 +1383,7 @@ test("hardware brightness stays in compact mode, outside the profile editor", ()
   assert.ok(panelQml.indexOf("BrightnessControl {") < panelQml.indexOf('text: "MONITOR MANAGEMENT"'))
   assert.doesNotMatch(panelQml, /omarchy-brightness-keyboard/)
   assert.match(brightnessQml, /text: "Brightness"/)
-  assert.match(brightnessQml, /text: "Selected display · " \+ root\.displayLabel/)
+  assert.match(brightnessQml, /text: root\.displayLabel/)
   assert.match(brightnessQml, /height: Math\.max\(brightnessSlider\.implicitHeight/)
   assert.match(brightnessQml, /visible: !root\.available/)
 })
@@ -1514,8 +1514,9 @@ function editorRefreshPanel() {
     } }, previewTimer: { start() {}, stop() {} } }
   for (const name of ["send", "updateDocument", "queueEditorRefresh", "requestEditorState", "updateEditor", "handleMessage",
     "retryConnectingDisplays", "open",
-    "changeWorkspaceStrategy", "editWorkspaces", "editDraft", "beginCreateProfile", "loadSelectedSavedProfile", "selectSavedProfile", "beginExecEdit"])
+    "changeWorkspaceStrategy", "editWorkspaces", "editDraft", "editOutputs", "finishOutputEdit", "beginCreateProfile", "loadSelectedSavedProfile", "selectSavedProfile", "beginExecEdit"])
     root[name] = panelFunction(name, root, globals)
+  root.outputEditQueue = []
   return {
     root, requests, packets, result,
     receive(id, value = result) {
@@ -2191,7 +2192,13 @@ test("Off is the strategy shown for a disabled planner and keeps the stored plan
   assert.deepEqual(Model.workspaceStrategyChanges({ enabled: false, strategy: "sequential" }, "sequential"),
     { strategy: "sequential", enabled: true })
   assert.deepEqual(Model.workspaceStrategyChanges({ enabled: true, strategy: "manual" }, "sequential"),
-    { strategy: "sequential" })
+    { strategy: "sequential", group_size: 3 })
+  assert.deepEqual(Model.workspaceStrategyChanges({ enabled: true, strategy: "interleave", group_size: 1 }, "sequential"),
+    { strategy: "sequential", group_size: 3 }, "an interleaved group size of 1 does not carry into Sequential")
+  assert.deepEqual(Model.workspaceStrategyChanges({ enabled: true, strategy: "manual", group_size: 4 }, "sequential"),
+    { strategy: "sequential" }, "a chosen group size survives a strategy round trip")
+  assert.deepEqual(Model.workspaceStrategyChanges({ enabled: false, strategy: "sequential", group_size: 1 }, "sequential"),
+    { strategy: "sequential", enabled: true }, "re-enabling keeps a deliberate sequential group size")
 })
 
 test("choosing Off edits only enabled and choosing a strategy from Off re-enables", () => {
@@ -2433,7 +2440,7 @@ test("the picker UI route never sends a daemon command", () => {
 test('workspace switching from the planner is direct and blocked during drafts or previews', () => {
   const calls=[]
   const root={workspaceOnly:true,pickerBlockedReason:'',close:()=>calls.push('close')}
-  const switchWorkspace=panelFunction('switchWorkspace',root,{Picker:require('../WorkspacePicker.js'),Hyprland:{usingLua:true,dispatch:value=>calls.push(value)}})
+  const switchWorkspace=panelFunction('switchWorkspace',root,{Picker:require('./script')('WorkspacePicker.js'),Hyprland:{usingLua:true,dispatch:value=>calls.push(value)}})
   switchWorkspace(4)
   assert.deepEqual(calls,['hl.dsp.focus({ workspace = "4" })','close'])
   calls.length=0
