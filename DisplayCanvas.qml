@@ -3,6 +3,7 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "Model.js" as Model
+import "Strings.js" as Strings
 
 // Direction B: the arrangement is a stage. Each display is drawn as a screen
 // (bezel plus lit panel) so the canvas reads as hardware at a glance; the
@@ -12,6 +13,10 @@ import "Model.js" as Model
 BorderSurface {
   id: root
 
+  // A picture of the desk, so it stays physical in right-to-left languages.
+  LayoutMirroring.enabled: false
+  LayoutMirroring.childrenInherit: true
+
   property var profile: ({ outputs: [] })
   property var editorDisplays: []
   property var workspacePlan: []
@@ -19,6 +24,9 @@ BorderSurface {
   property bool interactive: true
   property bool selectable: interactive
   property bool movable: interactive
+  // Right-clicking a card asks for its rotate menu. Separate from movable: a
+  // lone display has nothing to arrange but can still be turned.
+  property bool rotatable: false
   // Every canvas uses the same monitor-card anatomy. Emphasis changes visual
   // priority for the active task; it never changes what the monitor means.
   property string emphasis: "layout"
@@ -115,6 +123,7 @@ BorderSurface {
 
   signal outputSelected(string key)
   signal outputMoved(string key, int x, int y, int snapDistance)
+  signal outputContextRequested(string key, var item, real x, real y)
 
   readonly property var displays: Model.profileLayoutDisplays(profile, editorDisplays, notes)
   readonly property var bounds: Model.layoutBounds(displays)
@@ -264,6 +273,7 @@ BorderSurface {
             textFormat: Text.PlainText
             width: parent.width
             text: card.summary.connector
+            horizontalAlignment: Text.AlignLeft
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: card.compact ? Style.font.body : Style.font.title
@@ -277,6 +287,7 @@ BorderSurface {
             visible: root.detailed && card.height >= Style.space(card.compact && chips.visible ? 76 : 56)
             width: parent.width
             text: card.summary.model
+            horizontalAlignment: Text.AlignLeft
             color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.80)
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -299,7 +310,7 @@ BorderSurface {
             textFormat: Text.PlainText
             visible: card.disconnected
             width: parent.width
-            text: "not connected"
+            text: Strings.t("canvas.notConnected", "not connected")
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -361,6 +372,7 @@ BorderSurface {
             textFormat: Text.PlainText
             width: parent.width
             text: card.summary.mode
+            horizontalAlignment: Text.AlignLeft
             color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.72)
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -371,6 +383,7 @@ BorderSurface {
             textFormat: Text.PlainText
             width: parent.width
             text: card.summary.placement
+            horizontalAlignment: Text.AlignLeft
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -383,6 +396,7 @@ BorderSurface {
           anchors.fill: parent
           enabled: root.selectable
           hoverEnabled: true
+          acceptedButtons: root.rotatable ? Qt.LeftButton | Qt.RightButton : Qt.LeftButton
           cursorShape: root.movable
             ? (dragStarted ? Qt.ClosedHandCursor : Qt.OpenHandCursor)
             : Qt.PointingHandCursor
@@ -393,7 +407,14 @@ BorderSurface {
           property real pointerStartY: 0
           property bool dragStarted: false
 
+          onClicked: function(mouse) {
+            if (mouse.button !== Qt.RightButton) return
+            var key = String(card.modelData.key || "")
+            root.outputSelected(key)
+            root.outputContextRequested(key, dragArea, mouse.x, mouse.y)
+          }
           onPressed: function(mouse) {
+            if (mouse.button !== Qt.LeftButton) return
             root.dragging = root.movable
             root.outputSelected(String(card.modelData.key || ""))
             var point = dragArea.mapToItem(canvas, mouse.x, mouse.y)
@@ -404,7 +425,7 @@ BorderSurface {
             card.dragOffsetY = 0
           }
           onPositionChanged: function(mouse) {
-            if (!pressed || !root.movable) return
+            if (!(pressedButtons & Qt.LeftButton) || !root.movable) return
             var point = dragArea.mapToItem(canvas, mouse.x, mouse.y)
             var deltaX = point.x - pointerStartX
             var deltaY = point.y - pointerStartY
@@ -484,7 +505,7 @@ BorderSurface {
       textFormat: Text.PlainText
       visible: root.displays.length === 0 && root.detailed
       anchors.centerIn: parent
-      text: "No enabled displays"
+      text: Strings.t("canvas.noEnabled", "No enabled displays")
       color: root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.body

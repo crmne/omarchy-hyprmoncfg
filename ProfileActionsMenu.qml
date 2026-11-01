@@ -41,13 +41,22 @@ FocusScope {
     card.x = Math.max(0, Math.min(point.x, width - card.width))
     card.y = point.y + card.height <= height ? point.y
       : Math.max(0, point.y - (atPointer ? 0 : anchor.height) - card.height)
-    currentIndex = 0
+    currentIndex = Math.max(0, actions.findIndex(function(action) { return action.checked === true }))
     visible = true
     forceActiveFocus()
   }
+  function moveCurrent(delta) {
+    currentIndex = (currentIndex + delta + actions.length) % Math.max(1, actions.length)
+  }
+  Keys.onPressed: function(event) {
+    if (event.text === "j") moveCurrent(1)
+    else if (event.text === "k") moveCurrent(-1)
+    else return
+    event.accepted = true
+  }
   Keys.onEscapePressed: close()
-  Keys.onDownPressed: currentIndex = (currentIndex + 1) % Math.max(1, actions.length)
-  Keys.onUpPressed: currentIndex = (currentIndex + actions.length - 1) % Math.max(1, actions.length)
+  Keys.onDownPressed: moveCurrent(1)
+  Keys.onUpPressed: moveCurrent(-1)
   Keys.onReturnPressed: activate(currentIndex)
   Keys.onEnterPressed: activate(currentIndex)
 
@@ -76,6 +85,7 @@ FocusScope {
             textFormat: Text.PlainText
             anchors.fill: parent
             anchors.margins: 8
+            anchors.rightMargin: modelData.checked === true ? checkMark.width + 16 : 8
             text: String(modelData.label)
             color: root.foreground
             opacity: modelData.enabled === false ? 0.4 : 1
@@ -83,6 +93,20 @@ FocusScope {
             font.pixelSize: root.fontSize
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
+          }
+          Text {
+            id: checkMark
+            textFormat: Text.PlainText
+            objectName: "checkMark"
+            visible: modelData.checked === true
+            anchors.right: parent.right
+            anchors.rightMargin: 8
+            anchors.verticalCenter: parent.verticalCenter
+            text: "✓"
+            color: root.accent
+            font.family: root.fontFamily
+            font.pixelSize: root.fontSize
+            font.bold: true
           }
           MouseArea {
             anchors.fill: parent

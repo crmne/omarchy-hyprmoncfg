@@ -71,6 +71,42 @@ Rectangle {
       compare(menu.menuY, 90)
     }
 
+    function test_checked_row_gets_the_cursor_and_a_mark() {
+      menu.actions = [{ id: "0", label: "Normal" }, { id: "1", label: "90°", checked: true }]
+      menu.openAt(stage, 10, 10)
+      compare(menu.currentIndex, 1)
+      var marks = 0
+      for (var i = 0; i < 2; i++) {
+        var row = menu.itemAt(i)
+        for (var c = 0; c < row.children.length; c++)
+          if (row.children[c].objectName === "checkMark" && row.children[c].visible) marks++
+      }
+      compare(marks, 1)
+    }
+
+    function test_j_and_k_walk_the_rows_like_the_arrows() {
+      menu.currentIndex = 0
+      keyClick("j")
+      compare(menu.currentIndex, 1)
+      keyClick("k")
+      compare(menu.currentIndex, 0)
+      keyClick("k")
+      compare(menu.currentIndex, 3)
+    }
+
+    function test_escape_only_closes_the_menu() {
+      keyClick(Qt.Key_Escape)
+      tryCompare(menu, "opened", false)
+      compare(menu.triggered, false)
+    }
+
+    function test_disabled_row_does_nothing() {
+      menu.actions = [{ id: "0", label: "Normal", enabled: false }]
+      keyClick(Qt.Key_Return)
+      compare(menu.triggered, false)
+      compare(menu.opened, true)
+    }
+
     function test_overflow_button_aligns_menu_to_button_edge() {
       menu.openAt(anchor)
       compare(menu.menuX + menu.menuWidth, anchor.x + anchor.width)

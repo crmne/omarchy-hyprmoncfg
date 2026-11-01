@@ -3,6 +3,7 @@ import QtQml
 
 QtObject {
   property int cornerRadius: 0
+  property int normalBorderWidth: 1
   property QtObject bar: QtObject {
     property int iconFont: 14
     property int iconSlot: 27
@@ -13,6 +14,8 @@ QtObject {
     property string family: "monospace"
     property int body: 14
     property int bodySmall: 12
+    property int caption: 11
+    property int title: 16
   }
   property QtObject spacing: QtObject {
     property int controlPaddingX: 10

@@ -3,6 +3,7 @@ import QtQuick.Controls
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "Strings.js" as Strings
 
 // Dropdown for a KeyboardPanel. The menu is positioned in panel coordinates
 // instead of relying on Popup's implicit parent, which keeps it attached to
@@ -33,7 +34,7 @@ Item {
   // when it carries the current value).
   property bool active: false
   property bool resetVisible: false
-  property string resetTooltip: "Reset to loaded profile value"
+  property string resetTooltip: Strings.t("reset.default", "Reset to loaded profile value")
 
   readonly property var popupBorderSpec: Border.localOrSurfaceSpec(
     "popups", "border", popupBorder, Commons.Color.popups.border, Style.normalBorderWidth)
@@ -119,7 +120,7 @@ Item {
 
       Keys.onPressed: function(event) {
         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
-            || event.key === Qt.Key_Space || event.key === Qt.Key_Down) {
+            || event.key === Qt.Key_Space || event.key === Qt.Key_Down || event.text === "j") {
           root.toggle()
           event.accepted = true
         } else if (event.key === Qt.Key_Escape && menu.opened) {

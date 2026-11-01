@@ -2,12 +2,16 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "Strings.js" as Strings
 
 Item {
   id: root
 
   property string page: "layout"
   property bool workspaceOnly: false
+  // One display has nothing to move or select.
+  property bool arrangeable: true
+  property bool displayModeAvailable: false
   property color foreground: Commons.Color.foreground
   property color background: Commons.Color.background
   property color accent: Commons.Color.accent
@@ -18,60 +22,60 @@ Item {
   readonly property var groups: {
     var contextual = []
     if (root.page === "layout") {
-      contextual = [
-        {
-          title: "Selected display",
-          bindings: [
-            { keys: "drag, arrows", action: "Move by 100px" },
-            { keys: "Shift+arrows", action: "Move by 10px" },
-            { keys: "Ctrl+arrows", action: "Move by 1px" },
-            { keys: "Alt+arrows", action: "Snap beside the nearest display" },
-            { keys: "0", action: "Move to 0,0" },
-            { keys: "[  ]", action: "Select the previous or next display" }
-          ]
-        },
-        {
-          title: "Layout",
-          bindings: [
-            { keys: "Tab, Shift+Tab", action: "Move between canvas, Display, and Color" },
-            { keys: "↑  ↓", action: "Select a field in Display or Color" },
-            { keys: "←  →", action: "Adjust the selected field" },
-            { keys: "Enter", action: "Edit or apply the selected field" }
-          ]
-        }
-      ]
+      if (root.arrangeable) contextual.push({
+        title: Strings.t("help.selectedDisplay", "Selected display"),
+        bindings: [
+          { keys: Strings.t("help.keys.dragArrows", "drag, arrows, hjkl"), action: Strings.t("help.move100", "Move by 100px") },
+          { keys: Strings.t("help.keys.shiftArrows", "Shift+arrows"), action: Strings.t("help.move10", "Move by 10px") },
+          { keys: "Shift+hjkl", action: Strings.t("help.move500", "Move by 500px") },
+          { keys: Strings.t("help.keys.ctrlArrows", "Ctrl+arrows/hjkl"), action: Strings.t("help.move1", "Move by 1px") },
+          { keys: Strings.t("help.keys.altArrows", "Alt+arrows/hjkl"), action: Strings.t("help.snap", "Snap beside the nearest display") },
+          { keys: "0", action: Strings.t("help.moveOrigin", "Move to 0,0") },
+          { keys: "[  ]", action: Strings.t("help.selectDisplay", "Select the previous or next display") }
+        ]
+      })
+      contextual.push({
+        title: Strings.t("help.layout", "Layout"),
+        bindings: [
+          { keys: "Tab, Shift+Tab", action: Strings.t("help.movePanes", "Move between canvas, Display, and Color") },
+          { keys: "↑  ↓, j  k", action: Strings.t("help.selectField", "Select a field in Display or Color") },
+          { keys: "←  →, h  l", action: Strings.t("help.adjustField", "Adjust the selected field") },
+          { keys: "Enter", action: Strings.t("help.editField", "Edit or apply the selected field") },
+          { keys: Strings.t("help.keys.rightClick", "right-click"), action: Strings.t("help.rotate", "Rotate a display on the canvas") }
+        ].concat(root.displayModeAvailable ? [{ keys: "m", action: Strings.t("help.switchMode", "Switch between Extend and Mirror") }] : [])
+      })
     } else if (root.page === "profiles") {
       contextual = [{
-        title: "Selected profile",
+        title: Strings.t("help.selectedProfile", "Selected profile"),
         bindings: [
-          { keys: "↑  ↓", action: "Browse profiles and their saved setup" },
-          { keys: "Enter, a", action: "Preview this profile" },
-          { keys: "l", action: "Load it into the layout editor" },
-          { keys: "e", action: "Edit post-apply command" },
-          { keys: "d", action: "Delete with confirmation" },
-          { keys: "Shift+F10", action: "Open profile actions" },
-          { keys: "Space", action: "Toggle automatic profile selection" }
+          { keys: "↑  ↓, j  k", action: Strings.t("help.browseProfiles", "Browse profiles and their saved setup") },
+          { keys: "Enter, a", action: Strings.t("help.previewProfile", "Preview this profile") },
+          { keys: "l", action: Strings.t("help.loadProfile", "Load it into the layout editor") },
+          { keys: "e", action: Strings.t("help.editCommand", "Edit post-apply command") },
+          { keys: "d", action: Strings.t("help.deleteProfile", "Delete with confirmation") },
+          { keys: "Shift+F10", action: Strings.t("help.profileActions", "Open profile actions") },
+          { keys: "Space", action: Strings.t("help.toggleAutomatic", "Toggle automatic profile selection") }
         ]
       }]
     } else {
       contextual = [{
-        title: "Workspaces",
+        title: Strings.t("help.workspaces", "Workspaces"),
         bindings: [
-          { keys: "↑  ↓", action: "Select a setting, workspace, or display" },
-          { keys: "←  →", action: "Adjust it, assign a workspace, or reorder displays" },
-          { keys: "Enter, Space", action: "Advance the selected setting" }
+          { keys: "↑  ↓, j  k", action: Strings.t("help.selectSetting", "Select a setting, workspace, or display") },
+          { keys: "←  →, h  l", action: Strings.t("help.adjustSetting", "Adjust it, assign a workspace, or reorder displays") },
+          { keys: "Enter, Space", action: Strings.t("help.advanceSetting", "Advance the selected setting") }
         ]
       }]
     }
     contextual.push({
-      title: "Anywhere",
-      bindings: (root.workspaceOnly ? [] : [{ keys: "1  2  3", action: "Switch tabs" }]).concat([
-        { keys: "a", action: "Apply the current draft or selected profile" },
-        { keys: "s", action: "Save the current draft as a profile" },
-        { keys: "r", action: "Reset from live Hyprland state" },
-        { keys: "?", action: "Show these keys" },
-        { keys: "R", action: "Restart the daemon after an upgrade" },
-        { keys: "q, Esc", action: "Close the panel" }
+      title: Strings.t("help.anywhere", "Anywhere"),
+      bindings: (root.workspaceOnly ? [] : [{ keys: "1  2  3", action: Strings.t("help.switchTabs", "Switch tabs") }]).concat([
+        { keys: "a", action: Strings.t("help.apply", "Apply the current draft or selected profile") },
+        { keys: "s", action: Strings.t("help.save", "Save the current draft as a profile") },
+        { keys: "r", action: Strings.t("help.resetLive", "Reset from live Hyprland state") },
+        { keys: "?", action: Strings.t("help.showKeys", "Show these keys") },
+        { keys: "R", action: Strings.t("help.restartDaemon", "Restart the daemon after an upgrade") },
+        { keys: "q, Esc", action: Strings.t("help.closePanel", "Close the panel") }
       ])
     })
     return contextual
@@ -106,7 +110,7 @@ Item {
 
       Text {
         textFormat: Text.PlainText
-        text: "Keys"
+        text: Strings.t("help.title", "Keys")
         color: root.foreground
         font.family: root.fontFamily
         font.pixelSize: Style.font.subtitle
@@ -146,6 +150,7 @@ Item {
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.bodySmall
                 font.bold: true
+                wrapMode: Text.Wrap
               }
 
               Text {
@@ -155,7 +160,7 @@ Item {
                 color: root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.bodySmall
-                elide: Text.ElideRight
+                wrapMode: Text.Wrap
               }
             }
           }
@@ -164,7 +169,7 @@ Item {
 
       Text {
         textFormat: Text.PlainText
-        text: "Any key closes this."
+        text: Strings.t("help.anyKey", "Any key closes this.")
         color: Qt.darker(root.foreground, 1.5)
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
