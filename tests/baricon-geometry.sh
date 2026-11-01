@@ -16,7 +16,7 @@ mkdir -m 700 "$test_tmp/runtime"
 ln -s "$(realpath "$shell_dir/Ui")" "$test_tmp/Ui"
 ln -s "$(realpath "$shell_dir/Commons")" "$test_tmp/Commons"
 cp "$root/BarWidget.qml" "$test_tmp/WidgetUnderTest.qml"
-cp "$root/DisplayIcon.qml" "$test_tmp/DisplayIcon.qml"
+cp "$root/DisplayIcon.qml" "$root/PaintedGlyph.qml" "$root/Strings.js" "$root/StringsSource.qml" "$test_tmp/"
 cp "$root/tests/baricon-geometry/Panel.qml" "$test_tmp/Panel.qml"
 cp "$root/tests/baricon-geometry/shell.qml" "$test_tmp/shell.qml"
 

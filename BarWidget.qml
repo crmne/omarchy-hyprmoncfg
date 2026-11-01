@@ -3,6 +3,7 @@ import Quickshell
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "Strings.js" as Strings
 
 BarWidget {
   id: root
@@ -86,17 +87,18 @@ BarWidget {
     fixedWidth: vertical ? -1 : Style.bar.iconSlot
     fixedHeight: vertical ? Style.bar.iconSlot : -1
     dimmed: root.barIconDimmed
-    tooltipText: root.activeProfile !== "" ? "Display · " + root.activeProfile : "Display · hyprmoncfg"
+    tooltipText: Strings.t("bar.tooltip", "Display · %1", root.activeProfile !== "" ? root.activeProfile : "hyprmoncfg")
     DisplayIcon {
       x: (parent.width - width) / 2
       y: (parent.height - height) / 2
       fontSize: button.fontSize
-      size: Style.bar.iconSize
+      size: Style.bar.iconSize || Style.bar.iconFont
+      paintedSize: Style.bar.iconSize || 0
       monitorCount: root.monitorCount
       connected: root.backendConnected
       fontFamily: button.fontFamily
       foreground: button.foreground
-      scale: button.pressScale
+      scale: button.pressScale || 1
     }
 
     onPressed: function(mouseButton) {

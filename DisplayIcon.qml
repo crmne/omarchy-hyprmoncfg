@@ -1,7 +1,6 @@
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
-import qs.Ui
 
 // Omarchy's display glyphs, optically sized independently of the status mark.
 Item {
@@ -10,6 +9,9 @@ Item {
   property bool connected: false
   property real size: Style.space(28)
   property real fontSize: size
+  // The monitor's painted size. 0 keeps it at fontSize, as a stock icon is on
+  // a shell whose Style.bar has no iconSize.
+  property real paintedSize: size
   property bool optical: true
   property string fontFamily: Style.font.family
   property color foreground: Commons.Color.foreground
@@ -18,14 +20,14 @@ Item {
   implicitWidth: optical ? size : hero.implicitWidth
   implicitHeight: optical ? size : hero.implicitHeight
 
-  OpticalGlyph {
+  PaintedGlyph {
     id: monitor
     visible: root.optical
     anchors.fill: parent
     text: root.monitorCount > 1 ? "󰍺" : "󰍹"
     fontFamily: root.fontFamily
     fontSize: root.fontSize
-    paintedSize: root.size
+    paintedSize: root.paintedSize
     color: root.foreground
   }
   Text {
@@ -38,7 +40,7 @@ Item {
     color: root.foreground
   }
   TextMetrics { id: heroMetrics; text: hero.text; font: hero.font }
-  OpticalGlyph {
+  PaintedGlyph {
     id: check
     visible: root.connected
     width: Math.max(Style.space(6), root.fontSize * 0.3)

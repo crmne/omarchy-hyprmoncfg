@@ -1,6 +1,6 @@
 const test = require("node:test")
 const assert = require("node:assert/strict")
-const fs = require("node:fs")
+const { fs } = require("./english")
 const vm = require("node:vm")
 const path = require("node:path")
 

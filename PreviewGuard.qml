@@ -9,6 +9,7 @@ import qs.Ui
 import "Model.js" as Model
 import "IdentifyModel.js" as IdentifyModel
 import "WorkspacePicker.js" as Picker
+import "Strings.js" as Strings
 
 // Display previews can rebuild every per-monitor bar instance. Keep the
 // safety decision in a shell-level service so the confirmation is already on
@@ -39,7 +40,10 @@ Item {
     root.workspacePageRequested(origin)
     return root.workspacePageHandled ? "ok" : "unavailable"
   }
-  Commons.ShellIpc {
+  // Plain IpcHandler: Commons.ShellIpc is not in Omarchy 4.0. This service has
+  // one instance, so it needs nothing from ShellIpc, and omarchy-shell falls
+  // back to qs ipc for it.
+  IpcHandler {
     target: "crmne.hyprmoncfg.editor"
     function workspaces(payload: string): string { return root.openWorkspacePage(payload) }
   }
@@ -90,7 +94,7 @@ Item {
   function identifyDisplays(key) {
     root.identifyError = ""
     if (!root.connected || root.opened || root.foreignPreviewActive || root.identifyPending) {
-      root.identifyError = "Identify is unavailable while a preview is active or the service is busy."
+      root.identifyError = Strings.t("identify.unavailable", "Identify is unavailable while a preview is active or the service is busy.")
       return false
     }
     root.identifyKey = String(key || "")
@@ -108,7 +112,7 @@ Item {
     interval: 7000
     onTriggered: {
       root.identifyPending = false
-      root.identifyError = "Reading displays timed out. Try Identify again."
+      root.identifyError = Strings.t("identify.timedOut", "Reading displays timed out. Try Identify again.")
     }
   }
   onOpenedChanged: if (opened) root.cancelIdentify()
@@ -162,18 +166,18 @@ Item {
 
   function beginPreview(params, name, save, draft) {
     if (root.opened || root.requestPending || root.actionPending) {
-      root.errorMessage = "Finish the current display preview first."
+      root.errorMessage = Strings.t("preview.finishCurrent", "Finish the current display preview first.")
       root.requestFinished(false, root.errorMessage)
       return false
     }
     if (!backendSocket.connected) {
-      root.errorMessage = "The display confirmation service is reconnecting. Try again in a moment."
+      root.errorMessage = Strings.t("preview.reconnecting", "The display confirmation service is reconnecting. Try again in a moment.")
       root.requestFinished(false, root.errorMessage)
       return false
     }
 
     root.rememberScreen()
-    root.profileName = String(name || "Display layout")
+    root.profileName = String(name || Strings.t("preview.defaultName", "Display layout"))
     root.saveOnCommit = save === true
     root.draftApply = draft === true
     root.errorMessage = ""
@@ -184,7 +188,7 @@ Item {
 
     root.requestPending = false
     root.stage = "error"
-    root.errorMessage = "Could not start the display preview."
+    root.errorMessage = Strings.t("preview.couldNotStart", "Could not start the display preview.")
     root.requestFinished(false, root.errorMessage)
     return false
   }
@@ -195,7 +199,7 @@ Item {
       profile: value,
       timeout_seconds: Math.max(1, Number(timeoutSeconds || 30)),
       save_on_commit: true
-    }, String(value.name || "Display layout"), true, true)
+    }, String(value.name || Strings.t("preview.defaultName", "Display layout")), true, true)
   }
 
   function startDraftApply(profile, timeoutSeconds) {
@@ -204,7 +208,7 @@ Item {
       profile: value,
       timeout_seconds: Math.max(1, Number(timeoutSeconds || 30)),
       save_on_commit: false
-    }, String(value.name || "Display layout"), false, true)
+    }, String(value.name || Strings.t("preview.defaultName", "Display layout")), false, true)
   }
 
   function startSavedProfilePreview(name, timeoutSeconds) {
@@ -219,11 +223,11 @@ Item {
   function keep() {
     if (root.actionPending) return false
     if (root.transactionId === "") {
-      root.actionError = "The display preview is no longer available."
+      root.actionError = Strings.t("preview.gone", "The display preview is no longer available.")
       return false
     }
     if (!backendSocket.connected) {
-      root.actionError = "The display confirmation service is reconnecting. Try again in a moment."
+      root.actionError = Strings.t("preview.reconnecting", "The display confirmation service is reconnecting. Try again in a moment.")
       return false
     }
     root.actionPending = true
@@ -233,25 +237,25 @@ Item {
       save: root.saveOnCommit
     }) !== "") return true
     root.actionPending = false
-    root.actionError = "Could not keep this display layout."
+    root.actionError = Strings.t("preview.couldNotKeep", "Could not keep this display layout.")
     return false
   }
 
   function revert() {
     if (root.actionPending) return false
     if (root.transactionId === "") {
-      root.actionError = "The display preview is no longer available."
+      root.actionError = Strings.t("preview.gone", "The display preview is no longer available.")
       return false
     }
     if (!backendSocket.connected) {
-      root.actionError = "The display confirmation service is reconnecting. Try again in a moment."
+      root.actionError = Strings.t("preview.reconnecting", "The display confirmation service is reconnecting. Try again in a moment.")
       return false
     }
     root.actionPending = true
     root.actionError = ""
     if (root.send("revert", { transaction_id: root.transactionId }) !== "") return true
     root.actionPending = false
-    root.actionError = "Could not restore the previous display layout."
+    root.actionError = Strings.t("preview.couldNotRestore", "Could not restore the previous display layout.")
     return false
   }
 
@@ -290,7 +294,7 @@ Item {
       root.profileName = String(pending.profile_name
         || (pending.profile ? pending.profile.name : "")
         || root.profileName
-        || "Display layout")
+        || Strings.t("preview.defaultName", "Display layout"))
       root.deadline = String(pending.deadline || root.deadline || "")
       root.saveOnCommit = pending.save_on_commit === true || root.saveOnCommit
       root.requestPending = false
@@ -336,7 +340,7 @@ Item {
     if (method === "editor_state"
         && (String(envelope.id) !== root.identifyRequestId || !root.identifyPending)) return
     if (envelope.error) {
-      var message = String(envelope.error.message || "hyprmoncfg request failed")
+      var message = String(envelope.error.message || Strings.t("error.requestFailed", "hyprmoncfg request failed"))
       if (method === "editor_state") {
         root.identifyPending = false
         identifyTimeout.stop()
@@ -360,7 +364,7 @@ Item {
       if (root.opened || root.foreignPreviewActive) return
       if (root.identifyRequestRevision !== root.identifyTopologyRevision
           || !Model.monitorSnapshotsMatch(root.document, envelope.result)) {
-        root.identifyError = "The displays changed. Refresh before identifying them again."
+        root.identifyError = Strings.t("identify.displaysChanged", "The displays changed. Refresh before identifying them again.")
         root.send("status", {})
         return
       }
@@ -374,7 +378,7 @@ Item {
         }
       }
       var targets = Model.identifyTargets(envelope.result, Quickshell.screens || [], root.identifyKey)
-      if (!targets.length) root.identifyError = "No awake, enabled display is available to identify."
+      if (!targets.length) root.identifyError = Strings.t("identify.noneAvailable", "No awake, enabled display is available to identify.")
       else identifyOverlay.show(targets)
     } else if (method === "subscribe" || method === "status") {
       root.updateDocument(envelope.result)
@@ -413,7 +417,7 @@ Item {
         root.pendingMethods = ({})
         root.pendingContexts = ({})
         root.clear()
-        if (wasPending) root.requestFinished(false, "hyprmoncfg disconnected during the preview. Reconnecting…")
+        if (wasPending) root.requestFinished(false, Strings.t("preview.disconnected", "hyprmoncfg disconnected during the preview. Reconnecting…"))
       }
     }
     onError: function(error) {
@@ -475,7 +479,7 @@ Item {
       onOwnsDialogChanged: guardWindow.restoreInputFocus()
       Component.onCompleted: guardWindow.restoreInputFocus()
 
-      ScreenMoveRemap {
+      SurfaceRemap {
         id: remapGuard
         window: guardWindow
       }
