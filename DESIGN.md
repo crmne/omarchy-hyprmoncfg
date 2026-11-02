@@ -147,34 +147,49 @@ in the keyboard field order, and Hyprland's terminology.
   no -/+ buttons: four- and five-digit coordinates are set by dragging, arrow
   nudges (Shift 10px, Ctrl 1px) and snapping, and typed when an exact value is
   needed. Invalid text reverts; nothing is guessed.
-- `PLACE BESIDE <display>` offers Left, Right, Above and Below as the pointer
-  equivalent of Alt+arrows. It calls the same snapping function and names the
-  same nearest display, so there is one placement engine; the exact X/Y above
-  it show where the display landed.
-- Scale follows Omarchy's own Display panel (decided 2026-09-28, Carmine): one
-  row of bordered preset pills, the current one active and its label
-  right-aligned in the SCALE header, then a More dropdown with every sharp
-  scale for the draft mode, so no sharp scale is out of reach. Revised
-  2026-10-17 (sharpness in Go): the pills, the list and every sharpness verdict
-  come from the daemon's stateless `scale_info` (Go's `internal/scaling`),
-  cached by mode and scale; the panel never computes sharpness. A daemon
-  without `scale_info` gets no pills, no Blurry marker and no Custom…, and More
-  falls back to `editor_state` `scale_options` for the live mode.
+- `PLACE BESIDE <display>` is a selector with fixed text, `Choose side`, offering
+  Left, Right, Above and Below as the pointer equivalent of Alt+arrows. It calls
+  the same snapping function and names the same nearest display, so there is one
+  placement engine; the exact X/Y beside it show where the display landed.
+- The inspector shows values, not alternatives (decided 2026-11-02, Carmine,
+  replacing the pills and chips copied from Omarchy's panel). A setting with three
+  or more options is a selector; one with exactly two stays a toggle or a two-chip
+  row; only rare settings, or ones with a second route, go behind the tab's single
+  `ADVANCED` row. Display shows Enabled and a two-column grid of Resolution,
+  Refresh, Scale, VRR, Rotation and Mirror. VRR and Mirror stay visible because on
+  a desktop they have no other route. Flipped, Position and Place beside are
+  Advanced. Color shows Depth and Color space; the rest is Advanced.
+- Advanced stays honest about what it hides: the closed row names hidden values
+  that are not at their default and shows a dot when a hidden field differs from
+  the loaded profile. It never opens by itself, because dragging a card changes
+  X and Y and the inspector would jump. Open state lasts the session, per tab, not
+  per display. The panel is sized closed, so opening it never moves the canvas.
+  Closed, its fields leave the keyboard order; closing with the cursor inside
+  leaves the cursor on the row.
+- Keyboard: arrows step selectors and stop at their ends, as before. Enter opens a
+  selector's list. Selectors do not change on the mouse wheel.
+- Scale is a selector. Its list leads with the presets, then a hairline, every
+  other sharp scale for the draft mode, then Custom…, so 1.5x is not buried among
+  18 ascending values and no sharp scale is out of reach. Revised 2026-10-17
+  (sharpness in Go): the presets, the list and every sharpness verdict come from
+  the daemon's stateless `scale_info` (Go's `internal/scaling`), cached by mode
+  and scale; the panel never computes sharpness. A daemon without `scale_info`
+  gets no presets, no Blurry marker and no Custom…, and the list falls back to
+  `editor_state` `scale_options` for the live mode.
   - Preset rule (Go's `scaling.PresetChoices`): presets 1, 1.25, 1.5, 1.6, 2
     and 3, plus 4 when the sharp list reaches 4 and the mode is at least 5120
     pixels wide. As in Omarchy's
     `cleanScale`/`availableScales`, each preset becomes the smallest sharp scale
     at or above it; presets that land on the same scale collapse to the closest
     one; preset order is kept; a preset above the largest sharp scale is
-    dropped. Revised 2026-10-17 (stable scale row): the pills depend only on
-    the mode, so stepping never changes their count. A current scale that is
-    not a pill, sharp or not, is shown on the More trigger instead (active,
-    labelled `1.33x`) and is never rewritten.
+    dropped. The presets depend only on the mode, so stepping never changes
+    them. A current scale that is not a preset shows on the trigger like any
+    other (`1.33x`) and is never rewritten.
   - Blurry (2026-10-17): a current scale that `scale_info` reports as not
-    sharp reads `1.33x ⚠` on More and in the list, and `1.33x ⚠ Blurry` in
-    the SCALE header, in the urgent colour but never by colour alone. Blurry
+    sharp reads `1.33x ⚠` on the trigger and in the list, and `Blurry` in the
+    SCALE header, in the urgent colour but never by colour alone. Blurry
     is the one user-facing label in both clients.
-  - Custom… (2026-10-17) ends the More list, as in the TUI. It opens an exact
+  - Custom… (2026-10-17) ends the list, as in the TUI. It opens an exact
     entry built from key events (`KeyField`). The panel only parses the
     number; `scale_info` checks the range and sharpness, and the feedback is
     worded line for line like the TUI's dialog: sharp sizes, or Blurry with
@@ -185,33 +200,31 @@ in the keyboard field order, and Hyprland's terminology.
     (`1.33x`, `1.07x`, `2x`); if two scales in the same list would share a
     label, both show the exact value. Labels are display only: the stored and
     applied value is always the exact sharp scale.
-  - Keyboard: arrows step through the full sharp list, as the TUI does; Enter
-    opens More.
+  - Keyboard: arrows step through the full ascending sharp list, as the TUI
+    does; Enter opens the list.
 - Resolution and Refresh (2026-10-17) replace the single Mode dropdown, as in
   the TUI and Omarchy's Display panel. RESOLUTION is a dropdown of the
-  display's resolutions, each once, largest first. REFRESH is a `ButtonGroup`
-  of the rates that resolution offers, slowest first, labelled like the cards
+  display's resolutions, each once, largest first. REFRESH is a selector of the
+  rates that resolution offers, slowest first, labelled like the cards
   (`144Hz`). Changing the resolution keeps the rate when the new resolution
   offers it, otherwise takes its highest. Both send the one `mode` edit; the
   profile and IPC are unchanged. Keyboard order is Enabled, Resolution (1),
   Refresh (23), Scale (2), then the rest; arrows on Resolution wrap like the
-  old Mode list, Refresh stops at its ends and Enter wraps.
-- Small closed sets use the shell's `ButtonGroup`, so spacing, hover, focus and
-  keys are Omarchy's: VRR (Off, On, Fullscreen), colour depth (8-bit, 10-bit),
-  SDR EOTF, and WCG/HDR capability (Force off, Auto-detect, Force on). A value
-  the panel does not recognise is shown as an extra choice and is never
-  rewritten. Headers are uppercase with an optional right-aligned detail:
-  PLACE BESIDE names the display it snaps to.
-- Rotation is Normal, 90°, 180° and 270° with a separate Flipped toggle. Both edit
-  the one Hyprland transform and preserve each other; an unknown transform is
-  shown and left alone; the ROTATION header shows the raw transform.
+  old Mode list and Refresh stops at its ends.
+- A value a selector does not recognise is shown as an extra choice and is never
+  rewritten. Colour depth's two chips use the shell's `ButtonGroup`. Headers are
+  uppercase with an optional right-aligned detail: PLACE BESIDE names the display
+  it snaps to.
+- Rotation is Normal, 90°, 180° and 270° with a separate Flipped toggle in Advanced.
+  Both edit the one Hyprland transform and preserve each other; an unknown
+  transform is shown on the trigger and left alone.
 - When the daemon reports `rotation_auto_supported` for a built-in panel, Rotation
   starts with **Auto**, which turns the panel with the device and keeps its
-  current rotation as upright (shown as, for example, "Upright 270°" in the
-  header). Choosing a fixed rotation turns Auto off. Beside Auto the toggle is
-  **Lock**, the live rotation lock (`set_rotation` with `locked`), not a draft edit; the
-  header adds "Locked", or "Upright while folded" on a convertible folded as a
-  laptop. Reset restores the saved rotation and Auto together. A daemon without
+  current rotation as upright. Choosing a fixed rotation turns Auto off. On Auto
+  a **Lock** row appears under the grid, outside Advanced: it is live state
+  (`set_rotation` with `locked`), not a draft edit, and frequent on convertibles.
+  Its description carries "Upright 270°", "Locked", or "Upright while folded" on
+  a convertible folded as a laptop. **Calibrate** sits with it. Reset restores the saved rotation and Auto together. A daemon without
   rotation support shows neither. To flip a panel that rotates automatically,
   choose a fixed rotation, set Flipped, then choose Auto again.
 - A choice row whose chips leave no room for the reset shows it in the header,

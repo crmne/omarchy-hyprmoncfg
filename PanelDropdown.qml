@@ -15,6 +15,9 @@ Item {
 
   property string label: ""
   property string tooltipText: ""
+  // Right-aligned in the label row: a target, or a verdict on the current value.
+  property string detail: ""
+  property color detailColor: Qt.darker(root.foreground, 1.4)
   property string value: ""
   property var options: []
   property Item popupParent: null
@@ -47,9 +50,16 @@ Item {
   onOwnerOpenChanged: if (!ownerOpen) menu.close()
   onVisibleChanged: if (!visible) menu.close()
 
-  function open() { menu.open() }
+  function open() { if (root.enabled) menu.open() }
   function close() { menu.close() }
-  function toggle() { menu.opened ? menu.close() : menu.open() }
+  function toggle() { menu.opened ? menu.close() : root.open() }
+  // An option { separator: true } draws a hairline; nothing can select it.
+  function isSeparator(option) { return !!option && typeof option === "object" && option.separator === true }
+  function nextOption(from, delta) {
+    for (var index = from + delta; index >= 0 && index < options.length; index += delta)
+      if (!isSeparator(options[index])) return index
+    return from
+  }
   function optionValue(option) {
     return option && typeof option === "object" ? String(option.value) : String(option)
   }
@@ -66,7 +76,8 @@ Item {
     if (!popupParent) return Qt.point(0, trigger.height + Style.spacing.xxs)
     var below = trigger.mapToItem(popupParent, 0, trigger.height + Style.spacing.xxs)
     if (below.y + menu.implicitHeight <= popupParent.height) return below
-    return trigger.mapToItem(popupParent, 0, -menu.implicitHeight - Style.spacing.xxs)
+    var above = trigger.mapToItem(popupParent, 0, -menu.implicitHeight - Style.spacing.xxs)
+    return Qt.point(above.x, Math.max(0, above.y))
   }
 
   implicitWidth: Style.spacing.dropdownWidth
@@ -79,22 +90,45 @@ Item {
     anchors.fill: parent
     spacing: Style.spacing.labelGap
 
-    Text {
-      id: dropdownLabel
-      textFormat: Text.PlainText
+    Item {
       visible: root.showLabel && root.label !== ""
-      text: root.label
-      color: Qt.darker(root.foreground, 1.4)
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
-      font.bold: true
-      topPadding: Math.ceil(font.pixelSize * 0.15)
+      width: parent.width
+      height: dropdownLabel.implicitHeight
 
-      HoverHandler { id: labelHover }
-      PanelToolTip {
-        visible: root.tooltipText !== "" && labelHover.hovered
-        text: root.tooltipText
-        fontFamily: root.fontFamily
+      Text {
+        id: dropdownLabel
+        textFormat: Text.PlainText
+        anchors.left: parent.left
+        anchors.right: detailText.visible ? detailText.left : parent.right
+        anchors.rightMargin: detailText.visible ? Style.spacing.xs : 0
+        text: root.label
+        horizontalAlignment: Text.AlignLeft
+        color: Qt.darker(root.foreground, 1.4)
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        font.bold: true
+        topPadding: Math.ceil(font.pixelSize * 0.15)
+        elide: Text.ElideRight
+
+        HoverHandler { id: labelHover }
+        PanelToolTip {
+          visible: root.tooltipText !== "" && labelHover.hovered
+          text: root.tooltipText
+          fontFamily: root.fontFamily
+        }
+      }
+
+      Text {
+        id: detailText
+        textFormat: Text.PlainText
+        anchors.right: parent.right
+        anchors.verticalCenter: dropdownLabel.verticalCenter
+        visible: root.detail !== ""
+        text: root.detail
+        color: root.detailColor
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        font.bold: true
       }
     }
 
@@ -195,8 +229,10 @@ Item {
     x: anchoredPosition.x
     y: anchoredPosition.y
     width: trigger.width
+    readonly property int separators: root.options.filter(root.isSeparator).length
+    readonly property int rows: root.options.length - separators
     implicitHeight: Math.min(
-      root.options.length * root.popupRowHeight
+      rows * root.popupRowHeight + separators * Style.spacing.xs
         + Math.max(0, root.options.length - 1) * Style.spacing.labelGap
         + Style.spacing.xxs,
       root.popupRowHeight * 8 + 7 * Style.spacing.labelGap + Style.spacing.xxs)
@@ -235,7 +271,7 @@ Item {
         return -1
       }
       function selectCurrent() {
-        if (currentIndex < 0 || currentIndex >= root.options.length) return
+        if (currentIndex < 0 || currentIndex >= root.options.length || root.isSeparator(root.options[currentIndex])) return
         var selectedValue = root.optionValue(root.options[currentIndex])
         root.changed(selectedValue)
         menu.close()
@@ -247,10 +283,10 @@ Item {
           menu.close()
           event.accepted = true
         } else if (event.key === Qt.Key_Down || event.text === "j") {
-          currentIndex = Math.min(root.options.length - 1, currentIndex + 1)
+          currentIndex = root.nextOption(currentIndex, 1)
           event.accepted = true
         } else if (event.key === Qt.Key_Up || event.text === "k") {
-          currentIndex = Math.max(0, currentIndex - 1)
+          currentIndex = root.nextOption(currentIndex, -1)
           event.accepted = true
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
           selectCurrent()
@@ -261,20 +297,31 @@ Item {
       delegate: Rectangle {
         required property var modelData
         required property int index
+        readonly property bool separator: root.isSeparator(modelData)
         width: optionList.width
-        height: root.popupRowHeight
-        color: index === optionList.currentIndex
+        height: separator ? Style.spacing.xs : root.popupRowHeight
+        color: !separator && index === optionList.currentIndex
           ? Style.hoverFillFor(root.foreground, root.accent)
           : "transparent"
 
+        Rectangle {
+          visible: parent.separator
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          height: Style.normalBorderWidth
+          color: Qt.darker(root.foreground, 2.5)
+        }
+
         Text {
           textFormat: Text.PlainText
+          visible: !parent.separator
           anchors.left: parent.left
           anchors.right: parent.right
           anchors.verticalCenter: parent.verticalCenter
           anchors.leftMargin: Style.spacing.controlPaddingX
           anchors.rightMargin: Style.spacing.controlPaddingX
-          text: root.optionLabel(modelData)
+          text: parent.separator ? "" : root.optionLabel(modelData)
           color: index === optionList.currentIndex
             ? Style.hoverStateColor(root.foreground, root.accent)
             : root.foreground
@@ -285,6 +332,7 @@ Item {
 
         MouseArea {
           anchors.fill: parent
+          enabled: !parent.separator
           hoverEnabled: true
           cursorShape: Qt.PointingHandCursor
           onPositionChanged: optionList.currentIndex = parent.index

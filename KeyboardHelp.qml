@@ -63,7 +63,7 @@ Item {
         bindings: [
           { keys: "↑  ↓, j  k", action: Strings.t("help.selectSetting", "Select a setting, workspace, or display") },
           { keys: "←  →, h  l", action: Strings.t("help.adjustSetting", "Adjust it, assign a workspace, or reorder displays") },
-          { keys: "Enter, Space", action: Strings.t("help.advanceSetting", "Advance the selected setting") }
+          { keys: "Enter, Space", action: Strings.t("help.editField", "Edit or apply the selected field") }
         ]
       }]
     }

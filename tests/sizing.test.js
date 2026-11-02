@@ -192,8 +192,9 @@ test("QML sizes the panel only through the Model functions", () => {
 test("the Color tab grows the Layout page instead of scrolling", () => {
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
   const input = qml.slice(qml.indexOf("Model.expandedPanelLayout({"), qml.indexOf("hardwareHeight:"))
-  assert.match(input, /root\.inspectorPage === "display" \? displayControls\.implicitHeight : colorControls\.implicitHeight/,
-    "the panel height follows the active inspector page")
+  assert.match(input, /root\.inspectorPage === "display"\s+\? displayControls\.implicitHeight - \(root\.displayAdvancedOpen \? displayAdvanced\.implicitHeight/,
+    "the panel height follows the active inspector page, closed, so Advanced never resizes it")
+  assert.match(input, /: colorControls\.implicitHeight - \(root\.colorAdvancedOpen \? colorAdvanced\.implicitHeight/)
 })
 
 test("the Layout stage width does not depend on measured heights", () => {

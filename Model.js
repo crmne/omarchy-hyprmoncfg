@@ -768,27 +768,29 @@ function scalePresets(info, current) {
   })
 }
 
-// What the Scale row shows for the current scale. The pills depend only on
-// the mode, so stepping never changes their count; a current scale that is
-// not a pill sits on More. A Blurry scale reads "1.33x ⚠" there and
-// "1.33x ⚠ Blurry" in the SCALE header. Without scale_info (an older daemon)
-// there are no pills, no verdict and no Custom… (supported: false).
+// What the Scale selector shows. The list leads with the presets, then a
+// separator and every other sharp scale, so 1.5x is not buried among 18
+// ascending values; stepping still walks the full ascending list. A Blurry
+// scale reads "1.33x ⚠" on the trigger and "Blurry" in the header. Without
+// scale_info (an older daemon) there are no presets, no verdict and no Custom…
+// (supported: false).
 function scaleRow(editorDisplays, key, current, info) {
   var presets = scalePresets(info, current)
   var options = scaleOptions(editorDisplays, key, current, info)
   var value = formatScale(current)
-  var onMore = !presets.some(function(p) { return p.value === value })
   var entry = options.filter(function(o) { return o.value === value })[0] || { label: value + "x", sharp: true }
   var label = entry.label.replace(/ ⚠$/, "")
   var blurry = !!info && info.sharp === false
+  var isPreset = function(option) { return presets.some(function(p) { return p.value === option.value }) }
+  var others = options.filter(function(o) { return !isPreset(o) })
   return {
     supported: !!info,
-    presets: presets,
-    options: options,
-    onMore: onMore,
+    options: presets.length > 0 && others.length > 0
+      ? presets.concat([{ separator: true, value: "", label: "" }]).concat(others)
+      : presets.concat(others),
     sharp: !blurry,
-    moreText: onMore ? label + (blurry ? " ⚠" : "") : Strings.t("scale.more", "More"),
-    detail: blurry ? Strings.t("scale.blurryDetail", "%1 ⚠ Blurry", label) : label
+    triggerText: label + (blurry ? " ⚠" : ""),
+    detail: blurry ? Strings.t("scale.blurryShort", "Blurry") : ""
   }
 }
 
@@ -1800,6 +1802,44 @@ function rotationStatus(document) {
 }
 
 // Directions for "Place beside nearest", identical to Alt+arrow snapping.
+// Keyboard order of the Display tab. Lock and Calibrate exist only on Auto,
+// Flipped only off it; closed, Advanced keeps only its own row.
+function displayInspectorFields(arrangeable, rotationAuto, calibrate, advancedOpen) {
+  var fields = [0, 1, 23, 2, 5, 6]
+  if (arrangeable) fields.push(9)
+  if (rotationAuto) fields.push(24)
+  if (rotationAuto && calibrate) fields.push(25)
+  if (!arrangeable && rotationAuto) return fields
+  fields.push(26)
+  if (!advancedOpen) return fields
+  if (!rotationAuto) fields.push(22)
+  return arrangeable ? fields.concat([7, 8, 21]) : fields
+}
+
+function colorInspectorFields(advancedOpen) {
+  return advancedOpen ? [3, 4, 27, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20] : [3, 4, 27]
+}
+
+// Hidden Color values that are not at their default, for the closed row.
+function colorAdvancedSummary(output) {
+  if (!output) return ""
+  var parts = []
+  var add = function(changed, key, fallback) { if (changed) parts.push(Strings.t(key, fallback)) }
+  add(Number(output.sdr_brightness || 1) !== 1, "field.sdrLuminance", "SDR LUMINANCE SCALE")
+  add(Number(output.sdr_saturation || 1) !== 1, "field.sdrSaturation", "SDR SATURATION SCALE")
+  // Hyprland reports its stock SDR levels, 0.2 and 80; neither is a user's choice.
+  add([0, 0.2].indexOf(Number(output.sdr_min_luminance || 0)) < 0, "field.sdrBlack", "SDR BLACK LEVEL (cd/m²)")
+  add([0, 80].indexOf(Number(output.sdr_max_luminance || 0)) < 0, "field.sdrWhite", "SDR WHITE LEVEL (cd/m²)")
+  if (String(output.sdr_eotf || "default") !== "default") parts.push("SDR EOTF")
+  add(Number(output.min_luminance || 0) !== 0, "field.displayBlack", "DISPLAY BLACK (cd/m²)")
+  add(Number(output.max_luminance || 0) !== 0, "field.displayPeak", "DISPLAY PEAK (cd/m²)")
+  add(Number(output.max_avg_luminance || 0) !== 0, "field.frameAverage", "MAX FRAME-AVERAGE (cd/m²)")
+  add(Number(output.supports_wide_color || 0) !== 0, "field.wcg", "WCG CAPABILITY")
+  add(Number(output.supports_hdr || 0) !== 0, "field.hdr", "HDR CAPABILITY")
+  add(String(output.icc || "") !== "", "field.icc", "ICC DEVICE PROFILE")
+  return parts.join(", ")
+}
+
 function placementOptions() {
   return [
     { value: "left", label: Strings.t("option.placeLeft", "Left") },
@@ -2090,6 +2130,9 @@ if (typeof module !== "undefined") {
     transformRotation: transformRotation,
     transformFlipped: transformFlipped,
     transformWith: transformWith,
+    displayInspectorFields: displayInspectorFields,
+    colorInspectorFields: colorInspectorFields,
+    colorAdvancedSummary: colorAdvancedSummary,
     placementOptions: placementOptions,
     optionsWithCurrent: optionsWithCurrent,
     parseCoordinate: parseCoordinate,

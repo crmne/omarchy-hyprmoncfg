@@ -81,9 +81,8 @@ test("Resolution and Refresh replace Mode and only ever send the mode", () => {
   assert.match(qml, /label: "RESOLUTION"/)
   assert.match(qml, /label: "REFRESH"/)
   assert.doesNotMatch(qml, /label: "MODE"/)
-  assert.match(qml, /SegmentedField \{\s+id: refreshField/)
+  assert.match(qml, /PanelDropdown \{\s+id: refreshField/)
   assert.match(qml, /onChanged: function\(value\) \{ root\.editOutput\(\{ mode: value \}\) \}/)
   assert.match(qml, /if \(mode !== ""\) root\.editOutput\(\{ mode: mode \}\)/)
-  assert.match(qml, /field === 22 \|\| field === 23\) root\.adjustInspectorField\(1, true\)/,
-    "Enter advances Refresh like the other choice rows")
+  assert.match(qml, /else if \(field === 23\) refreshField\.open\(\)/, "Enter opens Refresh's list")
 })

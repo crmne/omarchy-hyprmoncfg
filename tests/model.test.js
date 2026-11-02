@@ -1337,7 +1337,8 @@ test("profile details and workspace labels mirror the TUI semantics", () => {
   assert.match(panelQml, /"profile\.connectedCount", Number\(root\.selectedSavedSummary\.connected_outputs \|\| 0\), "%1 connected"/)
   assert.match(panelQml, /model: root\.selectedSavedWorkspaceRows/)
   assert.match(panelQml, /Model\.outputDisplayLabel\(root\.draftProfile, String\(modelData\)\)/)
-  assert.match(panelQml, /label: "ROTATION"\s+detail: !Model\.transformKnown\(transformValue\) \? "transform " \+ transformValue\s+: Model\.rotationDetail\(root\.selectedOutput, root\.rotation\)/)
+  assert.match(panelQml, /label: "ROTATION"\s+triggerText: Model\.transformKnown\(transformValue\) \? "" : "transform " \+ transformValue/)
+  assert.match(panelQml, /description: Model\.rotationDetail\(root\.selectedOutput, root\.rotation\)/)
   assert.doesNotMatch(panelQml, /label: "TRANSFORM"/)
 })
 

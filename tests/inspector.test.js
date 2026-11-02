@@ -103,26 +103,32 @@ test("keyboard: Rotation cycles angles keeping Flipped, and Flipped toggles alon
   assert.deepEqual(t.edits, [], "an unknown transform is left for the user to reset")
 })
 
-test("keyboard: Place beside nearest moves a cursor, and Enter snaps through the shared engine", () => {
+test("keyboard: Place beside opens its list, and arrows on it edit nothing", () => {
   const t = inspectorRoot({ transform: 0 }, 21)
   t.root.adjustInspectorField(1)
-  t.root.adjustInspectorField(1)
-  assert.equal(t.root.placementCursor, 2)
-  t.root.adjustInspectorField(5)
-  assert.equal(t.root.placementCursor, 3, "the cursor stops at the last choice")
-  assert.deepEqual(t.edits, [], "moving the cursor never edits")
-  t.root.activateInspectorField()
-  assert.deepEqual(t.snaps, ["down"])
+  assert.deepEqual(t.edits, [])
+  let opened = 0
+  panelFunction("activateInspectorField", t.root, { placementField: { open() { opened++ } } })()
+  assert.equal(opened, 1)
+  assert.match(qml, /onChanged: function\(value\) \{ root\.snapSelectedOutput\(value\) \}/)
 })
 
-test("keyboard: Enter on a segmented field advances it; Position focuses exact entry", () => {
-  let t = inspectorRoot({ vrr: 0 }, 5)
-  t.root.activateInspectorField()
-  assert.deepEqual(t.edits, [{ vrr: 1 }])
+test("keyboard: Enter opens a selector, flips a toggle, and Position focuses exact entry", () => {
+  for (const [field, id] of [[23, "refreshField"], [5, "vrrField"], [6, "rotationField"], [14, "sdrCurveField"], [18, "forceWideField"], [19, "forceHdrField"]]) {
+    const t = inspectorRoot({ vrr: 0 }, field)
+    let opened = 0
+    panelFunction("activateInspectorField", t.root, { [id]: { open() { opened++ } } })()
+    assert.equal(opened, 1, id)
+    assert.deepEqual(t.edits, [], "opening edits nothing")
+  }
 
-  t = inspectorRoot({ sdr_eotf: "srgb" }, 14)
-  t.root.activateInspectorField()
-  assert.deepEqual(t.edits, [{ sdr_eotf: "default" }])
+  const flip = inspectorRoot({ transform: 1 }, 22)
+  flip.root.activateInspectorField()
+  assert.deepEqual(flip.edits, [{ transform: 5 }])
+
+  const depth = inspectorRoot({ bitdepth: 8 }, 3)
+  depth.root.activateInspectorField()
+  assert.deepEqual(depth.edits, [{ bitdepth: 10 }], "two chips still wrap on Enter")
 
   let focused = ""
   const root = inspectorRoot({ x: 10 }, 7).root
@@ -133,20 +139,58 @@ test("keyboard: Enter on a segmented field advances it; Position focuses exact e
   assert.equal(focused, "x")
 })
 
+test("Enter opens nothing during a preview, so no list can sit over Keep and Revert", () => {
+  const t = inspectorRoot({ vrr: 0 }, 5, { editorPreviewBlocked: true })
+  let opened = 0
+  panelFunction("activateInspectorField", t.root, { vrrField: { open() { opened++ } } })()
+  assert.equal(opened, 0)
+  const owners = qml.match(/ownerOpen: root\.opened && root\.expanded && !inspectorViewport\.moving[^\n]*/g)
+  assert.ok(owners.length >= 11)
+  for (const owner of owners) assert.match(owner, /!root\.editorPreviewBlocked/)
+})
+
+test("Advanced hides rare fields from the keyboard until it is open", () => {
+  assert.deepEqual(Model.displayInspectorFields(true, false, false, false), [0, 1, 23, 2, 5, 6, 9, 26])
+  assert.deepEqual(Model.displayInspectorFields(true, false, false, true), [0, 1, 23, 2, 5, 6, 9, 26, 22, 7, 8, 21])
+  assert.deepEqual(Model.displayInspectorFields(true, true, true, false), [0, 1, 23, 2, 5, 6, 9, 24, 25, 26])
+  assert.deepEqual(Model.displayInspectorFields(true, true, false, true), [0, 1, 23, 2, 5, 6, 9, 24, 26, 7, 8, 21], "Flipped is off Auto only")
+  assert.deepEqual(Model.displayInspectorFields(false, false, false, true), [0, 1, 23, 2, 5, 6, 26, 22])
+  assert.deepEqual(Model.displayInspectorFields(false, true, true, true), [0, 1, 23, 2, 5, 6, 24, 25], "nothing left to hide")
+  assert.deepEqual(Model.colorInspectorFields(false), [3, 4, 27])
+  assert.equal(Model.colorInspectorFields(true).length, 14)
+})
+
+test("closing Advanced with the cursor inside leaves it on the row", () => {
+  const root = { inspectorPage: "display", displayAdvancedOpen: true, displayKeyboardFields: [0, 26], keyboardInspectorField: 7 }
+  panelFunction("toggleAdvanced", root, {})()
+  assert.equal(root.displayAdvancedOpen, false)
+  assert.equal(root.keyboardInspectorField, 26)
+})
+
+test("the Color row names hidden values that differ, ignoring Hyprland's stock levels", () => {
+  assert.equal(Model.colorAdvancedSummary({ sdr_brightness: 1, sdr_min_luminance: 0.2, sdr_max_luminance: 80 }), "")
+  assert.equal(Model.colorAdvancedSummary({ sdr_eotf: "gamma22", supports_hdr: 1 }), "SDR EOTF, HDR CAPABILITY")
+})
+
 test("the inspector wires every field into keyboard order and scroll-into-view", () => {
-  assert.match(qml, /readonly property var displayKeyboardFields: root\.arrangeable\n\s+\? \[0, 1, 23, 2, 5, 6, 22, 7, 8, 21, 9\] : \[0, 1, 23, 2, 5, 6, 22\]/)
-  assert.match(qml, /readonly property var colorKeyboardFields: \[3, 4, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20\]/)
   const list = qml.match(/\? \[(displayEnabledToggle[\s\S]*?)\]\[root\.keyboardInspectorField\]/)[1]
     .split(",").map(s => s.trim())
-  assert.equal(list.length, 24)
+  assert.equal(list.length, 28)
   assert.equal(list[21], "placementField")
-  assert.equal(list[22], "rotationField")
+  assert.equal(list[22], "flippedToggle")
   assert.equal(list[23], "refreshField")
+  assert.equal(list[24], "rotationLockToggle")
+  assert.equal(list[25], "calibrateButton")
+  assert.equal(list[26], "displayAdvancedRow")
+  assert.equal(list[27], "colorAdvancedRow")
   assert.equal(list[1], "modeDropdown")
   assert.equal(list[2], "scaleField")
   assert.equal(list[7], "positionXField")
-  for (const id of ["refreshField", "vrrField", "rotationField", "bitdepthField", "sdrCurveField", "forceWideField", "forceHdrField"])
-    assert.match(qml, new RegExp("SegmentedField \\{\\s+id: " + id))
+  assert.match(qml, /SegmentedField \{\s+id: bitdepthField/)
+  for (const id of ["refreshField", "vrrField", "rotationField", "placementField", "sdrCurveField", "forceWideField", "forceHdrField"]) {
+    assert.match(qml, new RegExp("PanelDropdown \\{\\s+id: " + id))
+    assert.match(qml, new RegExp(id + "\\.popupOpen"), "global keys hold while its list is open")
+  }
   for (const id of ["positionXField", "positionYField"])
     assert.match(qml, new RegExp("CoordinateField \\{\\s+id: " + id))
   assert.match(qml, /positionXField\.input\.activeFocus \|\| positionYField\.input\.activeFocus/)
@@ -181,8 +225,6 @@ test("form grid columns land on whole pixels inside the inspector's clip edge", 
   assert.ok(cells.length >= 5)
   for (const cell of cells) assert.match(cell, /Model\.gridCellWidth\(width, spacing, 2\)/)
   assert.match(monitorInfo, /cellWidth: Model\.gridCellWidth\(width, columnSpacing, columns\)/)
-  const pills = fs.readFileSync(path.join(__dirname, "..", "ScaleField.qml"), "utf8")
-  assert.match(pills, /Math\.floor\(\(width - moreWidth - spacing \* count\) \/ count\)/, "pill cells are whole pixels")
 })
 
 test("a built-in panel with a sensor offers Auto rotation, which keeps its rotation as upright", () => {
@@ -203,7 +245,7 @@ test("a built-in panel with a sensor offers Auto rotation, which keeps its rotat
   assert.equal(Model.rotationStatus({}), null, "an older daemon has no rotation")
 })
 
-test("arrows step into Auto, and beside Auto the toggle key locks rotation", () => {
+test("arrows step into Auto, and the Lock row locks rotation", () => {
   const locks = []
   const output = { key: "a", transform: 0 }
   let { root, edits } = inspectorRoot(output, 6, { selectedRotationAutoSupported: true })
@@ -215,7 +257,7 @@ test("arrows step into Auto, and beside Auto the toggle key locks rotation", () 
   root.adjustInspectorField(1, false)
   assert.deepEqual(edits, [{ transform: 0, rotation_auto: false }])
 
-  ;({ root, edits } = inspectorRoot(auto, 22, {
+  ;({ root, edits } = inspectorRoot(auto, 24, {
     rotation: { available: true, locked: false }, setRotationLock: locked => locks.push(locked)
   }))
   root.adjustInspectorField(1, false)
@@ -228,11 +270,14 @@ test("the rotation lock uses the daemon's set_rotation method", () => {
   assert.doesNotMatch(qml, /set_rotation_lock/)
 })
 
-test("Refresh wraps when a display offers more rates than fit on one line", () => {
-  const field = fs.readFileSync(path.join(__dirname, "..", "SegmentedField.qml"), "utf8")
-  assert.match(qml, /label: "REFRESH"\s+\/\/[^\n]*\n\s+wrap: true/)
-  assert.match(field, /readonly property bool wrapped: root\.wrap && controls\.implicitWidth > root\.width/)
-  assert.match(field, /Flow \{\s+id: wrappedChips/)
-  // The one-line row stays laid out, so it can tell when it fits again.
-  assert.match(field, /opacity: root\.wrapped \? 0 : 1\s+enabled: !root\.wrapped/)
+
+test("a selector's list skips its separator, and nothing can pick it", () => {
+  const dropdown = fs.readFileSync(path.join(__dirname, "..", "PanelDropdown.qml"), "utf8")
+  const source = dropdown.match(/function nextOption\(from, delta\) \{[\s\S]*?\n  \}/)[0]
+  const options = [{ value: "1" }, { separator: true }, { value: "2" }]
+  const next = vm.runInNewContext("(" + source + ")", { options, isSeparator: o => o.separator === true })
+  assert.equal(next(0, 1), 2)
+  assert.equal(next(2, -1), 0)
+  assert.equal(next(2, 1), 2, "it stops at the end")
+  assert.match(dropdown, /root\.isSeparator\(root\.options\[currentIndex\]\)\) return/)
 })

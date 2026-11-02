@@ -14,14 +14,17 @@ const info = (scale) => INFO["3840x2160@" + Model.formatScale(scale)]
 const STUDIO_4K = INFO["3840x2160@1"].options
 const displays = sharp => [{ key: "k", scale_options: sharp }]
 
-test("the pills and the More list come from scale_info", () => {
+const rows = row => row.options.filter(o => !o.separator)
+const presets = row => row.options.slice(0, row.options.findIndex(o => o.separator))
+
+test("the list comes from scale_info: presets, a separator, then every other sharp scale", () => {
   const row = Model.scaleRow(displays([1, 2]), "k", 1.5, info(1.5))
   assert.equal(row.supported, true)
-  assert.deepEqual(row.presets.map(p => p.label), ["1x", "1.25x", "1.5x", "1.6x", "2x", "3x"])
-  assert.deepEqual(row.options.map(o => Number(o.value)), STUDIO_4K, "not the display's scale_options")
-  assert.equal(row.onMore, false)
-  assert.equal(row.moreText, "More")
-  assert.equal(row.detail, "1.5x")
+  assert.deepEqual(presets(row).map(p => p.label), ["1x", "1.25x", "1.5x", "1.6x", "2x", "3x"])
+  assert.deepEqual(rows(row).map(o => Number(o.value)).sort((a, b) => a - b), STUDIO_4K, "not the display's scale_options")
+  assert.equal(row.options.filter(o => o.separator).length, 1)
+  assert.equal(row.triggerText, "1.5x")
+  assert.equal(row.detail, "")
 })
 
 test("compact labels: two decimals, zeros trimmed, exact when two would collide", () => {
@@ -34,37 +37,35 @@ test("compact labels: two decimals, zeros trimmed, exact when two would collide"
   assert.equal(options[1].label, "1.07x")
 })
 
-test("a Blurry scale sits on More, marked, with Blurry in the header", () => {
+test("a Blurry scale is marked on the trigger, with Blurry in the header", () => {
   const blurry = Model.scaleRow([], "k", 1.7, info(1.7))
-  assert.equal(blurry.presets.length, 6, "no extra pill")
-  assert.equal(blurry.onMore, true)
-  assert.equal(blurry.moreText, "1.7x ⚠")
-  assert.equal(blurry.detail, "1.7x ⚠ Blurry")
+  assert.equal(presets(blurry).length, 6, "no extra preset")
+  assert.equal(blurry.triggerText, "1.7x ⚠")
+  assert.equal(blurry.detail, "Blurry")
   assert.equal(blurry.sharp, false)
   assert.deepEqual(blurry.options.find(o => o.value === "1.7"), { value: "1.7", label: "1.7x ⚠", sharp: false })
 
   const sharpNonPreset = Model.scaleRow([], "k", 2.66667, info(2.66667))
-  assert.equal(sharpNonPreset.moreText, "2.67x")
-  assert.equal(sharpNonPreset.detail, "2.67x")
+  assert.equal(sharpNonPreset.triggerText, "2.67x")
+  assert.equal(sharpNonPreset.detail, "")
   assert.equal(sharpNonPreset.sharp, true)
 })
 
 test("without scale_info (an older daemon) nothing is guessed", () => {
   const row = Model.scaleRow(displays([1, 1.33333, 2]), "k", 1.7, null)
   assert.equal(row.supported, false, "no Custom…")
-  assert.deepEqual(row.presets, [], "no pills")
   assert.equal(row.sharp, true, "no Blurry verdict")
-  assert.equal(row.detail, "1.7x")
-  assert.equal(row.moreText, "1.7x")
-  assert.deepEqual(row.options.map(o => o.label), ["1x", "1.33x", "1.7x", "2x"], "More falls back to scale_options")
+  assert.equal(row.detail, "")
+  assert.equal(row.triggerText, "1.7x")
+  assert.deepEqual(row.options.map(o => o.label), ["1x", "1.33x", "1.7x", "2x"], "the list falls back to scale_options, with no separator")
 })
 
-test("stepping through every sharp scale never changes the pill count", () => {
+test("stepping through every sharp scale never changes the presets", () => {
   const options = Model.scaleOptions([], "k", 1, info(1))
   let value = "1"
   for (let i = 0; i < 25; i++) {
     const row = Model.scaleRow([], "k", Number(value), { presets: info(1).presets, options: STUDIO_4K, sharp: true })
-    assert.equal(row.presets.length, 6)
+    assert.equal(presets(row).length, 6)
     value = Model.stepScaleOption(options, value, 1)
   }
 })
@@ -124,7 +125,7 @@ test("keyboard steps through the full sharp list like the TUI and stops at the e
   assert.equal(Model.stepScaleOption([], "1.5", 1), "1.5")
 })
 
-test("arrows step Scale; Enter opens More", () => {
+test("arrows step Scale; Enter opens the list", () => {
   const edits = []
   let opened = 0
   const root = {
@@ -137,7 +138,7 @@ test("arrows step Scale; Enter opens More", () => {
   const source = name => qml.match(new RegExp("^  function " + name + "\\([\\s\\S]*?^  }", "m"))[0]
   root.adjustInspectorField = vm.runInNewContext("(" + source("adjustInspectorField") + ")", { root, Model })
   const activate = vm.runInNewContext("(" + source("activateInspectorField") + ")",
-    { root, Model, scaleField: { more: { open() { opened++ } } } })
+    { root, Model, scaleField: { dropdown: { open() { opened++ } } } })
   root.adjustInspectorField(1)
   root.adjustInspectorField(-1)
   activate()
@@ -145,26 +146,21 @@ test("arrows step Scale; Enter opens More", () => {
   assert.equal(opened, 1)
 })
 
-test("Scale is Omarchy's pill row plus a More dropdown, fed by the backend list", () => {
+test("Scale is a selector fed by the backend list", () => {
   const scale = fs.readFileSync(path.join(__dirname, "..", "ScaleField.qml"), "utf8")
   const dropdown = fs.readFileSync(path.join(__dirname, "..", "PanelDropdown.qml"), "utf8")
   assert.match(qml, /ScaleField \{\s+id: scaleField/)
   assert.match(qml, /readonly property var row: Model\.scaleRow\(root\.editorDocument\.displays, root\.selectedOutputKey,\s+root\.selectedOutput \? root\.selectedOutput\.scale : 1, root\.selectedScaleInfo\)/)
   assert.match(qml, /onCustomApplied: function\(value\) \{ root\.editOutput\(\{ scale: value, snap_scale: true \}\) \}/)
   assert.match(qml, /root\.send\("scale_info", \{ width: w, height: h, scale: value \}/)
-  assert.match(qml, /presets: row\.presets\s+allOptions: row\.options/)
-  assert.match(qml, /else if \(field === 2\) scaleField\.more\.open\(\)/)
-  assert.match(qml, /scaleField\.more\.popupOpen/)
+  assert.match(qml, /options: row\.options\s+sharp: row\.sharp\s+triggerText: row\.triggerText/)
+  assert.match(qml, /else if \(field === 2\) scaleField\.dropdown\.open\(\)/)
+  assert.match(qml, /scaleField\.dropdown\.popupOpen/)
   assert.match(qml, /scaleField\.customInput\.activeFocus/, "typing a custom scale holds the panel's keys")
-  assert.doesNotMatch(qml, /scaleDropdown/)
-  assert.match(scale, /bordered: true/)
-  assert.match(scale, /active: String\(modelData\.value\) === root\.value/, "Omarchy's ScalePill marks the current scale as active")
-  assert.match(scale, /triggerText: root\.moreText/)
-  assert.match(scale, /active: root\.onMore/, "More carries an off-preset current scale as active")
-  assert.match(scale, /options: root\.customAvailable \? root\.allOptions\.concat\(\[\{ value: "custom", label: "Custom…" \}\]\) : root\.allOptions/)
+  assert.match(scale, /options: root\.customAvailable \? root\.options\.concat\(\[\{ value: "custom", label: "Custom…" \}\]\) : root\.options/)
   assert.match(scale, /KeyField \{\s+id: customInput/, "Custom… is built from key events")
   assert.doesNotMatch(scale, /TextField|TextInput|SpinBox/)
-  assert.match(scale, /text: "SCALE"/)
+  assert.match(scale, /label: "SCALE"/)
   assert.match(dropdown, /text: root\.triggerText !== "" \? root\.triggerText : root\.currentLabel\(\)/)
 })
 

@@ -17,7 +17,7 @@ from pathlib import Path
 from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter
 
 repo = Path(__file__).resolve().parent.parent
-wallpaper = Path("/usr/share/omarchy/themes/ristretto/backgrounds/1-color-curves.jpg")
+wallpaper = Path("/usr/share/omarchy/themes/ristretto/backgrounds/0-launch.webp")
 W, H = 2560, 1600
 ZOOM = 1.12
 

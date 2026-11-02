@@ -5,23 +5,19 @@ import qs.Ui
 import "Model.js" as Model
 import "Strings.js" as Strings
 
-// Scale the way Omarchy's own Display panel shows it: one row of preset pills
-// (bordered Button, `active` = current) and a trailing More dropdown listing
-// every sharp scale, ending with Custom… for typing one. The pills, the list
-// and every sharpness verdict come from hyprmoncfg's scale_info (computed in
-// Go, see Model.scaleRow); this file only draws them. Labels are compact
-// (Model.compactScaleLabels); the value emitted is always the exact scale.
+// Scale as a selector. The list leads with the presets, then a hairline, every
+// other sharp scale and Custom… for typing one. The list and every sharpness
+// verdict come from hyprmoncfg's scale_info (computed in Go, see Model.scaleRow);
+// this file only draws them. Labels are compact (Model.compactScaleLabels); the
+// value emitted is always the exact scale.
 //
-// The pills depend only on the mode, so stepping never changes their count. A
-// current scale that is not a preset is shown on the More trigger instead
-// (active, "1.33x"), and a Blurry one reads "1.33x ⚠" there and "Blurry" in
-// the SCALE header, never colour alone. It is never rewritten. Without
-// scale_info (an older daemon) there are no pills and no Custom….
+// A Blurry scale reads "1.33x ⚠" on the trigger and "Blurry" in the header, never
+// colour alone. It is never rewritten. Without scale_info (an older daemon)
+// there are no presets and no Custom….
 Column {
   id: root
 
-  property var presets: []
-  property var allOptions: []
+  property var options: []
   property string value: ""
   // Whether value is sharp, from scale_info, and the mode Custom… asks about.
   property bool sharp: true
@@ -30,8 +26,8 @@ Column {
   // Custom… needs scale_info; `infos` are its cached replies by scaleInfoKey.
   property bool customAvailable: false
   property var infos: ({})
-  // Trigger text for More and the header detail, from Model.scaleRow.
-  property string moreText: Strings.t("scale.more", "More")
+  // Trigger text and the header's verdict, from Model.scaleRow.
+  property string triggerText: ""
   property string detail: ""
   property bool hasCursor: false
   property bool resetVisible: false
@@ -42,10 +38,9 @@ Column {
   property color accent: Commons.Color.accent
   property color urgent: Commons.Color.urgent
   property string fontFamily: Style.font.family
-  readonly property alias more: moreDropdown
+  readonly property alias dropdown: scaleDropdown
   readonly property alias customInput: customInput
   readonly property bool customOpen: customEntry.visible
-  readonly property bool onMore: !root.presets.some(function(p) { return String(p.value) === root.value })
 
   signal changed(string value)
   // Typed Custom… scale to apply; the panel sends it with snap_scale.
@@ -57,13 +52,6 @@ Column {
   signal customClosed()
 
   spacing: Style.spacing.labelGap
-
-  readonly property string currentLabel: {
-    if (root.detail !== "") return root.detail
-    for (var i = 0; i < allOptions.length; i++)
-      if (String(allOptions[i].value) === root.value) return String(allOptions[i].label)
-    return root.value !== "" ? root.value + "x" : ""
-  }
 
   function openCustom() {
     if (!root.customAvailable) return
@@ -96,111 +84,28 @@ Column {
 
   onVisibleChanged: if (!visible) closeCustom()
 
-  Item {
+  PanelDropdown {
+    id: scaleDropdown
     width: parent.width
-    implicitHeight: Math.max(header.implicitHeight, currentText.implicitHeight, resetAction.visible ? resetAction.height : 0)
-
-    PanelSectionHeader {
-      id: header
-      anchors.left: parent.left
-      anchors.verticalCenter: parent.verticalCenter
-      text: Strings.t("scale.title", "SCALE")
-      foreground: root.foreground
-      fontFamily: root.fontFamily
+    label: Strings.t("scale.title", "SCALE")
+    detail: root.detail
+    detailColor: root.sharp ? Qt.darker(root.foreground, 1.4) : root.urgent
+    triggerText: root.triggerText
+    hasCursor: root.hasCursor
+    options: root.customAvailable ? root.options.concat([{ value: "custom", label: Strings.t("scale.custom", "Custom…") }]) : root.options
+    value: root.value
+    popupParent: root.popupParent
+    ownerOpen: root.ownerOpen
+    enabled: root.enabled
+    foreground: root.foreground
+    fontFamily: root.fontFamily
+    resetVisible: root.resetVisible
+    resetTooltip: root.resetTooltip
+    onChanged: function(value) {
+      if (value === "custom") Qt.callLater(root.openCustom)
+      else root.changed(value)
     }
-
-    Text {
-      id: currentText
-      textFormat: Text.PlainText
-      anchors.right: resetAction.visible ? resetAction.left : parent.right
-      anchors.rightMargin: resetAction.visible ? Style.spacing.xxs : 0
-      anchors.verticalCenter: parent.verticalCenter
-      text: root.currentLabel
-      color: root.sharp ? Qt.darker(root.foreground, 1.4) : root.urgent
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
-      font.bold: true
-    }
-
-    PanelActionButton {
-      id: resetAction
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      visible: root.resetVisible
-      enabled: root.enabled
-      iconText: "󰑐"
-      tooltipText: root.resetTooltip
-      foreground: root.foreground
-      fontFamily: root.fontFamily
-      focusable: true
-      onClicked: root.resetRequested()
-    }
-  }
-
-  TextMetrics { id: moreText; font.family: root.fontFamily; font.pixelSize: Style.font.body; text: Strings.t("scale.more", "More") }
-  TextMetrics { id: currentMoreText; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true; text: root.moreText }
-  TextMetrics { id: moreChevron; font.family: root.fontFamily; font.pixelSize: Style.font.body; text: "󰅀" }
-
-  Row {
-    id: pillRow
-    width: parent.width
-    spacing: Style.spacing.xs
-    // Sized from the trigger's own text, chevron and paddings, so neither
-    // Strings.t("scale.more", "More") nor the current scale it may carry ever elides.
-    readonly property real moreWidth: Math.ceil(Math.max(moreText.advanceWidth, currentMoreText.advanceWidth)
-      + moreChevron.advanceWidth + Style.spacing.controlPaddingX + Style.spacing.md + Style.spacing.controlGap
-      + Style.normalBorderWidth * 2 + Style.space(2))
-    readonly property int count: Math.max(1, root.presets.length)
-    readonly property real cellWidth: Math.max(1,
-      Math.floor((width - moreWidth - spacing * count) / count))
-
-    Repeater {
-      model: root.presets
-
-      Button {
-        id: pill
-        required property var modelData
-        width: pillRow.cellWidth
-        height: moreDropdown.rowHeight
-        text: String(modelData.label)
-        fontSize: Style.font.caption
-        // Omarchy's pill padding when there is room; less, never below one
-        // pixel, when a narrow panel or a wide More trigger narrows the cells.
-        horizontalPadding: Math.max(1, Math.min(Style.spacing.xs,
-          Math.floor((pillRow.cellWidth - labelMetrics.advanceWidth - Style.normalBorderWidth * 2) / 2)))
-        TextMetrics { id: labelMetrics; font.family: root.fontFamily; font.pixelSize: Style.font.caption; text: pill.text }
-        verticalPadding: Style.spacing.controlPaddingY
-        bordered: true
-        focusable: true
-        active: String(modelData.value) === root.value
-        hasCursor: root.hasCursor && String(modelData.value) === root.value
-        enabled: root.enabled
-        foreground: root.foreground
-        accent: root.accent
-        fontFamily: root.fontFamily
-        onClicked: root.changed(String(modelData.value))
-      }
-    }
-
-    PanelDropdown {
-      id: moreDropdown
-      width: pillRow.moreWidth
-      showLabel: false
-      triggerText: root.moreText
-      active: root.onMore
-      hasCursor: root.hasCursor && root.onMore
-      options: root.customAvailable ? root.allOptions.concat([{ value: "custom", label: Strings.t("scale.custom", "Custom…") }]) : root.allOptions
-      value: root.value
-      popupParent: root.popupParent
-      ownerOpen: root.ownerOpen
-      enabled: root.enabled
-      foreground: root.foreground
-      fontFamily: root.fontFamily
-      onChanged: function(value) {
-        if (value === "custom") Qt.callLater(root.openCustom)
-        else root.changed(value)
-      }
-    }
+    onResetRequested: root.resetRequested()
   }
 
   // Custom…: type an exact scale. Built from key events (KeyField), never
