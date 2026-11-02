@@ -3706,6 +3706,9 @@ Panel {
                         readonly property int transformValue: rotationField.transformValue
                         visible: !root.selectedRotationAuto
                         width: parent.width
+                        // A one-line setting, the height of the fields around it.
+                        height: Style.spacing.controlHeight
+                        titleSize: Style.font.body
                         label: Strings.t("field.rotationFlipped", "Flipped")
                         checked: Model.transformFlipped(transformValue)
                         enabled: root.managedChecked && !!root.selectedOutput && !root.editPending && Model.transformKnown(transformValue)
