@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Kalibruoti",
   "action.cancel": "Atšaukti",
   "action.close": "Uždaryti",
   "action.createProfile": "Sukurti profilį",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Palikti ir išsaugoti",
   "action.preview": "Peržiūrėti",
   "action.previewAndSave": "Peržiūrėti ir išsaugoti",
+  "action.rename": "Pervardyti",
+  "action.renameMenu": "Pervardyti…",
   "action.resumeMatching": "Tęsti automatinį parinkimą",
   "action.resuming": "Tęsiama…",
   "action.resumingMatching": "Tęsiamas automatinis parinkimas…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Nepavyko patvirtinti automatinio perjungimo būsenos.",
   "error.editsBeforeCommand": "Prieš redaguodami profilio komandą išsaugokite arba atmeskite pakeitimus.",
   "error.editsBeforeDelete": "Prieš trindami profilį išsaugokite arba atmeskite pakeitimus.",
+  "error.editsBeforeRename": "Prieš pervardydami profilį išsaugokite arba atmeskite pakeitimus.",
   "error.editsBeforeUse": "Prieš naudodami kitą profilį išsaugokite arba atmeskite pakeitimus.",
   "error.invalidEditor": "hyprmoncfg grąžino netinkamą rengyklės būseną.",
   "error.invalidIpc": "hyprmoncfg grąžino netinkamą IPC pranešimą.",
@@ -343,6 +347,7 @@
   "profile.nameBestMatch": "%1 · geriausia atitiktis",
   "profile.notManaged": "(nevaldoma)",
   "profile.otherSetup": "Kita sąranka",
+  "profile.renameTitle": "Pervardyti „%1“",
   "profile.savedCount": {
     "one": "%1 išsaugotas",
     "few": "%1 išsaugoti",
@@ -371,6 +376,7 @@
   "reset.sdrWhite": "Atkurti SDR baltos lygį į reikšmę, išsaugotą čia: %1",
   "reset.vrr": "Atkurti VRR režimą į reikšmę, išsaugotą čia: %1",
   "reset.wcg": "Atkurti plačios spalvų gamos galimybę į reikšmę, išsaugotą čia: %1",
+  "rotation.calibrateHint": "Pirmiausia laikykite įrenginį vertikaliai",
   "rotation.locked": "Užrakinta",
   "rotation.upright": "Stačias %1",
   "rotation.uprightFlipped": "Stačias, apverstas %1",

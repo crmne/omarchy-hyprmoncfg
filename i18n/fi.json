@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Kalibroi",
   "action.cancel": "Peruuta",
   "action.close": "Sulje",
   "action.createProfile": "Luo profiili",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Pidä ja tallenna",
   "action.preview": "Esikatsele",
   "action.previewAndSave": "Esikatsele ja tallenna",
+  "action.rename": "Nimeä uudelleen",
+  "action.renameMenu": "Nimeä uudelleen…",
   "action.resumeMatching": "Jatka automaattista täsmäystä",
   "action.resuming": "Jatketaan…",
   "action.resumingMatching": "Jatketaan automaattista täsmäystä…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Automaattisen vaihdon tilaa ei voitu vahvistaa.",
   "error.editsBeforeCommand": "Tallenna tai hylkää muutokset ennen profiilin komennon muokkaamista.",
   "error.editsBeforeDelete": "Tallenna tai hylkää muutokset ennen profiilin poistamista.",
+  "error.editsBeforeRename": "Tallenna tai hylkää muutokset ennen profiilin nimeämistä uudelleen.",
   "error.editsBeforeUse": "Tallenna tai hylkää muutokset ennen toisen profiilin käyttöä.",
   "error.invalidEditor": "hyprmoncfg palautti virheellisen editorin tilan.",
   "error.invalidIpc": "hyprmoncfg palautti virheellisen IPC-viestin.",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · paras vastaavuus",
   "profile.notManaged": "(ei hallinnassa)",
   "profile.otherSetup": "Muu kokoonpano",
+  "profile.renameTitle": "Nimeä “%1” uudelleen",
   "profile.savedCount": {
     "one": "%1 tallennettu",
     "other": "%1 tallennettu"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "Palauta SDR-valkotaso arvoon, joka on tallennettu kohteeseen %1",
   "reset.vrr": "Palauta VRR-tila arvoon, joka on tallennettu kohteeseen %1",
   "reset.wcg": "Palauta laajan väriskaalan tuki arvoon, joka on tallennettu kohteeseen %1",
+  "rotation.calibrateHint": "Pidä laite ensin pystyssä",
   "rotation.locked": "Lukittu",
   "rotation.upright": "Pystyasento %1",
   "rotation.uprightFlipped": "Pystyasento peilattuna %1",

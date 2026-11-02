@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Kalibrera",
   "action.cancel": "Avbryt",
   "action.close": "Stäng",
   "action.createProfile": "Skapa profil",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Behåll & spara",
   "action.preview": "Förhandsvisa",
   "action.previewAndSave": "Förhandsvisa & spara",
+  "action.rename": "Byt namn",
+  "action.renameMenu": "Byt namn…",
   "action.resumeMatching": "Återuppta automatisk matchning",
   "action.resuming": "Återupptar…",
   "action.resumingMatching": "Återupptar automatisk matchning…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Kunde inte bekräfta status för automatisk växling.",
   "error.editsBeforeCommand": "Spara eller kassera dina ändringar innan du redigerar ett profilkommando.",
   "error.editsBeforeDelete": "Spara eller kassera dina ändringar innan du raderar en profil.",
+  "error.editsBeforeRename": "Spara eller ignorera dina ändringar innan du byter namn på en profil.",
   "error.editsBeforeUse": "Spara eller kassera dina ändringar innan du använder en annan profil.",
   "error.invalidEditor": "hyprmoncfg returnerade ett ogiltigt redigerartillstånd.",
   "error.invalidIpc": "hyprmoncfg returnerade ett ogiltigt IPC-meddelande.",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · bästa träff",
   "profile.notManaged": "(hanteras inte)",
   "profile.otherSetup": "Annan uppsättning",
+  "profile.renameTitle": "Byt namn på ”%1”",
   "profile.savedCount": {
     "one": "%1 sparad",
     "other": "%1 sparade"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "Återställ SDR-vitnivå till värdet sparat i %1",
   "reset.vrr": "Återställ VRR-läge till värdet sparat i %1",
   "reset.wcg": "Återställ förmåga för brett färgomfång till värdet sparat i %1",
+  "rotation.calibrateHint": "Håll först enheten upprätt",
   "rotation.locked": "Låst",
   "rotation.upright": "Upprätt %1",
   "rotation.uprightFlipped": "Upprätt vänd %1",

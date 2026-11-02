@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Calibrer",
   "action.cancel": "Annuler",
   "action.close": "Fermer",
   "action.createProfile": "Créer un profil",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Garder et enregistrer",
   "action.preview": "Aperçu",
   "action.previewAndSave": "Aperçu et enregistrement",
+  "action.rename": "Renommer",
+  "action.renameMenu": "Renommer…",
   "action.resumeMatching": "Reprendre l'association automatique",
   "action.resuming": "Reprise…",
   "action.resumingMatching": "Reprise de l'association automatique…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Impossible de confirmer l'état du basculement automatique.",
   "error.editsBeforeCommand": "Enregistrez ou abandonnez vos modifications avant de modifier la commande d'un profil.",
   "error.editsBeforeDelete": "Enregistrez ou abandonnez vos modifications avant de supprimer un profil.",
+  "error.editsBeforeRename": "Enregistrez ou annulez vos modifications avant de renommer un profil.",
   "error.editsBeforeUse": "Enregistrez ou abandonnez vos modifications avant d'utiliser un autre profil.",
   "error.invalidEditor": "hyprmoncfg a renvoyé un état d'éditeur non valide.",
   "error.invalidIpc": "hyprmoncfg a renvoyé un message IPC non valide.",
@@ -343,6 +347,7 @@
   "profile.nameBestMatch": "%1 · meilleur choix",
   "profile.notManaged": "(non géré)",
   "profile.otherSetup": "Autre configuration",
+  "profile.renameTitle": "Renommer « %1 »",
   "profile.savedCount": {
     "one": "%1 enregistré",
     "many": "%1 d'enregistrés",
@@ -371,6 +376,7 @@
   "reset.sdrWhite": "Rétablir le niveau de blanc SDR à la valeur enregistrée dans %1",
   "reset.vrr": "Rétablir le mode VRR à la valeur enregistrée dans %1",
   "reset.wcg": "Rétablir la capacité de gamme étendue à la valeur enregistrée dans %1",
+  "rotation.calibrateHint": "Tenez d’abord l’appareil à la verticale",
   "rotation.locked": "Verrouillée",
   "rotation.upright": "Vertical %1",
   "rotation.uprightFlipped": "Vertical inversé %1",

@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Kalibreeri",
   "action.cancel": "Loobu",
   "action.close": "Sulge",
   "action.createProfile": "Loo profiil",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Säilita ja salvesta",
   "action.preview": "Eelvaade",
   "action.previewAndSave": "Eelvaade ja salvesta",
+  "action.rename": "Nimeta ümber",
+  "action.renameMenu": "Nimeta ümber…",
   "action.resumeMatching": "Jätka automaatset sobitamist",
   "action.resuming": "Jätkamine…",
   "action.resumingMatching": "Automaatse sobitamise jätkamine…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Automaatse vahetamise olekut ei õnnestunud kinnitada.",
   "error.editsBeforeCommand": "Salvesta või hülga muudatused enne profiili käsu muutmist.",
   "error.editsBeforeDelete": "Salvesta või hülga muudatused enne profiili kustutamist.",
+  "error.editsBeforeRename": "Enne profiili ümbernimetamist salvesta või loobu muudatustest.",
   "error.editsBeforeUse": "Salvesta või hülga muudatused enne teise profiili kasutamist.",
   "error.invalidEditor": "hyprmoncfg tagastas vigase redaktori oleku.",
   "error.invalidIpc": "hyprmoncfg tagastas vigase IPC-sõnumi.",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · parim vaste",
   "profile.notManaged": "(pole hallatud)",
   "profile.otherSetup": "Muu seadistus",
+  "profile.renameTitle": "Nimeta „%1“ ümber",
   "profile.savedCount": {
     "one": "%1 salvestatud",
     "other": "%1 salvestatud"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "Lähtesta SDR-i valge tase salvestatud väärtusele: %1",
   "reset.vrr": "Lähtesta VRR-režiim salvestatud väärtusele: %1",
   "reset.wcg": "Lähtesta laia värviruumi võimekus salvestatud väärtusele: %1",
+  "rotation.calibrateHint": "Hoia seadet esmalt püsti",
   "rotation.locked": "Lukustatud",
   "rotation.upright": "Püstine %1",
   "rotation.uprightFlipped": "Püstine peegeldatud %1",

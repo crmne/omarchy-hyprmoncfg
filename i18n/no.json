@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Kalibrer",
   "action.cancel": "Avbryt",
   "action.close": "Lukk",
   "action.createProfile": "Opprett profil",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Behold og lagre",
   "action.preview": "Forhåndsvis",
   "action.previewAndSave": "Forhåndsvis og lagre",
+  "action.rename": "Gi nytt navn",
+  "action.renameMenu": "Gi nytt navn…",
   "action.resumeMatching": "Gjenoppta automatisk matching",
   "action.resuming": "Gjenopptar…",
   "action.resumingMatching": "Gjenopptar automatisk matching…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Kunne ikke bekrefte statusen for automatisk bytte.",
   "error.editsBeforeCommand": "Lagre eller forkast endringene før du redigerer en profilkommando.",
   "error.editsBeforeDelete": "Lagre eller forkast endringene før du sletter en profil.",
+  "error.editsBeforeRename": "Lagre eller forkast endringene før du gir en profil nytt navn.",
   "error.editsBeforeUse": "Lagre eller forkast endringene før du bruker en annen profil.",
   "error.invalidEditor": "hyprmoncfg returnerte en ugyldig editortilstand.",
   "error.invalidIpc": "hyprmoncfg returnerte en ugyldig IPC-melding.",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · beste treff",
   "profile.notManaged": "(ikke administrert)",
   "profile.otherSetup": "Annet oppsett",
+  "profile.renameTitle": "Gi «%1» nytt navn",
   "profile.savedCount": {
     "one": "%1 lagret",
     "other": "%1 lagret"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "Tilbakestill SDR-hvitnivå til verdien lagret i %1",
   "reset.vrr": "Tilbakestill VRR-modus til verdien lagret i %1",
   "reset.wcg": "Tilbakestill evne for bredt fargespekter til verdien lagret i %1",
+  "rotation.calibrateHint": "Hold først enheten oppreist",
   "rotation.locked": "Låst",
   "rotation.upright": "Stående %1",
   "rotation.uprightFlipped": "Stående speilvendt %1",

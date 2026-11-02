@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Calabraigh",
   "action.cancel": "Cealaigh",
   "action.close": "Dún",
   "action.createProfile": "Cruthaigh próifíl",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Coinnigh & sábháil",
   "action.preview": "Réamhamharc",
   "action.previewAndSave": "Réamhamharc & sábháil",
+  "action.rename": "Athainmnigh",
+  "action.renameMenu": "Athainmnigh…",
   "action.resumeMatching": "Atosaigh meaitseáil uathoibríoch",
   "action.resuming": "Ag atosú…",
   "action.resumingMatching": "Ag atosú meaitseála uathoibríche…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Níorbh fhéidir staid an athraithe uathoibríoch a dheimhniú.",
   "error.editsBeforeCommand": "Sábháil do chuid athruithe nó caith uait iad sula gcuireann tú ordú próifíle in eagar.",
   "error.editsBeforeDelete": "Sábháil do chuid athruithe nó caith uait iad sula scriosann tú próifíl.",
+  "error.editsBeforeRename": "Sábháil nó caith uait d’athruithe sula n-athainmníonn tú próifíl.",
   "error.editsBeforeUse": "Sábháil do chuid athruithe nó caith uait iad sula n-úsáideann tú próifíl eile.",
   "error.invalidEditor": "Chuir hyprmoncfg staid eagarthóra neamhbhailí ar ais.",
   "error.invalidIpc": "Chuir hyprmoncfg teachtaireacht IPC neamhbhailí ar ais.",
@@ -369,6 +373,7 @@
   "profile.nameBestMatch": "%1 · an mheaitseáil is fearr",
   "profile.notManaged": "(gan bhainistiú)",
   "profile.otherSetup": "Socrú eile",
+  "profile.renameTitle": "Athainmnigh “%1”",
   "profile.savedCount": {
     "one": "%1 sábháilte",
     "two": "%1 sábháilte",
@@ -399,6 +404,7 @@
   "reset.sdrWhite": "Athshocraigh leibhéal bán SDR go dtí an luach sábháilte i %1",
   "reset.vrr": "Athshocraigh mód VRR go dtí an luach sábháilte i %1",
   "reset.wcg": "Athshocraigh cumas raoin leathain dathanna go dtí an luach sábháilte i %1",
+  "rotation.calibrateHint": "Coinnigh an gléas ina sheasamh ar dtús",
   "rotation.locked": "Glasáilte",
   "rotation.upright": "Ina sheasamh %1",
   "rotation.uprightFlipped": "Ina sheasamh iompaithe %1",

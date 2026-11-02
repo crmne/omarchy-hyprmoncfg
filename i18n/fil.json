@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "I-calibrate",
   "action.cancel": "Kanselahin",
   "action.close": "Isara",
   "action.createProfile": "Gumawa ng profile",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Panatilihin at i-save",
   "action.preview": "I-preview",
   "action.previewAndSave": "I-preview at i-save",
+  "action.rename": "Palitan ang pangalan",
+  "action.renameMenu": "Palitan ang pangalan…",
   "action.resumeMatching": "Ituloy ang awtomatikong pagtutugma",
   "action.resuming": "Itinutuloy…",
   "action.resumingMatching": "Itinutuloy ang awtomatikong pagtutugma…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Hindi makumpirma ang estado ng awtomatikong paglipat.",
   "error.editsBeforeCommand": "I-save o itapon ang mga edit bago i-edit ang command ng profile.",
   "error.editsBeforeDelete": "I-save o itapon ang mga edit bago magtanggal ng profile.",
+  "error.editsBeforeRename": "I-save o i-discard muna ang mga pagbabago bago palitan ang pangalan ng profile.",
   "error.editsBeforeUse": "I-save o itapon ang mga edit bago gumamit ng ibang profile.",
   "error.invalidEditor": "Nagbalik ang hyprmoncfg ng di-wastong estado ng editor.",
   "error.invalidIpc": "Nagbalik ang hyprmoncfg ng di-wastong mensaheng IPC.",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · pinakatugma",
   "profile.notManaged": "(hindi pinamamahalaan)",
   "profile.otherSetup": "Ibang setup",
+  "profile.renameTitle": "Palitan ang pangalan ng “%1”",
   "profile.savedCount": {
     "one": "%1 naka-save",
     "other": "%1 naka-save"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "I-reset ang antas ng puti ng SDR sa value na naka-save sa %1",
   "reset.vrr": "I-reset ang mode ng VRR sa value na naka-save sa %1",
   "reset.wcg": "I-reset ang kakayahang wide color gamut sa value na naka-save sa %1",
+  "rotation.calibrateHint": "Hawakan muna nang patayo ang device",
   "rotation.locked": "Naka-lock",
   "rotation.upright": "Nakatayo %1",
   "rotation.uprightFlipped": "Nakatayo at nakabaligtad %1",

@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "調整",
   "action.cancel": "キャンセル",
   "action.close": "閉じる",
   "action.createProfile": "プロファイル作成",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "維持して保存",
   "action.preview": "プレビュー",
   "action.previewAndSave": "プレビューして保存",
+  "action.rename": "名前を変更",
+  "action.renameMenu": "名前を変更…",
   "action.resumeMatching": "自動マッチングを再開",
   "action.resuming": "再開中…",
   "action.resumingMatching": "自動マッチングを再開中…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "自動切り替えの状態を確認できませんでした。",
   "error.editsBeforeCommand": "プロファイルのコマンドを編集する前に、編集内容を保存または破棄してください。",
   "error.editsBeforeDelete": "プロファイルを削除する前に、編集内容を保存または破棄してください。",
+  "error.editsBeforeRename": "プロファイル名を変更する前に、編集内容を保存または破棄してください。",
   "error.editsBeforeUse": "別のプロファイルを使用する前に、編集内容を保存または破棄してください。",
   "error.invalidEditor": "hyprmoncfg が無効なエディター状態を返しました。",
   "error.invalidIpc": "hyprmoncfg が無効な IPC メッセージを返しました。",
@@ -317,6 +321,7 @@
   "profile.nameBestMatch": "%1 · 最適",
   "profile.notManaged": "(管理対象外)",
   "profile.otherSetup": "その他の構成",
+  "profile.renameTitle": "「%1」の名前を変更",
   "profile.savedCount": {
     "other": "%1 台保存"
   },
@@ -343,6 +348,7 @@
   "reset.sdrWhite": "SDR 白レベルを %1 に保存された値にリセット",
   "reset.vrr": "VRR モードを %1 に保存された値にリセット",
   "reset.wcg": "広色域機能を %1 に保存された値にリセット",
+  "rotation.calibrateHint": "先にデバイスをまっすぐ立ててください",
   "rotation.locked": "ロック中",
   "rotation.upright": "正立 %1",
   "rotation.uprightFlipped": "正立・反転 %1",

@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "ක්‍රමාංකනය කරන්න",
   "action.cancel": "අවලංගු කරන්න",
   "action.close": "වසන්න",
   "action.createProfile": "පැතිකඩ සාදන්න",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "තබා සුරකින්න",
   "action.preview": "පෙරදසුන",
   "action.previewAndSave": "පෙරදසුන හා සුරකින්න",
+  "action.rename": "නැවත නම් කරන්න",
+  "action.renameMenu": "නැවත නම් කරන්න…",
   "action.resumeMatching": "ස්වයංක්‍රීය ගැලපීම නැවත අරඹන්න",
   "action.resuming": "නැවත අරඹමින්…",
   "action.resumingMatching": "ස්වයංක්‍රීය ගැලපීම නැවත අරඹමින්…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "ස්වයංක්‍රීය මාරුවීමේ තත්ත්වය තහවුරු කළ නොහැකි විය.",
   "error.editsBeforeCommand": "පැතිකඩ විධානයක් සංස්කරණයට පෙර ඔබේ සංස්කරණ සුරකින්න හෝ ඉවතලන්න.",
   "error.editsBeforeDelete": "පැතිකඩක් මැකීමට පෙර ඔබේ සංස්කරණ සුරකින්න හෝ ඉවතලන්න.",
+  "error.editsBeforeRename": "පැතිකඩක් නැවත නම් කිරීමට පෙර වෙනස්කම් සුරකින්න හෝ ඉවත ලන්න.",
   "error.editsBeforeUse": "වෙනත් පැතිකඩක් භාවිතයට පෙර ඔබේ සංස්කරණ සුරකින්න හෝ ඉවතලන්න.",
   "error.invalidEditor": "hyprmoncfg අවලංගු සංස්කාරක තත්ත්වයක් ලබා දුන්නේය.",
   "error.invalidIpc": "hyprmoncfg අවලංගු IPC පණිවිඩයක් ලබා දුන්නේය.",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · හොඳම ගැලපීම",
   "profile.notManaged": "(කළමනාකරණය නොවේ)",
   "profile.otherSetup": "වෙනත් සැකසුම",
+  "profile.renameTitle": "“%1” නැවත නම් කරන්න",
   "profile.savedCount": {
     "one": "%1ක් සුරැකි",
     "other": "%1ක් සුරැකි"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "SDR සුදු මට්ටම %1 හි සුරැකි අගයට යළි සකසන්න",
   "reset.vrr": "VRR ප්‍රකාරය %1 හි සුරැකි අගයට යළි සකසන්න",
   "reset.wcg": "පුළුල් වර්ණ පරාස හැකියාව %1 හි සුරැකි අගයට යළි සකසන්න",
+  "rotation.calibrateHint": "පළමුව උපාංගය කෙළින් අල්ලා ගන්න",
   "rotation.locked": "අගුළු දමා ඇත",
   "rotation.upright": "සෘජු %1",
   "rotation.uprightFlipped": "සෘජු පෙරළූ %1",

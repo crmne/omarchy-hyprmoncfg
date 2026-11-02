@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Sawazisha",
   "action.cancel": "Ghairi",
   "action.close": "Funga",
   "action.createProfile": "Unda wasifu",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Bakiza na hifadhi",
   "action.preview": "Hakiki",
   "action.previewAndSave": "Hakiki na hifadhi",
+  "action.rename": "Badilisha jina",
+  "action.renameMenu": "Badilisha jina…",
   "action.resumeMatching": "Endelea na ulinganishaji wa kiotomatiki",
   "action.resuming": "Inaendelea…",
   "action.resumingMatching": "Inaendelea na ulinganishaji wa kiotomatiki…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Imeshindwa kuthibitisha hali ya kubadili kiotomatiki.",
   "error.editsBeforeCommand": "Hifadhi au tupa mabadiliko yako kabla ya kuhariri amri ya wasifu.",
   "error.editsBeforeDelete": "Hifadhi au tupa mabadiliko yako kabla ya kufuta wasifu.",
+  "error.editsBeforeRename": "Hifadhi au tupa mabadiliko kabla ya kubadilisha jina la wasifu.",
   "error.editsBeforeUse": "Hifadhi au tupa mabadiliko yako kabla ya kutumia wasifu mwingine.",
   "error.invalidEditor": "hyprmoncfg imerudisha hali batili ya kihariri.",
   "error.invalidIpc": "hyprmoncfg imerudisha ujumbe batili wa IPC.",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · ulinganifu bora",
   "profile.notManaged": "(haisimamiwi)",
   "profile.otherSetup": "Usanidi mwingine",
+  "profile.renameTitle": "Badilisha jina la “%1”",
   "profile.savedCount": {
     "one": "%1 imehifadhiwa",
     "other": "%1 zimehifadhiwa"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "Rudisha kiwango cha weupe cha SDR kwenye thamani iliyohifadhiwa katika %1",
   "reset.vrr": "Rudisha hali ya VRR kwenye thamani iliyohifadhiwa katika %1",
   "reset.wcg": "Rudisha uwezo wa wigo mpana wa rangi kwenye thamani iliyohifadhiwa katika %1",
+  "rotation.calibrateHint": "Kwanza shikilia kifaa wima",
   "rotation.locked": "Imefungwa",
   "rotation.upright": "Wima %1",
   "rotation.uprightFlipped": "Wima imegeuzwa %1",

@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Skalibruj",
   "action.cancel": "Anuluj",
   "action.close": "Zamknij",
   "action.createProfile": "Utwórz profil",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Zachowaj i zapisz",
   "action.preview": "Podgląd",
   "action.previewAndSave": "Podgląd i zapis",
+  "action.rename": "Zmień nazwę",
+  "action.renameMenu": "Zmień nazwę…",
   "action.resumeMatching": "Wznów automatyczne dopasowanie",
   "action.resuming": "Wznawianie…",
   "action.resumingMatching": "Wznawianie automatycznego dopasowania…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Nie udało się potwierdzić stanu automatycznego przełączania.",
   "error.editsBeforeCommand": "Zapisz lub odrzuć zmiany przed edycją polecenia profilu.",
   "error.editsBeforeDelete": "Zapisz lub odrzuć zmiany przed usunięciem profilu.",
+  "error.editsBeforeRename": "Zapisz lub odrzuć zmiany przed zmianą nazwy profilu.",
   "error.editsBeforeUse": "Zapisz lub odrzuć zmiany przed użyciem innego profilu.",
   "error.invalidEditor": "hyprmoncfg zwrócił nieprawidłowy stan edytora.",
   "error.invalidIpc": "hyprmoncfg zwrócił nieprawidłowy komunikat IPC.",
@@ -356,6 +360,7 @@
   "profile.nameBestMatch": "%1 · najlepsza zgodność",
   "profile.notManaged": "(niezarządzany)",
   "profile.otherSetup": "Inna konfiguracja",
+  "profile.renameTitle": "Zmień nazwę „%1”",
   "profile.savedCount": {
     "one": "%1 zapisany",
     "few": "%1 zapisane",
@@ -385,6 +390,7 @@
   "reset.sdrWhite": "Zresetuj poziom bieli SDR do wartości zapisanej w %1",
   "reset.vrr": "Zresetuj tryb VRR do wartości zapisanej w %1",
   "reset.wcg": "Zresetuj obsługę szerokiej gamy kolorów do wartości zapisanej w %1",
+  "rotation.calibrateHint": "Najpierw ustaw urządzenie pionowo",
   "rotation.locked": "Zablokowany",
   "rotation.upright": "Pionowo %1",
   "rotation.uprightFlipped": "Pionowo z odbiciem %1",

@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Hiệu chỉnh",
   "action.cancel": "Hủy",
   "action.close": "Đóng",
   "action.createProfile": "Tạo hồ sơ",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Giữ & lưu",
   "action.preview": "Xem trước",
   "action.previewAndSave": "Xem trước & lưu",
+  "action.rename": "Đổi tên",
+  "action.renameMenu": "Đổi tên…",
   "action.resumeMatching": "Tiếp tục tự động khớp",
   "action.resuming": "Đang tiếp tục…",
   "action.resumingMatching": "Đang tiếp tục tự động khớp…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Không thể xác nhận trạng thái tự động chuyển đổi.",
   "error.editsBeforeCommand": "Hãy lưu hoặc bỏ các thay đổi trước khi sửa lệnh của hồ sơ.",
   "error.editsBeforeDelete": "Hãy lưu hoặc bỏ các thay đổi trước khi xóa hồ sơ.",
+  "error.editsBeforeRename": "Hãy lưu hoặc hủy thay đổi trước khi đổi tên hồ sơ.",
   "error.editsBeforeUse": "Hãy lưu hoặc bỏ các thay đổi trước khi dùng hồ sơ khác.",
   "error.invalidEditor": "hyprmoncfg trả về trạng thái trình sửa không hợp lệ.",
   "error.invalidIpc": "hyprmoncfg trả về thông điệp IPC không hợp lệ.",
@@ -317,6 +321,7 @@
   "profile.nameBestMatch": "%1 · khớp nhất",
   "profile.notManaged": "(không được quản lý)",
   "profile.otherSetup": "Thiết lập khác",
+  "profile.renameTitle": "Đổi tên “%1”",
   "profile.savedCount": {
     "other": "%1 đã lưu"
   },
@@ -343,6 +348,7 @@
   "reset.sdrWhite": "Đặt lại mức trắng SDR về giá trị đã lưu trong %1",
   "reset.vrr": "Đặt lại chế độ VRR về giá trị đã lưu trong %1",
   "reset.wcg": "Đặt lại khả năng gam màu rộng về giá trị đã lưu trong %1",
+  "rotation.calibrateHint": "Trước tiên hãy giữ thiết bị thẳng đứng",
   "rotation.locked": "Đã khóa",
   "rotation.upright": "Hướng đứng %1",
   "rotation.uprightFlipped": "Hướng đứng lật %1",

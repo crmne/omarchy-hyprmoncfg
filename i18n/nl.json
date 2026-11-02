@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Kalibreren",
   "action.cancel": "Annuleren",
   "action.close": "Sluiten",
   "action.createProfile": "Profiel maken",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Behouden & opslaan",
   "action.preview": "Voorbeeld",
   "action.previewAndSave": "Voorbeeld & opslaan",
+  "action.rename": "Hernoemen",
+  "action.renameMenu": "Hernoemen…",
   "action.resumeMatching": "Automatisch koppelen hervatten",
   "action.resuming": "Hervatten…",
   "action.resumingMatching": "Automatisch koppelen hervatten…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Kon de status van automatisch wisselen niet bevestigen.",
   "error.editsBeforeCommand": "Sla je wijzigingen op of verwerp ze voordat je een profielopdracht bewerkt.",
   "error.editsBeforeDelete": "Sla je wijzigingen op of verwerp ze voordat je een profiel verwijdert.",
+  "error.editsBeforeRename": "Sla je wijzigingen op of verwijder ze voordat je een profiel hernoemt.",
   "error.editsBeforeUse": "Sla je wijzigingen op of verwerp ze voordat je een ander profiel gebruikt.",
   "error.invalidEditor": "hyprmoncfg gaf een ongeldige editorstatus terug.",
   "error.invalidIpc": "hyprmoncfg gaf een ongeldig IPC-bericht terug.",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · beste match",
   "profile.notManaged": "(niet beheerd)",
   "profile.otherSetup": "Andere opstelling",
+  "profile.renameTitle": "“%1” hernoemen",
   "profile.savedCount": {
     "one": "%1 opgeslagen",
     "other": "%1 opgeslagen"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "SDR-witniveau herstellen naar de waarde opgeslagen in %1",
   "reset.vrr": "VRR-modus herstellen naar de waarde opgeslagen in %1",
   "reset.wcg": "Ondersteuning voor breed kleurengamma herstellen naar de waarde opgeslagen in %1",
+  "rotation.calibrateHint": "Houd het apparaat eerst rechtop",
   "rotation.locked": "Vergrendeld",
   "rotation.upright": "Rechtop %1",
   "rotation.uprightFlipped": "Rechtop gespiegeld %1",

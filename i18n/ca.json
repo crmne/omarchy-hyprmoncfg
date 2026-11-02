@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Calibra",
   "action.cancel": "Cancel·la",
   "action.close": "Tanca",
   "action.createProfile": "Crea un perfil",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Mantén i desa",
   "action.preview": "Previsualitza",
   "action.previewAndSave": "Previsualitza i desa",
+  "action.rename": "Canvia el nom",
+  "action.renameMenu": "Canvia el nom…",
   "action.resumeMatching": "Reprèn la selecció automàtica",
   "action.resuming": "S'està reprenent…",
   "action.resumingMatching": "S'està reprenent la selecció automàtica…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "No s'ha pogut confirmar l'estat del canvi automàtic.",
   "error.editsBeforeCommand": "Desa o descarta les edicions abans d'editar l'ordre d'un perfil.",
   "error.editsBeforeDelete": "Desa o descarta les edicions abans de suprimir un perfil.",
+  "error.editsBeforeRename": "Deseu o descarteu els canvis abans de canviar el nom d’un perfil.",
   "error.editsBeforeUse": "Desa o descarta les edicions abans d'usar un altre perfil.",
   "error.invalidEditor": "hyprmoncfg ha retornat un estat de l'editor no vàlid.",
   "error.invalidIpc": "hyprmoncfg ha retornat un missatge IPC no vàlid.",
@@ -343,6 +347,7 @@
   "profile.nameBestMatch": "%1 · millor opció",
   "profile.notManaged": "(sense gestionar)",
   "profile.otherSetup": "Una altra configuració",
+  "profile.renameTitle": "Canvia el nom de «%1»",
   "profile.savedCount": {
     "one": "%1 desada",
     "many": "%1 de desades",
@@ -371,6 +376,7 @@
   "reset.sdrWhite": "Restableix el nivell de blanc SDR al valor desat a %1",
   "reset.vrr": "Restableix el mode VRR al valor desat a %1",
   "reset.wcg": "Restableix la capacitat de gamma àmplia al valor desat a %1",
+  "rotation.calibrateHint": "Primer manteniu el dispositiu dret",
   "rotation.locked": "Bloquejada",
   "rotation.upright": "Vertical %1",
   "rotation.uprightFlipped": "Vertical invertida %1",

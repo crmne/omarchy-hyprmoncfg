@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "कैलिब्रेट करें",
   "action.cancel": "रद्द करें",
   "action.close": "बंद करें",
   "action.createProfile": "प्रोफ़ाइल बनाएं",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "रखें और सहेजें",
   "action.preview": "पूर्वावलोकन",
   "action.previewAndSave": "पूर्वावलोकन और सहेजें",
+  "action.rename": "नाम बदलें",
+  "action.renameMenu": "नाम बदलें…",
   "action.resumeMatching": "स्वचालित मिलान फिर शुरू करें",
   "action.resuming": "फिर शुरू हो रहा है…",
   "action.resumingMatching": "स्वचालित मिलान फिर शुरू हो रहा है…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "स्वचालित स्विचिंग की स्थिति की पुष्टि नहीं हो सकी.",
   "error.editsBeforeCommand": "प्रोफ़ाइल कमांड संपादित करने से पहले अपने बदलाव सहेजें या छोड़ें.",
   "error.editsBeforeDelete": "प्रोफ़ाइल हटाने से पहले अपने बदलाव सहेजें या छोड़ें.",
+  "error.editsBeforeRename": "प्रोफ़ाइल का नाम बदलने से पहले अपने बदलाव सहेजें या छोड़ दें।",
   "error.editsBeforeUse": "दूसरी प्रोफ़ाइल चुनने से पहले अपने बदलाव सहेजें या छोड़ें.",
   "error.invalidEditor": "hyprmoncfg ने अमान्य एडिटर स्थिति लौटाई.",
   "error.invalidIpc": "hyprmoncfg ने अमान्य IPC संदेश लौटाया.",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · सर्वोत्तम मिलान",
   "profile.notManaged": "(प्रबंधित नहीं)",
   "profile.otherSetup": "अन्य सेटअप",
+  "profile.renameTitle": "“%1” का नाम बदलें",
   "profile.savedCount": {
     "one": "%1 सहेजा गया",
     "other": "%1 सहेजे गए"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "SDR व्हाइट लेवल को %1 में सहेजे गए मान पर रीसेट करें",
   "reset.vrr": "VRR मोड को %1 में सहेजे गए मान पर रीसेट करें",
   "reset.wcg": "वाइड कलर गैमट क्षमता को %1 में सहेजे गए मान पर रीसेट करें",
+  "rotation.calibrateHint": "पहले डिवाइस को सीधा रखें",
   "rotation.locked": "लॉक",
   "rotation.upright": "सीधा %1",
   "rotation.uprightFlipped": "सीधा पलटा हुआ %1",

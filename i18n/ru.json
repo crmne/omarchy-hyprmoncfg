@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Откалибровать",
   "action.cancel": "Отмена",
   "action.close": "Закрыть",
   "action.createProfile": "Создать профиль",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Оставить и сохранить",
   "action.preview": "Просмотр",
   "action.previewAndSave": "Просмотр и сохранение",
+  "action.rename": "Переименовать",
+  "action.renameMenu": "Переименовать…",
   "action.resumeMatching": "Возобновить автоподбор",
   "action.resuming": "Возобновление…",
   "action.resumingMatching": "Возобновление автоподбора…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Не удалось подтвердить состояние автопереключения.",
   "error.editsBeforeCommand": "Сохраните или отбросьте изменения, прежде чем менять команду профиля.",
   "error.editsBeforeDelete": "Сохраните или отбросьте изменения, прежде чем удалять профиль.",
+  "error.editsBeforeRename": "Сохраните или отмените изменения перед переименованием профиля.",
   "error.editsBeforeUse": "Сохраните или отбросьте изменения, прежде чем использовать другой профиль.",
   "error.invalidEditor": "hyprmoncfg вернул недопустимое состояние редактора.",
   "error.invalidIpc": "hyprmoncfg вернул недопустимое сообщение IPC.",
@@ -356,6 +360,7 @@
   "profile.nameBestMatch": "%1 · лучшее совпадение",
   "profile.notManaged": "(не управляется)",
   "profile.otherSetup": "Другая конфигурация",
+  "profile.renameTitle": "Переименовать «%1»",
   "profile.savedCount": {
     "one": "%1 сохранён",
     "few": "%1 сохранено",
@@ -385,6 +390,7 @@
   "reset.sdrWhite": "Сбросить уровень белого SDR до значения, сохранённого в %1",
   "reset.vrr": "Сбросить режим VRR до значения, сохранённого в %1",
   "reset.wcg": "Сбросить поддержку широкого цветового охвата до значения, сохранённого в %1",
+  "rotation.calibrateHint": "Сначала держите устройство вертикально",
   "rotation.locked": "Заблокирован",
   "rotation.upright": "Вертикально %1",
   "rotation.uprightFlipped": "Вертикально с отражением %1",

@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Kalibrovať",
   "action.cancel": "Zrušiť",
   "action.close": "Zavrieť",
   "action.createProfile": "Vytvoriť profil",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Ponechať a uložiť",
   "action.preview": "Náhľad",
   "action.previewAndSave": "Náhľad a uložiť",
+  "action.rename": "Premenovať",
+  "action.renameMenu": "Premenovať…",
   "action.resumeMatching": "Obnoviť automatické párovanie",
   "action.resuming": "Obnovuje sa…",
   "action.resumingMatching": "Obnovuje sa automatické párovanie…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Stav automatického prepínania sa nepodarilo potvrdiť.",
   "error.editsBeforeCommand": "Pred úpravou príkazu profilu uložte alebo zahoďte svoje úpravy.",
   "error.editsBeforeDelete": "Pred zmazaním profilu uložte alebo zahoďte svoje úpravy.",
+  "error.editsBeforeRename": "Pred premenovaním profilu uložte alebo zahoďte zmeny.",
   "error.editsBeforeUse": "Pred použitím iného profilu uložte alebo zahoďte svoje úpravy.",
   "error.invalidEditor": "hyprmoncfg vrátil neplatný stav editora.",
   "error.invalidIpc": "hyprmoncfg vrátil neplatnú správu IPC.",
@@ -343,6 +347,7 @@
   "profile.nameBestMatch": "%1 · najlepšia zhoda",
   "profile.notManaged": "(nespravované)",
   "profile.otherSetup": "Iné nastavenie",
+  "profile.renameTitle": "Premenovať „%1“",
   "profile.savedCount": {
     "one": "%1 uložený",
     "few": "%1 uložené",
@@ -371,6 +376,7 @@
   "reset.sdrWhite": "Obnoviť úroveň bielej SDR na hodnotu uloženú v: %1",
   "reset.vrr": "Obnoviť režim VRR na hodnotu uloženú v: %1",
   "reset.wcg": "Obnoviť podporu širokého farebného gamutu na hodnotu uloženú v: %1",
+  "rotation.calibrateHint": "Najprv držte zariadenie zvisle",
   "rotation.locked": "Uzamknuté",
   "rotation.upright": "Vzpriamene %1",
   "rotation.uprightFlipped": "Vzpriamene prevrátene %1",

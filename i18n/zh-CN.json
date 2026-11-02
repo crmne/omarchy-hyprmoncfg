@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "校准",
   "action.cancel": "取消",
   "action.close": "关闭",
   "action.createProfile": "创建配置文件",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "保留并保存",
   "action.preview": "预览",
   "action.previewAndSave": "预览并保存",
+  "action.rename": "重命名",
+  "action.renameMenu": "重命名…",
   "action.resumeMatching": "恢复自动匹配",
   "action.resuming": "正在恢复…",
   "action.resumingMatching": "正在恢复自动匹配…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "无法确认自动切换状态。",
   "error.editsBeforeCommand": "请先保存或放弃所做的编辑，再编辑配置文件命令。",
   "error.editsBeforeDelete": "请先保存或放弃所做的编辑，再删除配置文件。",
+  "error.editsBeforeRename": "重命名配置文件前，请先保存或放弃所做的编辑。",
   "error.editsBeforeUse": "请先保存或放弃所做的编辑，再使用其他配置文件。",
   "error.invalidEditor": "hyprmoncfg 返回了无效的编辑器状态。",
   "error.invalidIpc": "hyprmoncfg 返回了无效的 IPC 消息。",
@@ -317,6 +321,7 @@
   "profile.nameBestMatch": "%1 · 最佳匹配",
   "profile.notManaged": "（未管理）",
   "profile.otherSetup": "其他设置",
+  "profile.renameTitle": "重命名“%1”",
   "profile.savedCount": {
     "other": "%1 台已保存"
   },
@@ -343,6 +348,7 @@
   "reset.sdrWhite": "将 SDR 白位重置为 %1 中保存的值",
   "reset.vrr": "将 VRR 模式重置为 %1 中保存的值",
   "reset.wcg": "将广色域功能重置为 %1 中保存的值",
+  "rotation.calibrateHint": "请先将设备竖直放置",
   "rotation.locked": "已锁定",
   "rotation.upright": "直立方向 %1",
   "rotation.uprightFlipped": "直立方向已翻转 %1",

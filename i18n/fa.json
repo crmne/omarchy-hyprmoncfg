@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "واسنجی",
   "action.cancel": "لغو",
   "action.close": "بستن",
   "action.createProfile": "ساخت پروفایل",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "نگه‌داشتن و ذخیره",
   "action.preview": "پیش‌نمایش",
   "action.previewAndSave": "پیش‌نمایش و ذخیره",
+  "action.rename": "تغییر نام",
+  "action.renameMenu": "تغییر نام…",
   "action.resumeMatching": "ازسرگیری تطبیق خودکار",
   "action.resuming": "در حال ازسرگیری…",
   "action.resumingMatching": "در حال ازسرگیری تطبیق خودکار…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "وضعیت تعویض خودکار تأیید نشد.",
   "error.editsBeforeCommand": "پیش از ویرایش فرمان پروفایل، ویرایش‌های خود را ذخیره کنید یا دور بیندازید.",
   "error.editsBeforeDelete": "پیش از حذف پروفایل، ویرایش‌های خود را ذخیره کنید یا دور بیندازید.",
+  "error.editsBeforeRename": "پیش از تغییر نام نمایه، ویرایش‌ها را ذخیره کنید یا کنار بگذارید.",
   "error.editsBeforeUse": "پیش از استفاده از پروفایل دیگر، ویرایش‌های خود را ذخیره کنید یا دور بیندازید.",
   "error.invalidEditor": "hyprmoncfg وضعیت ویرایشگر نامعتبری برگرداند.",
   "error.invalidIpc": "hyprmoncfg پیام IPC نامعتبری برگرداند.",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · بهترین تطابق",
   "profile.notManaged": "(مدیریت‌نشده)",
   "profile.otherSetup": "پیکربندی دیگر",
+  "profile.renameTitle": "تغییر نام «%1»",
   "profile.savedCount": {
     "one": "%1 ذخیره‌شده",
     "other": "%1 ذخیره‌شده"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "بازنشانی سطح سفید SDR به مقدار ذخیره‌شده در %1",
   "reset.vrr": "بازنشانی حالت VRR به مقدار ذخیره‌شده در %1",
   "reset.wcg": "بازنشانی قابلیت گسترهٔ رنگی وسیع به مقدار ذخیره‌شده در %1",
+  "rotation.calibrateHint": "ابتدا دستگاه را عمودی نگه دارید",
   "rotation.locked": "قفل‌شده",
   "rotation.upright": "ایستاده %1",
   "rotation.uprightFlipped": "ایستادهٔ وارونه %1",

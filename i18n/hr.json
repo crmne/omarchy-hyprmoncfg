@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Kalibriraj",
   "action.cancel": "Odustani",
   "action.close": "Zatvori",
   "action.createProfile": "Stvori profil",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Zadrži i spremi",
   "action.preview": "Pregled",
   "action.previewAndSave": "Pregledaj i spremi",
+  "action.rename": "Preimenuj",
+  "action.renameMenu": "Preimenuj…",
   "action.resumeMatching": "Nastavi automatsko uparivanje",
   "action.resuming": "Nastavljanje…",
   "action.resumingMatching": "Nastavljanje automatskog uparivanja…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Nije moguće potvrditi stanje automatskog prebacivanja.",
   "error.editsBeforeCommand": "Spremite ili odbacite izmjene prije uređivanja naredbe profila.",
   "error.editsBeforeDelete": "Spremite ili odbacite izmjene prije brisanja profila.",
+  "error.editsBeforeRename": "Spremite ili odbacite promjene prije preimenovanja profila.",
   "error.editsBeforeUse": "Spremite ili odbacite izmjene prije korištenja drugog profila.",
   "error.invalidEditor": "hyprmoncfg je vratio nevaljano stanje uređivača.",
   "error.invalidIpc": "hyprmoncfg je vratio nevaljanu IPC poruku.",
@@ -343,6 +347,7 @@
   "profile.nameBestMatch": "%1 · najbolje podudaranje",
   "profile.notManaged": "(bez upravljanja)",
   "profile.otherSetup": "Druga postava",
+  "profile.renameTitle": "Preimenuj „%1”",
   "profile.savedCount": {
     "one": "%1 spremljen",
     "few": "%1 spremljena",
@@ -371,6 +376,7 @@
   "reset.sdrWhite": "Vrati SDR razinu bijele na vrijednost spremljenu u %1",
   "reset.vrr": "Vrati VRR način na vrijednost spremljenu u %1",
   "reset.wcg": "Vrati podršku za širok raspon boja na vrijednost spremljenu u %1",
+  "rotation.calibrateHint": "Najprije držite uređaj uspravno",
   "rotation.locked": "Zaključano",
   "rotation.upright": "Uspravno %1",
   "rotation.uprightFlipped": "Uspravno okrenuto %1",

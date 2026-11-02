@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Kalibrēt",
   "action.cancel": "Atcelt",
   "action.close": "Aizvērt",
   "action.createProfile": "Izveidot profilu",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Paturēt un saglabāt",
   "action.preview": "Priekšskatīt",
   "action.previewAndSave": "Priekšskatīt un saglabāt",
+  "action.rename": "Pārdēvēt",
+  "action.renameMenu": "Pārdēvēt…",
   "action.resumeMatching": "Atsākt automātisko saskaņošanu",
   "action.resuming": "Atsāk…",
   "action.resumingMatching": "Atsāk automātisko saskaņošanu…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Neizdevās apstiprināt automātiskās pārslēgšanās stāvokli.",
   "error.editsBeforeCommand": "Pirms profila komandas rediģēšanas saglabājiet vai atmetiet izmaiņas.",
   "error.editsBeforeDelete": "Pirms profila dzēšanas saglabājiet vai atmetiet izmaiņas.",
+  "error.editsBeforeRename": "Pirms profila pārdēvēšanas saglabājiet vai atmetiet izmaiņas.",
   "error.editsBeforeUse": "Pirms cita profila lietošanas saglabājiet vai atmetiet izmaiņas.",
   "error.invalidEditor": "hyprmoncfg atgrieza nederīgu redaktora stāvokli.",
   "error.invalidIpc": "hyprmoncfg atgrieza nederīgu IPC ziņojumu.",
@@ -343,6 +347,7 @@
   "profile.nameBestMatch": "%1 · labākā atbilstība",
   "profile.notManaged": "(nepārvalda)",
   "profile.otherSetup": "Cits iestatījums",
+  "profile.renameTitle": "Pārdēvēt “%1”",
   "profile.savedCount": {
     "zero": "%1 saglabāti",
     "one": "%1 saglabāts",
@@ -371,6 +376,7 @@
   "reset.sdrWhite": "Atiestatīt SDR baltā līmeni uz vērtību, kas saglabāta šeit: %1",
   "reset.vrr": "Atiestatīt VRR režīmu uz vērtību, kas saglabāta šeit: %1",
   "reset.wcg": "Atiestatīt plašas krāsu gammas atbalstu uz vērtību, kas saglabāta šeit: %1",
+  "rotation.calibrateHint": "Vispirms turiet ierīci vertikāli",
   "rotation.locked": "Bloķēts",
   "rotation.upright": "Stāvus %1",
   "rotation.uprightFlipped": "Stāvus, apgriezts %1",

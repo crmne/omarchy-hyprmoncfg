@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Calibrate",
   "action.cancel": "Cancel",
   "action.close": "Close",
   "action.createProfile": "Create profile",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Keep & save",
   "action.preview": "Preview",
   "action.previewAndSave": "Preview & save",
+  "action.rename": "Rename",
+  "action.renameMenu": "Rename…",
   "action.resumeMatching": "Resume automatic matching",
   "action.resuming": "Resuming…",
   "action.resumingMatching": "Resuming automatic matching…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Could not confirm the automatic switching state.",
   "error.editsBeforeCommand": "Save or discard your edits before editing a profile command.",
   "error.editsBeforeDelete": "Save or discard your edits before deleting a profile.",
+  "error.editsBeforeRename": "Save or discard your edits before renaming a profile.",
   "error.editsBeforeUse": "Save or discard your edits before using another profile.",
   "error.invalidEditor": "hyprmoncfg returned an invalid editor state.",
   "error.invalidIpc": "hyprmoncfg returned an invalid IPC message.",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · best match",
   "profile.notManaged": "(not managed)",
   "profile.otherSetup": "Other setup",
+  "profile.renameTitle": "Rename “%1”",
   "profile.savedCount": {
     "one": "%1 saved",
     "other": "%1 saved"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "Reset SDR white level to the value saved in %1",
   "reset.vrr": "Reset VRR mode to the value saved in %1",
   "reset.wcg": "Reset wide-color-gamut capability to the value saved in %1",
+  "rotation.calibrateHint": "Hold the device upright first",
   "rotation.locked": "Locked",
   "rotation.upright": "Upright %1",
   "rotation.uprightFlipped": "Upright flipped %1",

@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "ปรับเทียบ",
   "action.cancel": "ยกเลิก",
   "action.close": "ปิด",
   "action.createProfile": "สร้างโปรไฟล์",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "เก็บไว้และบันทึก",
   "action.preview": "ดูตัวอย่าง",
   "action.previewAndSave": "ดูตัวอย่างและบันทึก",
+  "action.rename": "เปลี่ยนชื่อ",
+  "action.renameMenu": "เปลี่ยนชื่อ…",
   "action.resumeMatching": "จับคู่อัตโนมัติต่อ",
   "action.resuming": "กำลังทำต่อ…",
   "action.resumingMatching": "กำลังกลับมาจับคู่อัตโนมัติ…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "ยืนยันสถานะการสลับอัตโนมัติไม่ได้",
   "error.editsBeforeCommand": "บันทึกหรือทิ้งการแก้ไขก่อนแก้ไขคำสั่งของโปรไฟล์",
   "error.editsBeforeDelete": "บันทึกหรือทิ้งการแก้ไขก่อนลบโปรไฟล์",
+  "error.editsBeforeRename": "บันทึกหรือละทิ้งการแก้ไขก่อนเปลี่ยนชื่อโปรไฟล์",
   "error.editsBeforeUse": "บันทึกหรือทิ้งการแก้ไขก่อนใช้โปรไฟล์อื่น",
   "error.invalidEditor": "hyprmoncfg ส่งสถานะตัวแก้ไขที่ไม่ถูกต้องกลับมา",
   "error.invalidIpc": "hyprmoncfg ส่งข้อความ IPC ที่ไม่ถูกต้องกลับมา",
@@ -317,6 +321,7 @@
   "profile.nameBestMatch": "%1 · ตรงที่สุด",
   "profile.notManaged": "(ไม่ได้จัดการ)",
   "profile.otherSetup": "การตั้งค่าอื่น",
+  "profile.renameTitle": "เปลี่ยนชื่อ “%1”",
   "profile.savedCount": {
     "other": "บันทึก %1"
   },
@@ -343,6 +348,7 @@
   "reset.sdrWhite": "รีเซ็ตระดับขาว SDR เป็นค่าที่บันทึกไว้ใน %1",
   "reset.vrr": "รีเซ็ตโหมด VRR เป็นค่าที่บันทึกไว้ใน %1",
   "reset.wcg": "รีเซ็ตความสามารถขอบเขตสีกว้างเป็นค่าที่บันทึกไว้ใน %1",
+  "rotation.calibrateHint": "ตั้งอุปกรณ์ให้ตรงก่อน",
   "rotation.locked": "ล็อกแล้ว",
   "rotation.upright": "แนวตั้งตรง %1",
   "rotation.uprightFlipped": "แนวตั้งตรงแบบพลิก %1",

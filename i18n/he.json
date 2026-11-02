@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "כיול",
   "action.cancel": "ביטול",
   "action.close": "סגירה",
   "action.createProfile": "יצירת פרופיל",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "השארה ושמירה",
   "action.preview": "תצוגה מקדימה",
   "action.previewAndSave": "תצוגה מקדימה ושמירה",
+  "action.rename": "שינוי שם",
+  "action.renameMenu": "שינוי שם…",
   "action.resumeMatching": "חידוש התאמה אוטומטית",
   "action.resuming": "מחדש…",
   "action.resumingMatching": "מחדש התאמה אוטומטית…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "לא ניתן לאשר את מצב המעבר האוטומטי.",
   "error.editsBeforeCommand": "שמרו או השליכו את העריכות לפני עריכת פקודת פרופיל.",
   "error.editsBeforeDelete": "שמרו או השליכו את העריכות לפני מחיקת פרופיל.",
+  "error.editsBeforeRename": "יש לשמור או לבטל את השינויים לפני שינוי שם של פרופיל.",
   "error.editsBeforeUse": "שמרו או השליכו את העריכות לפני שימוש בפרופיל אחר.",
   "error.invalidEditor": "hyprmoncfg החזיר מצב עורך לא תקין.",
   "error.invalidIpc": "hyprmoncfg החזיר הודעת IPC לא תקינה.",
@@ -343,6 +347,7 @@
   "profile.nameBestMatch": "%1 · ההתאמה הטובה ביותר",
   "profile.notManaged": "(לא מנוהל)",
   "profile.otherSetup": "הגדרה אחרת",
+  "profile.renameTitle": "שינוי השם של “%1”",
   "profile.savedCount": {
     "one": "%1 שמורה",
     "two": "%1 שמורות",
@@ -371,6 +376,7 @@
   "reset.sdrWhite": "איפוס רמת הלבן של SDR לערך שנשמר עבור %1",
   "reset.vrr": "איפוס מצב VRR לערך שנשמר עבור %1",
   "reset.wcg": "איפוס יכולת מכלול הצבעים הרחב לערך שנשמר עבור %1",
+  "rotation.calibrateHint": "יש להחזיק תחילה את המכשיר זקוף",
   "rotation.locked": "נעול",
   "rotation.upright": "זקוף %1",
   "rotation.uprightFlipped": "זקוף הפוך %1",

@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Kvarða",
   "action.cancel": "Hætta við",
   "action.close": "Loka",
   "action.createProfile": "Búa til snið",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Halda og vista",
   "action.preview": "Forskoða",
   "action.previewAndSave": "Forskoða og vista",
+  "action.rename": "Endurnefna",
+  "action.renameMenu": "Endurnefna…",
   "action.resumeMatching": "Halda áfram sjálfvirkri pörun",
   "action.resuming": "Held áfram…",
   "action.resumingMatching": "Held áfram sjálfvirkri pörun…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Ekki tókst að staðfesta stöðu sjálfvirkra skipta.",
   "error.editsBeforeCommand": "Vistaðu eða hentu breytingunum áður en þú breytir skipun sniðs.",
   "error.editsBeforeDelete": "Vistaðu eða hentu breytingunum áður en þú eyðir sniði.",
+  "error.editsBeforeRename": "Vistaðu eða fleygðu breytingum áður en þú endurnefnir snið.",
   "error.editsBeforeUse": "Vistaðu eða hentu breytingunum áður en þú notar annað snið.",
   "error.invalidEditor": "hyprmoncfg skilaði ógildri stöðu ritils.",
   "error.invalidIpc": "hyprmoncfg skilaði ógildum IPC-skilaboðum.",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · besta samsvörun",
   "profile.notManaged": "(ekki stjórnað)",
   "profile.otherSetup": "Önnur uppsetning",
+  "profile.renameTitle": "Endurnefna „%1“",
   "profile.savedCount": {
     "one": "%1 vistaður",
     "other": "%1 vistaðir"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "Endurstilla SDR-hvítstig í gildið sem er vistað í %1",
   "reset.vrr": "Endurstilla VRR-ham í gildið sem er vistað í %1",
   "reset.wcg": "Endurstilla getu fyrir breitt litasvið í gildið sem er vistað í %1",
+  "rotation.calibrateHint": "Haltu tækinu fyrst uppréttu",
   "rotation.locked": "Læst",
   "rotation.upright": "Upprétt %1",
   "rotation.uprightFlipped": "Upprétt speglað %1",

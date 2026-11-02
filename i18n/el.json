@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Βαθμονόμηση",
   "action.cancel": "Άκυρο",
   "action.close": "Κλείσιμο",
   "action.createProfile": "Δημιουργία προφίλ",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Διατήρηση & αποθήκευση",
   "action.preview": "Προεπισκόπηση",
   "action.previewAndSave": "Προεπισκόπηση & αποθήκευση",
+  "action.rename": "Μετονομασία",
+  "action.renameMenu": "Μετονομασία…",
   "action.resumeMatching": "Συνέχιση αυτόματης αντιστοίχισης",
   "action.resuming": "Συνέχιση…",
   "action.resumingMatching": "Συνέχιση αυτόματης αντιστοίχισης…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Δεν ήταν δυνατή η επιβεβαίωση της κατάστασης αυτόματης εναλλαγής.",
   "error.editsBeforeCommand": "Αποθήκευσε ή απόρριψε τις αλλαγές πριν επεξεργαστείς εντολή προφίλ.",
   "error.editsBeforeDelete": "Αποθήκευσε ή απόρριψε τις αλλαγές πριν διαγράψεις προφίλ.",
+  "error.editsBeforeRename": "Αποθηκεύστε ή απορρίψτε τις αλλαγές πριν μετονομάσετε ένα προφίλ.",
   "error.editsBeforeUse": "Αποθήκευσε ή απόρριψε τις αλλαγές πριν χρησιμοποιήσεις άλλο προφίλ.",
   "error.invalidEditor": "Το hyprmoncfg επέστρεψε μη έγκυρη κατάσταση επεξεργαστή.",
   "error.invalidIpc": "Το hyprmoncfg επέστρεψε μη έγκυρο μήνυμα IPC.",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · καλύτερη αντιστοιχία",
   "profile.notManaged": "(χωρίς διαχείριση)",
   "profile.otherSetup": "Άλλη διαμόρφωση",
+  "profile.renameTitle": "Μετονομασία «%1»",
   "profile.savedCount": {
     "one": "%1 αποθηκευμένη",
     "other": "%1 αποθηκευμένες"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "Επαναφορά επιπέδου λευκού SDR στην αποθηκευμένη τιμή από: %1",
   "reset.vrr": "Επαναφορά λειτουργίας VRR στην αποθηκευμένη τιμή από: %1",
   "reset.wcg": "Επαναφορά υποστήριξης ευρείας χρωματικής γκάμας στην αποθηκευμένη τιμή από: %1",
+  "rotation.calibrateHint": "Κρατήστε πρώτα τη συσκευή όρθια",
   "rotation.locked": "Κλειδωμένη",
   "rotation.upright": "Όρθια %1",
   "rotation.uprightFlipped": "Όρθια αντεστραμμένη %1",

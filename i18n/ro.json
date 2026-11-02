@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Calibrează",
   "action.cancel": "Anulează",
   "action.close": "Închide",
   "action.createProfile": "Creează profil",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Păstrează și salvează",
   "action.preview": "Previzualizează",
   "action.previewAndSave": "Previzualizează și salvează",
+  "action.rename": "Redenumește",
+  "action.renameMenu": "Redenumește…",
   "action.resumeMatching": "Reia potrivirea automată",
   "action.resuming": "Se reia…",
   "action.resumingMatching": "Se reia potrivirea automată…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Starea comutării automate nu a putut fi confirmată.",
   "error.editsBeforeCommand": "Salvează sau renunță la modificări înainte de a edita comanda unui profil.",
   "error.editsBeforeDelete": "Salvează sau renunță la modificări înainte de a șterge un profil.",
+  "error.editsBeforeRename": "Salvează sau renunță la modificări înainte de a redenumi un profil.",
   "error.editsBeforeUse": "Salvează sau renunță la modificări înainte de a folosi alt profil.",
   "error.invalidEditor": "hyprmoncfg a returnat o stare invalidă a editorului.",
   "error.invalidIpc": "hyprmoncfg a returnat un mesaj IPC invalid.",
@@ -343,6 +347,7 @@
   "profile.nameBestMatch": "%1 · cea mai bună potrivire",
   "profile.notManaged": "(negestionat)",
   "profile.otherSetup": "Altă configurație",
+  "profile.renameTitle": "Redenumește „%1”",
   "profile.savedCount": {
     "one": "%1 salvat",
     "few": "%1 salvate",
@@ -371,6 +376,7 @@
   "reset.sdrWhite": "Resetează nivelul de alb SDR la valoarea salvată în %1",
   "reset.vrr": "Resetează modul VRR la valoarea salvată în %1",
   "reset.wcg": "Resetează capacitatea de gamă largă la valoarea salvată în %1",
+  "rotation.calibrateHint": "Ține mai întâi dispozitivul în poziție verticală",
   "rotation.locked": "Blocată",
   "rotation.upright": "Vertical %1",
   "rotation.uprightFlipped": "Vertical oglindit %1",

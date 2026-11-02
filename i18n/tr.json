@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Kalibre et",
   "action.cancel": "İptal",
   "action.close": "Kapat",
   "action.createProfile": "Profil oluştur",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Koru ve kaydet",
   "action.preview": "Önizle",
   "action.previewAndSave": "Önizle ve kaydet",
+  "action.rename": "Yeniden adlandır",
+  "action.renameMenu": "Yeniden adlandır…",
   "action.resumeMatching": "Otomatik eşleştirmeyi sürdür",
   "action.resuming": "Sürdürülüyor…",
   "action.resumingMatching": "Otomatik eşleştirme sürdürülüyor…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Otomatik geçiş durumu doğrulanamadı.",
   "error.editsBeforeCommand": "Profil komutunu düzenlemeden önce değişikliklerinizi kaydedin veya yok sayın.",
   "error.editsBeforeDelete": "Profil silmeden önce değişikliklerinizi kaydedin veya yok sayın.",
+  "error.editsBeforeRename": "Bir profili yeniden adlandırmadan önce değişikliklerinizi kaydedin veya atın.",
   "error.editsBeforeUse": "Başka bir profil kullanmadan önce değişikliklerinizi kaydedin veya yok sayın.",
   "error.invalidEditor": "hyprmoncfg geçersiz bir düzenleyici durumu döndürdü.",
   "error.invalidIpc": "hyprmoncfg geçersiz bir IPC mesajı döndürdü.",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · en iyi eşleşme",
   "profile.notManaged": "(yönetilmiyor)",
   "profile.otherSetup": "Diğer kurulum",
+  "profile.renameTitle": "“%1” adını değiştir",
   "profile.savedCount": {
     "one": "%1 kayıtlı",
     "other": "%1 kayıtlı"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "SDR beyaz seviyesini %1 içinde kayıtlı değere sıfırla",
   "reset.vrr": "VRR modunu %1 içinde kayıtlı değere sıfırla",
   "reset.wcg": "Geniş renk gamı yeteneğini %1 içinde kayıtlı değere sıfırla",
+  "rotation.calibrateHint": "Önce cihazı dik tutun",
   "rotation.locked": "Kilitli",
   "rotation.upright": "Dik %1",
   "rotation.uprightFlipped": "Dik çevrilmiş %1",

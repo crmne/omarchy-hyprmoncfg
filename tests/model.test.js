@@ -2448,3 +2448,11 @@ test('workspace switching from the planner is direct and blocked during drafts o
   switchWorkspace(5)
   assert.deepEqual(calls,[])
 })
+
+test("the panel offers Rename and Calibrate only to a daemon that supports them", () => {
+  const panel = require("node:fs").readFileSync(require("node:path").join(__dirname, "..", "Panel.qml"), "utf8")
+  assert.match(panel, /root\.document\.daemon\.rename_supported === true/)
+  assert.match(panel, /root\.renameSupported \? \[\{ id: "rename"/)
+  assert.match(panel, /root\.rotation\.calibration_supported === true/)
+  assert.match(panel, /send\("rename_profile", \{ name: name, new_name: next \}/)
+})

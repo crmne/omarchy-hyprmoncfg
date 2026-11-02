@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Kalibrieren",
   "action.cancel": "Abbrechen",
   "action.close": "Schließen",
   "action.createProfile": "Profil erstellen",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Behalten & speichern",
   "action.preview": "Vorschau",
   "action.previewAndSave": "Vorschau & speichern",
+  "action.rename": "Umbenennen",
+  "action.renameMenu": "Umbenennen…",
   "action.resumeMatching": "Automatische Zuordnung fortsetzen",
   "action.resuming": "Wird fortgesetzt…",
   "action.resumingMatching": "Automatische Zuordnung wird fortgesetzt…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Der Status des automatischen Wechsels konnte nicht bestätigt werden.",
   "error.editsBeforeCommand": "Speichere oder verwirf deine Änderungen, bevor du einen Profilbefehl bearbeitest.",
   "error.editsBeforeDelete": "Speichere oder verwirf deine Änderungen, bevor du ein Profil löschst.",
+  "error.editsBeforeRename": "Speichere oder verwirf deine Änderungen, bevor du ein Profil umbenennst.",
   "error.editsBeforeUse": "Speichere oder verwirf deine Änderungen, bevor du ein anderes Profil verwendest.",
   "error.invalidEditor": "hyprmoncfg hat einen ungültigen Editor-Zustand zurückgegeben.",
   "error.invalidIpc": "hyprmoncfg hat eine ungültige IPC-Nachricht zurückgegeben.",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · bester Treffer",
   "profile.notManaged": "(nicht verwaltet)",
   "profile.otherSetup": "Anderes Setup",
+  "profile.renameTitle": "„%1“ umbenennen",
   "profile.savedCount": {
     "one": "%1 gespeichert",
     "other": "%1 gespeichert"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "SDR-Weißwert auf den in %1 gespeicherten Wert zurücksetzen",
   "reset.vrr": "VRR-Modus auf den in %1 gespeicherten Wert zurücksetzen",
   "reset.wcg": "Fähigkeit für großen Farbraum auf den in %1 gespeicherten Wert zurücksetzen",
+  "rotation.calibrateHint": "Halte das Gerät zuerst aufrecht",
   "rotation.locked": "Gesperrt",
   "rotation.upright": "Aufrecht %1",
   "rotation.uprightFlipped": "Aufrecht gespiegelt %1",

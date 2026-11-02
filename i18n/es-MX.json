@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Calibrar",
   "action.cancel": "Cancelar",
   "action.close": "Cerrar",
   "action.createProfile": "Crear perfil",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Mantener y guardar",
   "action.preview": "Vista previa",
   "action.previewAndSave": "Previsualizar y guardar",
+  "action.rename": "Cambiar nombre",
+  "action.renameMenu": "Cambiar nombre…",
   "action.resumeMatching": "Reanudar la selección automática",
   "action.resuming": "Reanudando…",
   "action.resumingMatching": "Reanudando la selección automática…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "No se pudo confirmar el estado del cambio automático.",
   "error.editsBeforeCommand": "Guarda o descarta tus ediciones antes de editar el comando de un perfil.",
   "error.editsBeforeDelete": "Guarda o descarta tus ediciones antes de eliminar un perfil.",
+  "error.editsBeforeRename": "Guarda o descarta tus cambios antes de cambiar el nombre de un perfil.",
   "error.editsBeforeUse": "Guarda o descarta tus ediciones antes de usar otro perfil.",
   "error.invalidEditor": "hyprmoncfg devolvió un estado de editor no válido.",
   "error.invalidIpc": "hyprmoncfg devolvió un mensaje IPC no válido.",
@@ -343,6 +347,7 @@
   "profile.nameBestMatch": "%1 · mejor opción",
   "profile.notManaged": "(sin administrar)",
   "profile.otherSetup": "Otra configuración",
+  "profile.renameTitle": "Cambiar nombre de “%1”",
   "profile.savedCount": {
     "one": "%1 guardada",
     "many": "%1 de guardadas",
@@ -371,6 +376,7 @@
   "reset.sdrWhite": "Restablecer el nivel de blanco SDR al valor guardado en %1",
   "reset.vrr": "Restablecer el modo VRR al valor guardado en %1",
   "reset.wcg": "Restablecer la capacidad de gama amplia al valor guardado en %1",
+  "rotation.calibrateHint": "Primero sostén el dispositivo en posición vertical",
   "rotation.locked": "Bloqueada",
   "rotation.upright": "Vertical %1",
   "rotation.uprightFlipped": "Vertical invertida %1",

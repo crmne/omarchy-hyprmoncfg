@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Калибриране",
   "action.cancel": "Отказ",
   "action.close": "Затвори",
   "action.createProfile": "Създай профил",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Запази и съхрани",
   "action.preview": "Преглед",
   "action.previewAndSave": "Преглед и съхранение",
+  "action.rename": "Преименуване",
+  "action.renameMenu": "Преименуване…",
   "action.resumeMatching": "Поднови автоматичния избор",
   "action.resuming": "Подновяване…",
   "action.resumingMatching": "Подновяване на автоматичния избор…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Състоянието на автоматичното превключване не можа да се потвърди.",
   "error.editsBeforeCommand": "Съхранете или отхвърлете промените, преди да редактирате команда на профил.",
   "error.editsBeforeDelete": "Съхранете или отхвърлете промените, преди да изтриете профил.",
+  "error.editsBeforeRename": "Запазете или отхвърлете промените, преди да преименувате профил.",
   "error.editsBeforeUse": "Съхранете или отхвърлете промените, преди да използвате друг профил.",
   "error.invalidEditor": "hyprmoncfg върна невалидно състояние на редактора.",
   "error.invalidIpc": "hyprmoncfg върна невалидно IPC съобщение.",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · най-добро съвпадение",
   "profile.notManaged": "(не се управлява)",
   "profile.otherSetup": "Друга конфигурация",
+  "profile.renameTitle": "Преименуване на „%1“",
   "profile.savedCount": {
     "one": "%1 съхранен",
     "other": "%1 съхранени"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "Нулирай бялото ниво на SDR до стойността, съхранена в %1",
   "reset.vrr": "Нулирай режима VRR до стойността, съхранена в %1",
   "reset.wcg": "Нулирай поддръжката на широка цветова гама до стойността, съхранена в %1",
+  "rotation.calibrateHint": "Първо дръжте устройството изправено",
   "rotation.locked": "Заключен",
   "rotation.upright": "Изправен %1",
   "rotation.uprightFlipped": "Изправен и обърнат %1",

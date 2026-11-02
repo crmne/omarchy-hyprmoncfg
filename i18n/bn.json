@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "ক্যালিব্রেট করুন",
   "action.cancel": "বাতিল করুন",
   "action.close": "বন্ধ করুন",
   "action.createProfile": "প্রোফাইল তৈরি করুন",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "রাখুন ও সংরক্ষণ",
   "action.preview": "প্রিভিউ",
   "action.previewAndSave": "প্রিভিউ ও সংরক্ষণ",
+  "action.rename": "নাম বদলান",
+  "action.renameMenu": "নাম বদলান…",
   "action.resumeMatching": "স্বয়ংক্রিয় মিলানো আবার চালু করুন",
   "action.resuming": "আবার চালু হচ্ছে…",
   "action.resumingMatching": "স্বয়ংক্রিয় মিলানো আবার চালু হচ্ছে…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "স্বয়ংক্রিয় সুইচের অবস্থা নিশ্চিত করা যায়নি।",
   "error.editsBeforeCommand": "প্রোফাইল কমান্ড সম্পাদনার আগে আপনার পরিবর্তন সংরক্ষণ করুন বা বাদ দিন।",
   "error.editsBeforeDelete": "প্রোফাইল মোছার আগে আপনার পরিবর্তন সংরক্ষণ করুন বা বাদ দিন।",
+  "error.editsBeforeRename": "প্রোফাইলের নাম বদলানোর আগে পরিবর্তন সংরক্ষণ করুন বা বাতিল করুন।",
   "error.editsBeforeUse": "অন্য প্রোফাইল ব্যবহারের আগে আপনার পরিবর্তন সংরক্ষণ করুন বা বাদ দিন।",
   "error.invalidEditor": "hyprmoncfg একটি অবৈধ এডিটর অবস্থা ফিরিয়েছে।",
   "error.invalidIpc": "hyprmoncfg একটি অবৈধ IPC বার্তা ফিরিয়েছে।",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · সেরা মিল",
   "profile.notManaged": "(পরিচালিত নয়)",
   "profile.otherSetup": "অন্য সেটআপ",
+  "profile.renameTitle": "“%1” এর নাম বদলান",
   "profile.savedCount": {
     "one": "%1টি সংরক্ষিত",
     "other": "%1টি সংরক্ষিত"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "SDR হোয়াইট লেভেল %1-এ সংরক্ষিত মানে রিসেট করুন",
   "reset.vrr": "VRR মোড %1-এ সংরক্ষিত মানে রিসেট করুন",
   "reset.wcg": "ওয়াইড কালার গ্যামাট ক্ষমতা %1-এ সংরক্ষিত মানে রিসেট করুন",
+  "rotation.calibrateHint": "প্রথমে ডিভাইসটি সোজা করে ধরুন",
   "rotation.locked": "লক করা",
   "rotation.upright": "খাড়া %1",
   "rotation.uprightFlipped": "খাড়া, উল্টানো %1",

@@ -72,6 +72,10 @@ Panel {
   property int workspaceKeyboardIndex: 0
   property bool manualWorkspaceRulesInitialized: false
   property bool execEditing: false
+  property string renameProfileName: ""
+  property string renameDraft: ""
+  property string renamedProfileName: ""
+  readonly property bool renameSupported: !!(root.document && root.document.daemon && root.document.daemon.rename_supported === true)
   property string execDraft: ""
   property string deleteProfileName: ""
 
@@ -833,7 +837,10 @@ Panel {
       root.selectedOutputKey = Model.initialOutputKey(root.draftProfile, value.displays)
     if (!preserveSelection || !Model.savedProfileByName(value, root.profileChoice))
       root.profileChoice = root.activeProfile !== "" ? root.activeProfile : root.suggestedProfile
-    if (!preserveSelection || !Model.savedProfileByName(value, root.selectedSavedProfileName))
+    if (root.renamedProfileName !== "" && Model.savedProfileByName(value, root.renamedProfileName)) {
+      root.selectedSavedProfileName = root.renamedProfileName
+      root.renamedProfileName = ""
+    } else if (!preserveSelection || !Model.savedProfileByName(value, root.selectedSavedProfileName))
       root.selectedSavedProfileName = root.profileChoice !== ""
         ? root.profileChoice
         : (value.profiles instanceof Array && value.profiles.length > 0 ? String(value.profiles[0].name || "") : "")
@@ -1253,6 +1260,26 @@ Panel {
     root.send("delete", { name: name }, { name: name })
   }
 
+  function beginRename() {
+    var name = root.selectedSavedProfileName
+    if (name === "" || !root.renameSupported) return
+    if (root.draftDirty || root.editPending) {
+      root.lastError = Strings.t("error.editsBeforeRename", "Save or discard your edits before renaming a profile.")
+      return
+    }
+    root.renameProfileName = name
+    root.renameDraft = name
+    renameDialog.open()
+  }
+
+  function confirmRename() {
+    var name = root.renameProfileName, next = String(root.renameDraft || "").trim()
+    root.renameProfileName = ""
+    if (name === "" || next === "" || next === name || root.previewTransaction !== "" || root.previewPending) return
+    root.lastError = ""
+    root.send("rename_profile", { name: name, new_name: next }, { name: next })
+  }
+
   function beginExecEdit() {
     if (!root.selectedSavedProfile) return
     if (root.draftDirty || root.editPending) {
@@ -1585,6 +1612,14 @@ Panel {
     root.send("set_rotation", { locked: locked === true })
   }
 
+  // Makes the device's current position its upright one.
+  function calibrateRotation() {
+    if (!root.rotation || root.rotation.available !== true || root.rotationLockPending) return
+    root.lastError = ""
+    root.rotationLockPending = true
+    root.send("set_rotation", { calibrate: true })
+  }
+
   function resetRotation() {
     var edit = Model.outputFieldResetEdit(root.profileDefaults, root.selectedOutputKey, "transform") || {}
     if (root.selectedRotationAuto || root.outputFieldChanged("rotation_auto")) {
@@ -1797,6 +1832,9 @@ Panel {
     } else if (method === "set_rotation") {
       root.rotationLockPending = false
     } else if (method === "save" || method === "delete") {
+      root.requestEditorState()
+    } else if (method === "rename_profile") {
+      root.renamedProfileName = context.name || ""
       root.requestEditorState()
     }
   }
@@ -2534,7 +2572,7 @@ Panel {
       id: keyCatcher
       anchors.fill: parent
       property bool returnPressed: false
-      blocked: root.execEditing || profileActions.visible || rotateMenu.visible || deleteConfirmation.visible
+      blocked: root.execEditing || profileActions.visible || rotateMenu.visible || deleteConfirmation.visible || renameDialog.visible
         || profileNameInput.activeFocus
         || positionXField.input.activeFocus || positionYField.input.activeFocus
         || workspaceCountField.field.activeFocus || workspaceGroupSizeField.field.activeFocus
@@ -3588,6 +3626,19 @@ Panel {
                         else root.editOutput({ transform: Model.transformWith(transformValue, null, checked) })
                       }
                       onResetRequested: root.resetRotation()
+                    }
+
+                    Button {
+                      visible: root.selectedRotationAuto && !!root.rotation
+                        && root.rotation.available === true && root.rotation.calibration_supported === true
+                      enabled: !root.rotationLockPending
+                      text: Strings.t("action.calibrate", "Calibrate")
+                      tooltipText: Strings.t("rotation.calibrateHint", "Hold the device upright first")
+                      bordered: true
+                      focusable: true
+                      foreground: root.foreground
+                      fontFamily: root.fontFamily
+                      onClicked: root.calibrateRotation()
                     }
 
                     Grid {
@@ -5093,9 +5144,9 @@ Panel {
     actions: [
       { id: "use", label: Strings.t("action.useProfile", "Use this profile"), enabled: available && root.managedChecked },
       { id: "edit", label: Strings.t("action.editLayout", "Edit layout"), enabled: available },
-      { id: "exec", label: Strings.t("action.editCommandMenu", "Edit post-apply command…"), enabled: available },
-      { id: "delete", label: Strings.t("action.deleteMenu", "Delete…"), enabled: available }
-    ]
+      { id: "exec", label: Strings.t("action.editCommandMenu", "Edit post-apply command…"), enabled: available }
+    ].concat(root.renameSupported ? [{ id: "rename", label: Strings.t("action.renameMenu", "Rename…"), enabled: available }] : [])
+      .concat([{ id: "delete", label: Strings.t("action.deleteMenu", "Delete…"), enabled: available }])
     onVisibleChanged: if (visible) targetName = root.selectedSavedProfileName
     onClosed: Qt.callLater(function() { keyCatcher.forceActiveFocus() })
     onChosen: function(action) {
@@ -5103,6 +5154,7 @@ Panel {
       if (action === "use") root.activateSelectedSavedProfile()
       else if (action === "edit") root.loadSelectedSavedProfile()
       else if (action === "exec") root.beginExecEdit()
+      else if (action === "rename") root.beginRename()
       else if (action === "delete") root.deleteSelectedSavedProfile()
     }
   }
@@ -5122,6 +5174,87 @@ Panel {
       Model.rotationAutoSupported(root.editorDocument.displays, targetKey))
     onClosed: Qt.callLater(function() { keyCatcher.forceActiveFocus() })
     onChosen: function(value) { root.rotateOutput(targetKey, value) }
+  }
+
+  FocusScope {
+    id: renameDialog
+    parent: keyCatcher
+    anchors.fill: parent
+    z: 400
+    visible: false
+    function open() {
+      visible = true
+      renameInput.text = root.renameDraft
+      // After the actions menu hands focus back to the panel.
+      Qt.callLater(function() { renameInput.forceActiveFocus(); renameInput.selectAll() })
+    }
+    function close() {
+      visible = false
+      root.renameProfileName = ""
+      Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    }
+    function accept() {
+      root.confirmRename()
+      close()
+    }
+    Keys.onEscapePressed: close()
+    MouseArea { anchors.fill: parent; onClicked: renameDialog.close() }
+    BorderSurface {
+      anchors.centerIn: parent
+      width: Math.min(parent.width - Style.space(24), Style.space(440))
+      height: renameContent.implicitHeight + Style.space(32)
+      color: root.bar ? root.bar.background : Commons.Color.background
+      borderSpec: Border.controlSpec("focus", root.foreground, Commons.Color.accent)
+      radius: Style.cornerRadius
+      MouseArea { anchors.fill: parent }
+      Column {
+        id: renameContent
+        x: Style.space(16)
+        y: Style.space(16)
+        width: parent.width - Style.space(32)
+        spacing: Style.space(14)
+        Text {
+          text: Strings.t("profile.renameTitle", "Rename “%1”", root.renameProfileName)
+          textFormat: Text.PlainText
+          width: parent.width
+          elide: Text.ElideRight
+          color: root.foreground
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+          font.bold: true
+        }
+        KeyField {
+          id: renameInput
+          width: parent.width
+          height: Style.space(36)
+          foreground: root.foreground
+          placeholderText: Strings.t("footer.newNamePlaceholder", "New profile name")
+          onTextEdited: root.renameDraft = text
+          onAccepted: renameDialog.accept()
+        }
+        Row {
+          anchors.right: parent.right
+          spacing: Style.space(8)
+          Button {
+            text: Strings.t("action.cancel", "Cancel")
+            bordered: true
+            focusable: true
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            onClicked: renameDialog.close()
+          }
+          Button {
+            text: Strings.t("action.rename", "Rename")
+            bordered: true
+            focusable: true
+            enabled: String(root.renameDraft || "").trim() !== ""
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            onClicked: renameDialog.accept()
+          }
+        }
+      }
+    }
   }
 
   FocusScope {

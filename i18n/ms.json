@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Tentukur",
   "action.cancel": "Batal",
   "action.close": "Tutup",
   "action.createProfile": "Cipta profil",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Kekalkan & simpan",
   "action.preview": "Pratonton",
   "action.previewAndSave": "Pratonton & simpan",
+  "action.rename": "Namakan semula",
+  "action.renameMenu": "Namakan semula…",
   "action.resumeMatching": "Sambung padanan automatik",
   "action.resuming": "Menyambung…",
   "action.resumingMatching": "Menyambung padanan automatik…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Tidak dapat mengesahkan keadaan pertukaran automatik.",
   "error.editsBeforeCommand": "Simpan atau buang suntingan anda sebelum mengedit perintah profil.",
   "error.editsBeforeDelete": "Simpan atau buang suntingan anda sebelum memadam profil.",
+  "error.editsBeforeRename": "Simpan atau buang perubahan sebelum menamakan semula profil.",
   "error.editsBeforeUse": "Simpan atau buang suntingan anda sebelum menggunakan profil lain.",
   "error.invalidEditor": "hyprmoncfg mengembalikan keadaan editor yang tidak sah.",
   "error.invalidIpc": "hyprmoncfg mengembalikan mesej IPC yang tidak sah.",
@@ -317,6 +321,7 @@
   "profile.nameBestMatch": "%1 · padanan terbaik",
   "profile.notManaged": "(tidak diurus)",
   "profile.otherSetup": "Persediaan lain",
+  "profile.renameTitle": "Namakan semula “%1”",
   "profile.savedCount": {
     "other": "%1 disimpan"
   },
@@ -343,6 +348,7 @@
   "reset.sdrWhite": "Tetapkan semula aras putih SDR kepada nilai yang disimpan dalam %1",
   "reset.vrr": "Tetapkan semula mod VRR kepada nilai yang disimpan dalam %1",
   "reset.wcg": "Tetapkan semula keupayaan gamut warna luas kepada nilai yang disimpan dalam %1",
+  "rotation.calibrateHint": "Pegang peranti secara tegak dahulu",
   "rotation.locked": "Dikunci",
   "rotation.upright": "Tegak %1",
   "rotation.uprightFlipped": "Tegak terbalik %1",

@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "کیلیبریٹ کریں",
   "action.cancel": "منسوخ کریں",
   "action.close": "بند کریں",
   "action.createProfile": "پروفائل بنائیں",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "رکھیں اور محفوظ کریں",
   "action.preview": "پیش نظارہ",
   "action.previewAndSave": "پیش نظارہ اور محفوظ کریں",
+  "action.rename": "نام تبدیل کریں",
+  "action.renameMenu": "نام تبدیل کریں…",
   "action.resumeMatching": "خودکار میچنگ دوبارہ شروع کریں",
   "action.resuming": "دوبارہ شروع ہو رہا ہے…",
   "action.resumingMatching": "خودکار میچنگ دوبارہ شروع ہو رہی ہے…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "خودکار تبدیلی کی حالت کی تصدیق نہیں ہو سکی۔",
   "error.editsBeforeCommand": "پروفائل کمانڈ میں ترمیم سے پہلے اپنی ترامیم محفوظ یا مسترد کریں۔",
   "error.editsBeforeDelete": "پروفائل حذف کرنے سے پہلے اپنی ترامیم محفوظ یا مسترد کریں۔",
+  "error.editsBeforeRename": "پروفائل کا نام تبدیل کرنے سے پہلے اپنی تبدیلیاں محفوظ کریں یا مسترد کریں۔",
   "error.editsBeforeUse": "دوسرا پروفائل استعمال کرنے سے پہلے اپنی ترامیم محفوظ یا مسترد کریں۔",
   "error.invalidEditor": "hyprmoncfg نے ایڈیٹر کی غلط حالت لوٹائی۔",
   "error.invalidIpc": "hyprmoncfg نے غلط IPC پیغام لوٹایا۔",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · بہترین مماثلت",
   "profile.notManaged": "(غیر منظم)",
   "profile.otherSetup": "دوسرا سیٹ اپ",
+  "profile.renameTitle": "“%1” کا نام تبدیل کریں",
   "profile.savedCount": {
     "one": "%1 محفوظ",
     "other": "%1 محفوظ"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "SDR سفید سطح کو %1 میں محفوظ قدر پر ری سیٹ کریں",
   "reset.vrr": "VRR موڈ کو %1 میں محفوظ قدر پر ری سیٹ کریں",
   "reset.wcg": "وسیع رنگ گیمٹ صلاحیت کو %1 میں محفوظ قدر پر ری سیٹ کریں",
+  "rotation.calibrateHint": "پہلے آلے کو سیدھا رکھیں",
   "rotation.locked": "لاک شدہ",
   "rotation.upright": "سیدھا %1",
   "rotation.uprightFlipped": "سیدھا پلٹا ہوا %1",

@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Calibrar",
   "action.cancel": "Cancelar",
   "action.close": "Fechar",
   "action.createProfile": "Criar perfil",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Manter e guardar",
   "action.preview": "Pré-visualizar",
   "action.previewAndSave": "Pré-visualizar e guardar",
+  "action.rename": "Mudar o nome",
+  "action.renameMenu": "Mudar o nome…",
   "action.resumeMatching": "Retomar a seleção automática",
   "action.resuming": "A retomar…",
   "action.resumingMatching": "A retomar a seleção automática…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Não foi possível confirmar o estado da troca automática.",
   "error.editsBeforeCommand": "Guarda ou descarta as tuas edições antes de editar o comando de um perfil.",
   "error.editsBeforeDelete": "Guarda ou descarta as tuas edições antes de eliminar um perfil.",
+  "error.editsBeforeRename": "Guarde ou descarte as alterações antes de mudar o nome de um perfil.",
   "error.editsBeforeUse": "Guarda ou descarta as tuas edições antes de usar outro perfil.",
   "error.invalidEditor": "O hyprmoncfg devolveu um estado do editor inválido.",
   "error.invalidIpc": "O hyprmoncfg devolveu uma mensagem IPC inválida.",
@@ -343,6 +347,7 @@
   "profile.nameBestMatch": "%1 · melhor opção",
   "profile.notManaged": "(não gerido)",
   "profile.otherSetup": "Outra configuração",
+  "profile.renameTitle": "Mudar o nome de “%1”",
   "profile.savedCount": {
     "one": "%1 guardado",
     "many": "%1 de guardados",
@@ -371,6 +376,7 @@
   "reset.sdrWhite": "Repor o nível de branco SDR para o valor guardado (%1)",
   "reset.vrr": "Repor o modo VRR para o valor guardado (%1)",
   "reset.wcg": "Repor a capacidade de gama ampla para o valor guardado (%1)",
+  "rotation.calibrateHint": "Primeiro segure o dispositivo na vertical",
   "rotation.locked": "Bloqueada",
   "rotation.upright": "Vertical %1",
   "rotation.uprightFlipped": "Vertical invertida %1",

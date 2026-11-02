@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "அளவுத்திருத்து",
   "action.cancel": "ரத்து செய்",
   "action.close": "மூடு",
   "action.createProfile": "சுயவிவரம் உருவாக்கு",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "வைத்துச் சேமி",
   "action.preview": "முன்னோட்டம்",
   "action.previewAndSave": "முன்னோட்டமிட்டுச் சேமி",
+  "action.rename": "பெயர் மாற்று",
+  "action.renameMenu": "பெயர் மாற்று…",
   "action.resumeMatching": "தானியங்கு பொருத்தத்தைத் தொடர்",
   "action.resuming": "தொடர்கிறது…",
   "action.resumingMatching": "தானியங்கு பொருத்தம் தொடர்கிறது…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "தானியங்கு மாற்ற நிலையை உறுதிப்படுத்த முடியவில்லை.",
   "error.editsBeforeCommand": "சுயவிவரக் கட்டளையைத் திருத்தும் முன் உங்கள் மாற்றங்களைச் சேமிக்கவும் அல்லது கைவிடவும்.",
   "error.editsBeforeDelete": "சுயவிவரத்தை நீக்கும் முன் உங்கள் மாற்றங்களைச் சேமிக்கவும் அல்லது கைவிடவும்.",
+  "error.editsBeforeRename": "சுயவிவரத்தின் பெயரை மாற்றும் முன் மாற்றங்களைச் சேமிக்கவும் அல்லது நிராகரிக்கவும்.",
   "error.editsBeforeUse": "வேறு சுயவிவரத்தைப் பயன்படுத்தும் முன் உங்கள் மாற்றங்களைச் சேமிக்கவும் அல்லது கைவிடவும்.",
   "error.invalidEditor": "hyprmoncfg தவறான திருத்தி நிலையைத் திருப்பியது.",
   "error.invalidIpc": "hyprmoncfg தவறான IPC செய்தியைத் திருப்பியது.",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · சிறந்த பொருத்தம்",
   "profile.notManaged": "(நிர்வகிக்கப்படவில்லை)",
   "profile.otherSetup": "பிற அமைப்பு",
+  "profile.renameTitle": "“%1” பெயரை மாற்று",
   "profile.savedCount": {
     "one": "%1 சேமிக்கப்பட்டது",
     "other": "%1 சேமிக்கப்பட்டன"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "SDR வெள்ளை நிலையை %1 இல் சேமித்த மதிப்புக்கு மீட்டமை",
   "reset.vrr": "VRR பயன்முறையை %1 இல் சேமித்த மதிப்புக்கு மீட்டமை",
   "reset.wcg": "பரந்த நிற வரம்புத் திறனை %1 இல் சேமித்த மதிப்புக்கு மீட்டமை",
+  "rotation.calibrateHint": "முதலில் சாதனத்தை நிமிர்த்திப் பிடிக்கவும்",
   "rotation.locked": "பூட்டப்பட்டது",
   "rotation.upright": "நிமிர்ந்த %1",
   "rotation.uprightFlipped": "நிமிர்ந்து புரட்டிய %1",

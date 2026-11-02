@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Kalibrer",
   "action.cancel": "Annuller",
   "action.close": "Luk",
   "action.createProfile": "Opret profil",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Behold og gem",
   "action.preview": "Forhåndsvis",
   "action.previewAndSave": "Forhåndsvis og gem",
+  "action.rename": "Omdøb",
+  "action.renameMenu": "Omdøb…",
   "action.resumeMatching": "Genoptag automatisk matchning",
   "action.resuming": "Genoptager…",
   "action.resumingMatching": "Genoptager automatisk matchning…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Kunne ikke bekræfte status for automatisk skift.",
   "error.editsBeforeCommand": "Gem eller kassér dine ændringer, før du redigerer en profilkommando.",
   "error.editsBeforeDelete": "Gem eller kassér dine ændringer, før du sletter en profil.",
+  "error.editsBeforeRename": "Gem eller kassér dine ændringer, før du omdøber en profil.",
   "error.editsBeforeUse": "Gem eller kassér dine ændringer, før du bruger en anden profil.",
   "error.invalidEditor": "hyprmoncfg returnerede en ugyldig editortilstand.",
   "error.invalidIpc": "hyprmoncfg returnerede en ugyldig IPC-meddelelse.",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · bedste match",
   "profile.notManaged": "(ikke administreret)",
   "profile.otherSetup": "Anden opsætning",
+  "profile.renameTitle": "Omdøb “%1”",
   "profile.savedCount": {
     "one": "%1 gemt",
     "other": "%1 gemte"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "Nulstil SDR-hvidniveau til værdien gemt i %1",
   "reset.vrr": "Nulstil VRR-tilstand til værdien gemt i %1",
   "reset.wcg": "Nulstil evne til bredt farveområde til værdien gemt i %1",
+  "rotation.calibrateHint": "Hold først enheden oprejst",
   "rotation.locked": "Låst",
   "rotation.upright": "Opretstående %1",
   "rotation.uprightFlipped": "Opretstående spejlvendt %1",

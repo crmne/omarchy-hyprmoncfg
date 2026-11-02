@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Kalibrlash",
   "action.cancel": "Bekor qilish",
   "action.close": "Yopish",
   "action.createProfile": "Profil yaratish",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Qoldirish va saqlash",
   "action.preview": "Oldindan koʻrish",
   "action.previewAndSave": "Koʻrish va saqlash",
+  "action.rename": "Nomini o‘zgartirish",
+  "action.renameMenu": "Nomini o‘zgartirish…",
   "action.resumeMatching": "Avtomatik moslashni davom ettirish",
   "action.resuming": "Davom ettirilmoqda…",
   "action.resumingMatching": "Avtomatik moslash davom ettirilmoqda…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Avtomatik almashtirish holatini tasdiqlab boʻlmadi.",
   "error.editsBeforeCommand": "Profil buyrugʻini tahrirlashdan oldin oʻzgarishlarni saqlang yoki bekor qiling.",
   "error.editsBeforeDelete": "Profilni oʻchirishdan oldin oʻzgarishlarni saqlang yoki bekor qiling.",
+  "error.editsBeforeRename": "Profil nomini o‘zgartirishdan oldin tahrirlarni saqlang yoki bekor qiling.",
   "error.editsBeforeUse": "Boshqa profilni ishlatishdan oldin oʻzgarishlarni saqlang yoki bekor qiling.",
   "error.invalidEditor": "hyprmoncfg notoʻgʻri muharrir holatini qaytardi.",
   "error.invalidIpc": "hyprmoncfg notoʻgʻri IPC xabarini qaytardi.",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · eng mos",
   "profile.notManaged": "(boshqarilmaydi)",
   "profile.otherSetup": "Boshqa sozlama",
+  "profile.renameTitle": "“%1” nomini o‘zgartirish",
   "profile.savedCount": {
     "one": "%1 ta saqlangan",
     "other": "%1 ta saqlangan"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "SDR oq darajasini %1 ichida saqlangan qiymatga qaytarish",
   "reset.vrr": "VRR rejimini %1 ichida saqlangan qiymatga qaytarish",
   "reset.wcg": "Keng rang gamuti imkoniyatini %1 ichida saqlangan qiymatga qaytarish",
+  "rotation.calibrateHint": "Avval qurilmani tik tuting",
   "rotation.locked": "Qulflangan",
   "rotation.upright": "Tik %1",
   "rotation.uprightFlipped": "Tik agʻdarilgan %1",

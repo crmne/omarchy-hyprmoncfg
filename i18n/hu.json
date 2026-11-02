@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "Kalibrálás",
   "action.cancel": "Mégse",
   "action.close": "Bezárás",
   "action.createProfile": "Profil létrehozása",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "Megtartás és mentés",
   "action.preview": "Előnézet",
   "action.previewAndSave": "Előnézet és mentés",
+  "action.rename": "Átnevezés",
+  "action.renameMenu": "Átnevezés…",
   "action.resumeMatching": "Automatikus egyeztetés folytatása",
   "action.resuming": "Folytatás…",
   "action.resumingMatching": "Automatikus egyeztetés folytatása…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "Nem sikerült megerősíteni az automatikus váltás állapotát.",
   "error.editsBeforeCommand": "Profilparancs szerkesztése előtt mentsd vagy vesd el a módosításokat.",
   "error.editsBeforeDelete": "Profil törlése előtt mentsd vagy vesd el a módosításokat.",
+  "error.editsBeforeRename": "Profil átnevezése előtt mentse vagy vesse el a módosításokat.",
   "error.editsBeforeUse": "Másik profil használata előtt mentsd vagy vesd el a módosításokat.",
   "error.invalidEditor": "A hyprmoncfg érvénytelen szerkesztőállapotot adott vissza.",
   "error.invalidIpc": "A hyprmoncfg érvénytelen IPC-üzenetet adott vissza.",
@@ -330,6 +334,7 @@
   "profile.nameBestMatch": "%1 · legjobb egyezés",
   "profile.notManaged": "(nincs kezelve)",
   "profile.otherSetup": "Más beállítás",
+  "profile.renameTitle": "„%1” átnevezése",
   "profile.savedCount": {
     "one": "%1 mentve",
     "other": "%1 mentve"
@@ -357,6 +362,7 @@
   "reset.sdrWhite": "SDR fehérszint visszaállítása az itt mentett értékre: %1",
   "reset.vrr": "VRR-mód visszaállítása az itt mentett értékre: %1",
   "reset.wcg": "Széles színskála-képesség visszaállítása az itt mentett értékre: %1",
+  "rotation.calibrateHint": "Előbb tartsa függőlegesen az eszközt",
   "rotation.locked": "Zárolva",
   "rotation.upright": "Álló helyzet: %1",
   "rotation.uprightFlipped": "Álló helyzet, tükrözve: %1",

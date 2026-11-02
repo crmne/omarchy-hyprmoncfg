@@ -1,4 +1,5 @@
 {
+  "action.calibrate": "معايرة",
   "action.cancel": "إلغاء",
   "action.close": "إغلاق",
   "action.createProfile": "إنشاء ملف تعريف",
@@ -13,6 +14,8 @@
   "action.keepAndSave": "الاحتفاظ والحفظ",
   "action.preview": "معاينة",
   "action.previewAndSave": "معاينة وحفظ",
+  "action.rename": "إعادة التسمية",
+  "action.renameMenu": "إعادة التسمية…",
   "action.resumeMatching": "استئناف المطابقة التلقائية",
   "action.resuming": "جارٍ الاستئناف…",
   "action.resumingMatching": "جارٍ استئناف المطابقة التلقائية…",
@@ -49,6 +52,7 @@
   "error.confirmSwitching": "تعذر تأكيد حالة التبديل التلقائي.",
   "error.editsBeforeCommand": "احفظ تعديلاتك أو تجاهلها قبل تعديل أمر ملف التعريف.",
   "error.editsBeforeDelete": "احفظ تعديلاتك أو تجاهلها قبل حذف ملف التعريف.",
+  "error.editsBeforeRename": "احفظ تعديلاتك أو تجاهلها قبل إعادة تسمية ملف التعريف.",
   "error.editsBeforeUse": "احفظ تعديلاتك أو تجاهلها قبل استخدام ملف تعريف آخر.",
   "error.invalidEditor": "أعاد hyprmoncfg حالة محرر غير صالحة.",
   "error.invalidIpc": "أعاد hyprmoncfg رسالة IPC غير صالحة.",
@@ -382,6 +386,7 @@
   "profile.nameBestMatch": "%1 · أفضل تطابق",
   "profile.notManaged": "(غير مُدار)",
   "profile.otherSetup": "إعداد آخر",
+  "profile.renameTitle": "إعادة تسمية “%1”",
   "profile.savedCount": {
     "zero": "%1 محفوظة",
     "one": "%1 محفوظة",
@@ -413,6 +418,7 @@
   "reset.sdrWhite": "إعادة مستوى أبيض SDR إلى القيمة المحفوظة في %1",
   "reset.vrr": "إعادة وضع VRR إلى القيمة المحفوظة في %1",
   "reset.wcg": "إعادة قدرة سلسلة الألوان الواسعة إلى القيمة المحفوظة في %1",
+  "rotation.calibrateHint": "أمسك الجهاز في وضع رأسي أولًا",
   "rotation.locked": "مقفل",
   "rotation.upright": "عمودي %1",
   "rotation.uprightFlipped": "عمودي مقلوب %1",

@@ -217,7 +217,7 @@ test("no text entry can receive a letter the canvas or the catcher took", () => 
     assert.ok(blocked.includes(id), id)
   assert.match(qml, /canvasKeysEnabled: [\s\S]*?!keyCatcher\.blocked/)
   const keyFields = (qml.match(/KeyField \{\n\s+id: (\w+)/g) || []).map(line => line.match(/id: (\w+)/)[1])
-  assert.deepEqual(keyFields.sort(), ["decimalInput", "iccProfileInput", "profileExecInput", "profileNameInput"],
+  assert.deepEqual(keyFields.sort(), ["decimalInput", "iccProfileInput", "profileExecInput", "profileNameInput", "renameInput"],
     "a new text field must join `blocked`")
 })
 
