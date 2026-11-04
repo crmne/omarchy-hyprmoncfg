@@ -171,7 +171,11 @@ test("profile thumbnails draw each saved setup from its own outputs", () => {
 test("QML sizes the panel only through the Model functions", () => {
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
   assert.match(qml, /readonly property var panelLayout: Model\.expandedPanelLayout\(\{/)
-  assert.match(qml, /height: Model\.compactStageHeight\(root\.layoutBounds, width, root\.sizingUnit, root\.layoutOffRow,\s+root\.displayMode\.available\)/)
+  // The compact stage sizes from the viewport, never its own width: that
+  // width moves with the scrollbar, and the stage height decides whether the
+  // scrollbar shows, which loops the layout forever on short screens.
+  assert.match(qml, /height: Model\.compactStageHeight\(root\.layoutBounds, compactBody\.width, root\.sizingUnit,\s+root\.layoutOffRow, root\.displayMode\.available\)/)
+  assert.doesNotMatch(qml, /Model\.compactStageHeight\(root\.layoutBounds, width,/)
   assert.match(qml, /Model\.panelResizeAllowed\(\{/)
   assert.match(qml, /onCanvasDraggingChanged: root\.applyPanelSize\(false\)/)
   assert.match(qml, /onExpandedChanged: root\.applyPanelSize\(true\)/)
