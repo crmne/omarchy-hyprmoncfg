@@ -10,6 +10,7 @@ import qs.Ui
 import "Model.js" as Model
 import "WorkspacePicker.js" as Picker
 import "Strings.js" as Strings
+import "WallpaperModel.js" as Wallpaper
 
 Panel {
   id: root
@@ -497,7 +498,8 @@ Panel {
   readonly property var pageOptions: [
     { value: "layout", label: "1  " + Strings.t("tab.layout", "Layout") },
     { value: "workspaces", label: "2  " + Strings.t("tab.workspaces", "Workspaces") },
-    { value: "profiles", label: "3  " + Strings.t("tab.profiles", "Profiles") }
+    { value: "profiles", label: "3  " + Strings.t("tab.profiles", "Profiles") },
+    { value: "wallpapers", label: "4  " + Strings.t("tab.wallpapers", "Wallpapers") }
   ]
   readonly property var inspectorOptions: [
     { value: "display", label: Strings.t("tab.display", "Display") },
@@ -1293,7 +1295,7 @@ Panel {
     root.renameProfileName = ""
     if (name === "" || next === "" || next === name || root.previewTransaction !== "" || root.previewPending) return
     root.lastError = ""
-    root.send("rename_profile", { name: name, new_name: next }, { name: next })
+    root.send("rename_profile", { name: name, new_name: next }, { name: next, from: name })
   }
 
   function beginExecEdit() {
@@ -1471,6 +1473,8 @@ Panel {
       else if (dx !== 0) root.adjustInspectorField(dx)
     } else if (root.activePage === "profiles") {
       if (dy !== 0) root.selectSavedProfile(dy)
+    } else if (root.activePage === "wallpapers") {
+      if (dy !== 0) wallpapersPage.move(dy)
     } else if (root.activePage === "workspaces") {
       if (dy !== 0) root.moveWorkspaceCursor(dy)
       else if (dx !== 0) root.adjustWorkspaceKeyboard(dx)
@@ -1497,6 +1501,8 @@ Panel {
     } else if (root.activePage === "workspaces") {
       if (root.pickerOfferVisible && root.workspaceKeyboardIndex === root.workspacePlanKeyboardCount()) root.activateWorkspacePicker()
       else root.adjustWorkspaceKeyboard(1)
+    } else if (root.activePage === "wallpapers") {
+      wallpapersPage.activate()
     }
   }
 
@@ -1522,6 +1528,10 @@ Panel {
     if (key === "1" || key === "2" || key === "3") {
       if (root.workspaceOnly) return
       root.activePage = key === "1" ? "layout" : (key === "2" ? "workspaces" : "profiles")
+      return
+    }
+    if (key === "4") {
+      root.activePage = "wallpapers"
       return
     }
     if (key === "?") {
@@ -1564,9 +1574,12 @@ Panel {
     } else if (root.activePage === "profiles") {
       if (key === "e") root.beginExecEdit()
       else if (key === "d") root.deleteSelectedSavedProfile()
+      else if (key === "w") root.openWallpapersFor(root.selectedSavedProfileName)
     } else if (root.activePage === "workspaces") {
       if (key === "-" || key === "_") root.adjustWorkspaceKeyboard(-1)
       else if (key === "+" || key === "=") root.adjustWorkspaceKeyboard(1)
+    } else if (root.activePage === "wallpapers") {
+      if (key === "d") wallpapersPage.clearSelected()
     }
   }
 
@@ -1848,8 +1861,10 @@ Panel {
     } else if (method === "set_rotation") {
       root.rotationLockPending = false
     } else if (method === "save" || method === "delete") {
+      if (method === "delete") wallpaperStore.dropProfile(context.name)
       root.requestEditorState()
     } else if (method === "rename_profile") {
+      wallpaperStore.renameProfile(context.from, context.name)
       root.renamedProfileName = context.name || ""
       root.requestEditorState()
     }
@@ -2000,6 +2015,7 @@ Panel {
     root.restorePanelExpanded()
   }
   onActivePageChanged: {
+    if (root.activePage !== "wallpapers") root.wallpaperProfileOverride = ""
     if (root.workspaceOnly && root.activePage !== "workspaces") { root.activePage = "workspaces"; return }
     if (root.activePage === "workspaces") {
       Qt.callLater(function() { root.ensureManualWorkspaceRules() })
@@ -2217,6 +2233,32 @@ Panel {
     onExited: function(exitCode) { root.pickerStatus = exitCode === 0 ? Picker.parseStatus(pickerOutput.text) : null }
   }
   Process { id: pickerAction }
+
+  // Wallpapers: the panel writes the store; the service layer watches it.
+  property string wallpaperTargetKey: ""
+  // Tab 4 edits the active profile unless Profiles opened it for another one.
+  property string wallpaperProfileOverride: ""
+  readonly property string wallpaperProfileName: root.wallpaperProfileOverride !== ""
+    ? root.wallpaperProfileOverride : root.activeProfile
+  readonly property var wallpaperProfile: Model.savedProfileByName(root.editorDocument, root.wallpaperProfileName)
+
+  function openWallpapersFor(name) {
+    if (String(name || "") === "") return
+    root.wallpaperProfileOverride = String(name)
+    root.activePage = "wallpapers"
+  }
+
+  WallpaperStore { id: wallpaperStore }
+
+  WallpaperPicker {
+    id: wallpaperPicker
+    onPicked: function(path) {
+      if (root.wallpaperTargetKey === "" || root.wallpaperProfileName === "") return
+      wallpaperStore.setWallpaper(root.wallpaperProfileName, root.wallpaperTargetKey, path)
+      root.lastError = ""
+    }
+    onFailed: function(message) { root.lastError = message }
+  }
 
   Process {
     id: serviceProcess
@@ -2502,7 +2544,10 @@ Panel {
     anchorItem: root.workspaceLaunchOrigin ? workspaceLaunchAnchor : root.anchorItem
     owner: root.barIdentity
     bar: root.bar
-    open: root.opened
+    // The file chooser is a normal window under this full-screen overlay, so
+    // its clicks would land here as outside-click dismissals. Step aside while
+    // it is up; root.opened stays true, so the panel returns as it was.
+    open: root.opened && !wallpaperPicker.running
     centerOnBar: false
     focusTarget: keyCatcher
     contentWidth: root.expanded
@@ -4091,6 +4136,58 @@ Panel {
             }
           }
 
+          WallpapersPage {
+            id: wallpapersPage
+            visible: root.activePage === "wallpapers"
+            anchors.fill: parent
+            opacity: root.managedChecked ? 1.0 : root.unmanagedOpacity
+            rows: Wallpaper.profileRows(wallpaperStore.store, root.wallpaperProfile)
+            profileName: root.wallpaperProfile ? root.wallpaperProfileName : ""
+            stageHeight: root.wallpaperProfile ? Math.max(Style.space(140), Math.min(root.profileStageHeight, height * 0.55)) : 0
+            foreground: root.foreground
+            dim: root.dim
+            accent: Commons.Color.accent
+            fontFamily: root.fontFamily
+            bodySize: Style.font.body
+            captionSize: Style.font.caption
+            unit: Style.space(10) / 10
+            onChooseRequested: function(key) {
+              root.wallpaperTargetKey = key
+              wallpaperPicker.open()
+            }
+            onClearRequested: function(key) { wallpaperStore.clearWallpaper(root.wallpaperProfileName, key) }
+
+            // The same stage as Profiles, with each display's wallpaper on its card.
+            stageContent: EditorPane {
+              anchors.fill: parent
+              title: ""
+              meta: ""
+              foreground: root.foreground
+              dim: root.dim
+              accent: Commons.Color.accent
+              fontFamily: root.fontFamily
+
+              DisplayCanvas {
+                anchors.fill: parent
+                profile: root.wallpaperProfile || ({ outputs: [] })
+                editorDisplays: root.editorDocument.displays
+                wallpapers: Wallpaper.pathsByKey(wallpaperStore.store, root.wallpaperProfileName)
+                emphasis: "profile"
+                selectedKey: wallpapersPage.selectedKey
+                interactive: true
+                movable: false
+                detailed: true
+                framed: true
+                markDisconnected: true
+                foreground: root.foreground
+                dim: root.dim
+                accent: Commons.Color.accent
+                fontFamily: root.fontFamily
+                onOutputSelected: function(key) { wallpapersPage.selectKey(key) }
+              }
+            }
+          }
+
           Item {
             visible: root.activePage === "profiles"
             anchors.fill: parent
@@ -4977,13 +5074,19 @@ Panel {
                         ? (root.selectedSavedProfileCurrent
                           ? Strings.t("footer.active", "This profile is active")
                           : Strings.t("footer.browsing", "Browsing %1", root.selectedSavedProfileName))
-                        : root.profileStatusTitle)))
+                        : (root.activePage === "wallpapers" && root.wallpaperProfileName !== ""
+                          ? Strings.t("footer.wallpapersFor", "Wallpapers for %1", root.wallpaperProfileName)
+                          : root.profileStatusTitle))))
                   subtitle: root.editPending ? Strings.t("status.checkingLayout", "Checking layout…")
                     : (root.creatingProfile ? Strings.t("footer.creatingHint", "Name it, arrange the displays, then preview and save.")
                     : (root.draftDirty ? Strings.t("footer.unsavedHint", "Changes are previewed safely before they can be saved.")
                     : (root.activePage === "profiles"
                       ? Strings.t("footer.browsingHint", "Preview, then keep to use this profile until displays change.")
-                      : root.profileStatusSubtitle)))
+                      : (root.activePage === "wallpapers" && root.wallpaperProfileName !== ""
+                        ? (root.wallpaperProfileName === root.activeProfile
+                          ? Strings.t("footer.wallpapersActiveHint", "Each display keeps its own picture while this profile is active.")
+                          : Strings.t("footer.wallpapersSavedHint", "Saved now; shown when this profile becomes active."))
+                        : root.profileStatusSubtitle))))
                   iconText: root.monitorCount > 1 ? "󰍺" : "󰍹"
                   foreground: root.lastError !== "" ? root.urgent : root.foreground
                   dim: root.dim
@@ -5231,7 +5334,8 @@ Panel {
     actions: [
       { id: "use", label: Strings.t("action.useProfile", "Use this profile"), enabled: available && root.managedChecked },
       { id: "edit", label: Strings.t("action.editLayout", "Edit layout"), enabled: available },
-      { id: "exec", label: Strings.t("action.editCommandMenu", "Edit post-apply command…"), enabled: available }
+      { id: "exec", label: Strings.t("action.editCommandMenu", "Edit post-apply command…"), enabled: available },
+      { id: "wallpapers", label: Strings.t("action.wallpapersMenu", "Wallpapers…"), enabled: true }
     ].concat(root.renameSupported ? [{ id: "rename", label: Strings.t("action.renameMenu", "Rename…"), enabled: available }] : [])
       .concat([{ id: "delete", label: Strings.t("action.deleteMenu", "Delete…"), enabled: available }])
     onVisibleChanged: if (visible) targetName = root.selectedSavedProfileName
@@ -5242,6 +5346,7 @@ Panel {
       else if (action === "edit") root.loadSelectedSavedProfile()
       else if (action === "exec") root.beginExecEdit()
       else if (action === "rename") root.beginRename()
+      else if (action === "wallpapers") root.openWallpapersFor(root.selectedSavedProfileName)
       else if (action === "delete") root.deleteSelectedSavedProfile()
     }
   }

@@ -353,6 +353,42 @@ atomic backend support, never separate client save/delete calls. Delete needs
 confirmation or undo and must not switch the live arrangement as a hidden side
 effect. Retain equivalent TUI operations and documented shortcuts.
 
+### Wallpapers
+
+The fourth tab lists each display the current profile drives, with a thumbnail,
+**Choose…** (Omarchy's file chooser, still images only) and **Clear**. Pictures
+are stored per profile and per display match key (make, model, serial) in the
+plugin-owned `~/.config/hyprmoncfg/wallpapers.json`, never in profile JSON,
+which the daemon owns. Moving a cable keeps each picture on its display.
+
+Omarchy's background draws one picture on every screen. While the active
+profile assigns any wallpaper, the persistent service suspends it and draws
+each screen itself: the assigned picture, or Omarchy's own background where
+none is set. Double-clicking the desktop opens Omarchy's background selector
+(left) or theme switcher (right); single clicks do nothing. When the active profile has none, or there is no current profile, the
+layer goes away and Omarchy's background returns, as it does when the plugin is
+disabled. A confirmed profile delete drops that profile's pictures.
+
+Capability gaps: wallpapers are panel-only, with no TUI counterpart. Renames go
+through the CLI and TUI, which the plugin does not observe, so a renamed
+profile's pictures need choosing again. Video backgrounds are not drawn on
+unassigned screens while the layer is active.
+
+```mermaid
+flowchart LR
+  Panel[Panel.qml] --> Page[WallpapersPage.qml] --> Row[WallpaperRow.qml]
+  Page -- stageContent --> Canvas[DisplayCanvas.qml wallpapers]
+  ProfilesTab[Profiles tab menu, w] -- openWallpapersFor --> Page
+  Panel --> Picker[WallpaperPicker.qml] --> FS[[omarchy file select]]
+  Panel --> Store[WallpaperStore.qml]
+  Guard[PreviewGuard.qml service] --> Layer[WallpaperLayer.qml]
+  Layer --> Store
+  Store --> JSON[(wallpapers.json)]
+  Page & Layer --> WM[WallpaperModel.js]
+  Guard -- status events --> Daemon[(hyprmoncfgd socket)]
+  Layer -- omarchy-shell IPC setSuspended --> OmBg[Omarchy background]
+```
+
 ### Footer and confirmation
 
 Keep the footer outside scrolling content. Show one concise state: Unsaved setup,

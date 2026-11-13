@@ -175,6 +175,18 @@ Hotplug refreshes preserve in-progress edits and input. Stale status/editor repl
 
 Editor refreshes wait for an active preview to finish; choosing Discard still resets the draft from a fresh layout.
 
+## Per-display wallpapers
+
+Open the **Wallpapers** tab (or press `4`) to give each display its own picture
+for the current profile. When hyprmoncfg switches profiles, each display gets its
+own picture back. Displays without one keep the Omarchy background, and clearing
+them all hands the desktop back to Omarchy entirely.
+
+The tab draws the profile's layout like the Profiles tab, with each display's
+picture on its card; click a card or use the list below it. To set up another
+saved profile, open it in **Profiles** and choose **Wallpapers…** from its menu,
+or press `w`.
+
 ## Languages
 
 The panel follows the language picked under Setup > Language, live and without a restart, in all 50 languages Omarchy ships, with their plural forms. Arabic, Hebrew, Persian and Urdu mirror the panel, except the layout canvas, which stays a picture of your desk. On an Omarchy without language support the panel stays in English.

@@ -53,8 +53,18 @@ Item {
           { keys: "l", action: Strings.t("help.loadProfile", "Load it into the layout editor") },
           { keys: "e", action: Strings.t("help.editCommand", "Edit post-apply command") },
           { keys: "d", action: Strings.t("help.deleteProfile", "Delete with confirmation") },
+          { keys: "w", action: Strings.t("help.profileWallpapers", "Manage this profile's wallpapers") },
           { keys: "Shift+F10", action: Strings.t("help.profileActions", "Open profile actions") },
           { keys: "Space", action: Strings.t("help.toggleAutomatic", "Toggle automatic profile selection") }
+        ]
+      }]
+    } else if (root.page === "wallpapers") {
+      contextual = [{
+        title: Strings.t("help.wallpapers", "Wallpapers"),
+        bindings: [
+          { keys: "↑  ↓", action: Strings.t("help.wallpaperDisplay", "Select a display") },
+          { keys: "Enter", action: Strings.t("help.chooseWallpaper", "Choose a wallpaper for this display") },
+          { keys: "d", action: Strings.t("help.clearWallpaper", "Clear it and use the Omarchy background") }
         ]
       }]
     } else {
@@ -69,7 +79,7 @@ Item {
     }
     contextual.push({
       title: Strings.t("help.anywhere", "Anywhere"),
-      bindings: (root.workspaceOnly ? [] : [{ keys: "1  2  3", action: Strings.t("help.switchTabs", "Switch tabs") }]).concat([
+      bindings: (root.workspaceOnly ? [] : [{ keys: "1  2  3  4", action: Strings.t("help.switchTabs", "Switch tabs") }]).concat([
         { keys: "a", action: Strings.t("help.apply", "Apply the current draft or selected profile") },
         { keys: "s", action: Strings.t("help.save", "Save the current draft as a profile") },
         { keys: "r", action: Strings.t("help.resetLive", "Reset from live Hyprland state") },

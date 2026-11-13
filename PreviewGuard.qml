@@ -542,4 +542,10 @@ Item {
       }
     }
   }
+
+  // Per-display wallpapers follow the active profile even with the panel closed.
+  WallpaperLayer {
+    shell: root.shell
+    document: root.document
+  }
 }

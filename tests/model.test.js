@@ -1347,7 +1347,8 @@ test("every panel canvas uses the same adaptive card with contextual emphasis", 
   const canvasQml = fs.readFileSync(path.join(__dirname, "..", "DisplayCanvas.qml"), "utf8")
 
   assert.equal((panelQml.match(/emphasis: "layout"/g) || []).length, 2)
-  assert.equal((panelQml.match(/emphasis: "profile"/g) || []).length, 1)
+  // Profiles and Wallpapers share the saved-profile stage.
+  assert.equal((panelQml.match(/emphasis: "profile"/g) || []).length, 2)
   assert.equal((panelQml.match(/emphasis: "workspaces"/g) || []).length, 1)
   assert.match(canvasQml, /readonly property string workspaceText:/)
   // Workspaces are bare-ID chips, or one pill with the shared text when they do not fit.

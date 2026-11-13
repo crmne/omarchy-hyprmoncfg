@@ -43,6 +43,9 @@ BorderSurface {
   // Output key to a short note from the daemon's display health, such as
   // "No usable signal" or "Running without VRR". See Model.displayNotes.
   property var notes: ({})
+  // Display key to an image path (Wallpapers page). The picture fills the
+  // card's panel under a scrim so the shared labels stay readable.
+  property var wallpapers: ({})
   property color foreground: Commons.Color.foreground
   property color dim: Qt.darker(foreground, 1.5)
   property color accent: Commons.Color.accent
@@ -221,6 +224,7 @@ BorderSurface {
         readonly property real gutter: Math.min(Style.space(root.detailed ? 3 : 1), previewRect.width / 8, previewRect.height / 8)
         readonly property real bezel: tiny ? Math.max(1, Style.space(1)) : Style.space(4)
         readonly property color lit: selected ? root.accent : root.foreground
+        readonly property string wallpaper: String(root.wallpapers[String(modelData.key || "")] || "")
 
         x: previewRect.x + gutter + dragOffsetX
         y: previewRect.y + gutter + dragOffsetY
@@ -255,6 +259,23 @@ BorderSurface {
             gradient: Gradient {
               GradientStop { position: 0.0; color: Qt.rgba(card.lit.r, card.lit.g, card.lit.b, card.selected ? 0.30 : 0.10) }
               GradientStop { position: 1.0; color: Qt.rgba(card.lit.r, card.lit.g, card.lit.b, card.selected ? 0.08 : 0.03) }
+            }
+            clip: card.wallpaper !== ""
+
+            Image {
+              anchors.fill: parent
+              visible: card.wallpaper !== ""
+              source: card.wallpaper !== "" ? "file://" + card.wallpaper : ""
+              sourceSize.width: Math.ceil(Math.max(1, width) * 1.5)
+              fillMode: Image.PreserveAspectCrop
+              asynchronous: true
+              cache: false
+            }
+
+            Rectangle {
+              anchors.fill: parent
+              visible: card.wallpaper !== ""
+              color: Qt.rgba(0, 0, 0, card.selected ? 0.30 : 0.45)
             }
           }
         }
