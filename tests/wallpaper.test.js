@@ -261,3 +261,16 @@ test("a background change re-asserts the suspension OWE lifts when it hands back
   const layer = fs.readFileSync(path.join(__dirname, "..", "WallpaperLayer.qml"), "utf8")
   assert.match(layer, /onStreamFinished: \{[\s\S]{0,200}if \(root\.suspendedByUs\) Quickshell\.execDetached\(Wallpaper\.suspendCommand\(true\)\)/)
 })
+
+test("the card scrim follows the theme, so labels stay readable on light themes too", () => {
+  // Labels use the theme foreground. A black scrim kept light text readable
+  // but left a light theme's dark text on a darkened picture.
+  assert.ok(Wallpaper.scrimOpacity(true, false) >= 0.7, "light themes wash the picture out further")
+  assert.ok(Wallpaper.scrimOpacity(true, true) > Wallpaper.scrimOpacity(false, true))
+  assert.equal(Wallpaper.scrimOpacity(false, false), 0.45, "dark themes keep the original strength")
+  assert.equal(Wallpaper.scrimOpacity(false, true), 0.30)
+  const canvas = fs.readFileSync(path.join(__dirname, "..", "DisplayCanvas.qml"), "utf8")
+  assert.doesNotMatch(canvas, /color: Qt\.rgba\(0, 0, 0, card\.selected/)
+  assert.match(canvas, /property color scrimBase: Commons\.Color\.background/)
+  assert.match(canvas, /Qt\.rgba\(root\.scrimBase\.r, root\.scrimBase\.g, root\.scrimBase\.b,\s*Wallpaper\.scrimOpacity\(root\.lightTheme, card\.selected\)\)/)
+})

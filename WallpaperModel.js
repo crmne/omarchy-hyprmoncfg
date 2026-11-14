@@ -101,6 +101,14 @@ function aboveVideo(assigned, connector, stock) {
   return !!(assigned || {})[String(connector || "")] && isVideoPath(stock)
 }
 
+// The Wallpapers stage dims each card's picture with the theme background so
+// the card labels, drawn in the theme foreground, stay readable. Light themes
+// have dark labels and need the picture washed out further.
+function scrimOpacity(lightTheme, selected) {
+  if (lightTheme) return selected ? 0.62 : 0.72
+  return selected ? 0.30 : 0.45
+}
+
 function shouldSuspend(assigned) {
   return !!assigned && Object.keys(assigned).length > 0
 }
@@ -209,6 +217,7 @@ if (typeof module !== "undefined") {
     screenSource: screenSource,
     screenVisible: screenVisible,
     aboveVideo: aboveVideo,
+    scrimOpacity: scrimOpacity,
     isVideoPath: isVideoPath,
     normalize: normalize,
     wallpaperFor: wallpaperFor,

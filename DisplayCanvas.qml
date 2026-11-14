@@ -4,6 +4,7 @@ import qs.Commons as Commons
 import qs.Ui
 import "Model.js" as Model
 import "Strings.js" as Strings
+import "WallpaperModel.js" as Wallpaper
 
 // Direction B: the arrangement is a stage. Each display is drawn as a screen
 // (bezel plus lit panel) so the canvas reads as hardware at a glance; the
@@ -46,6 +47,9 @@ BorderSurface {
   // Display key to an image path (Wallpapers page). The picture fills the
   // card's panel under a scrim so the shared labels stay readable.
   property var wallpapers: ({})
+  // The wallpaper scrim takes the theme background; see Wallpaper.scrimOpacity.
+  readonly property color scrimBase: Commons.Color.background
+  readonly property bool lightTheme: scrimBase.hslLightness > 0.5
   property color foreground: Commons.Color.foreground
   property color dim: Qt.darker(foreground, 1.5)
   property color accent: Commons.Color.accent
@@ -275,7 +279,8 @@ BorderSurface {
             Rectangle {
               anchors.fill: parent
               visible: card.wallpaper !== ""
-              color: Qt.rgba(0, 0, 0, card.selected ? 0.30 : 0.45)
+              color: Qt.rgba(root.scrimBase.r, root.scrimBase.g, root.scrimBase.b,
+                Wallpaper.scrimOpacity(root.lightTheme, card.selected))
             }
           }
         }
