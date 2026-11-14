@@ -28,7 +28,7 @@ const otherTypes = new Set(`Canvas Column Component Connections Flickable Flow F
   HoverHandler Item ListView Loader MouseArea NumberAnimation ParallelAnimation PauseAnimation Popup Process
   PanelWindow QtObject Rectangle Region Repeater Row ScriptAction SequentialAnimation Shortcut Socket SplitParser
   StdioCollector Text TextInput TextMetrics Timer Variants Window Gradient IpcHandler Scope PropertyAnimation
-  Behavior ColorAnimation TextEdit TapHandler Image ScrollBar FileView`.split(/\s+/))
+  Behavior ColorAnimation TextEdit TapHandler Image ScrollBar FileView FolderListModel`.split(/\s+/))
 
 // Item, Rectangle, Text and positioner properties a shell type inherits from Qt.
 const qtMembers = new Set(`activeFocus activeFocusOnTab anchors antialiasing baselineOffset border bottomPadding

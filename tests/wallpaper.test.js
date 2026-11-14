@@ -204,5 +204,60 @@ test("a confirmed profile rename moves that profile's wallpapers", () => {
   assert.match(panel, /root\.send\("rename_profile", \{ name: name, new_name: next \}, \{ name: next, from: name \}\)/)
   assert.match(panel, /method === "rename_profile"\) \{[\s\S]{0,200}wallpaperStore\.renameProfile\(context\.from, context\.name\)/)
   const store = fs.readFileSync(path.join(__dirname, "..", "WallpaperStore.qml"), "utf8")
-  assert.match(store, /function renameProfile\(from, to\) \{[\s\S]{0,200}Wallpaper\.renameProfile\(root\.store, from, to\)/)
+  // Writes start from the file on disk; tst_WallpaperStore.qml covers why.
+  assert.match(store, /function renameProfile\(from, to\) \{[\s\S]{0,200}Wallpaper\.renameProfile\(store, from, to\)/)
+})
+
+test("isVideoPath matches the extensions Omarchy treats as video", () => {
+  for (const video of ["/a.mp4", "/a.M4V", "/a.mov", "/a.webm", "/a.mkv", "/a.avi"]) assert.equal(Wallpaper.isVideoPath(video), true, video)
+  for (const still of ["/a.png", "/a.jpg", "", null, "/mp4"]) assert.equal(Wallpaper.isVideoPath(still), false, String(still))
+})
+
+test("screenVisible leaves unassigned screens to OWE when the stock background is a video", () => {
+  const assigned = { "DP-1": "/lg.png" }
+  assert.equal(Wallpaper.screenVisible(assigned, "DP-1", "/clip.mp4"), true, "an assigned screen shows its picture")
+  assert.equal(Wallpaper.screenVisible(assigned, "DP-2", "/clip.mp4"), false, "OWE's video shows through")
+  assert.equal(Wallpaper.screenVisible(assigned, "DP-2", "/stock.jpg"), true, "the layer draws the stock still itself")
+  assert.equal(Wallpaper.screenVisible({}, "DP-1", "/stock.jpg"), false, "no assignment means no layer")
+  assert.equal(Wallpaper.screenVisible(null, "DP-1", ""), false)
+})
+
+test("normalize reads the file as hyprmoncfg's Go store writes it", () => {
+  const written = "{\n  \"version\": 1,\n  \"profiles\": {\n    \"Desk\": {\n      \"dell|u2720q\": \"/a.png\"\n    }\n  }\n}\n"
+  assert.deepEqual(Wallpaper.normalize(JSON.parse(written)), { version: 1, profiles: { Desk: { "dell|u2720q": "/a.png" } } })
+})
+
+test("each screen's window follows screenVisible, so a video stock background shows through", () => {
+  const layer = fs.readFileSync(path.join(__dirname, "..", "WallpaperLayer.qml"), "utf8")
+  assert.match(layer, /visible: Wallpaper\.screenVisible\(root\.assigned, modelData\.name, root\.stock\)/)
+})
+
+test("a theme or background change re-reads the stock picture at once, not on a 15s poll", () => {
+  const layer = fs.readFileSync(path.join(__dirname, "..", "WallpaperLayer.qml"), "utf8")
+  assert.doesNotMatch(layer, /interval: 15000/)
+  assert.match(layer, /StockBackgroundWatch \{[\s\S]{0,200}onBackgroundChanged: if \(root\.active\) stockReader\.running = true/)
+  const watch = fs.readFileSync(path.join(__dirname, "..", "StockBackgroundWatch.qml"), "utf8")
+  // A FileView on the symlink never fires when ln -nsf replaces it; the
+  // directory does, for omarchy-theme-set and omarchy-theme-bg-next alike.
+  assert.match(watch, /FolderListModel \{[\s\S]*folder: /)
+  assert.match(watch, /\.local\/state\/omarchy\/current/)
+})
+
+test("over a video stock background an assigned screen sits above OWE's layer", () => {
+  // OWE draws video on the Background layer too, and Hyprland stacks a layer
+  // by map order, so the later surface would win. Bottom is above Background
+  // and still below windows.
+  const assigned = { "DP-1": "/lg.png" }
+  assert.equal(Wallpaper.aboveVideo(assigned, "DP-1", "/clip.mp4"), true)
+  assert.equal(Wallpaper.aboveVideo(assigned, "DP-1", "/stock.jpg"), false, "stills keep the Background layer")
+  assert.equal(Wallpaper.aboveVideo(assigned, "DP-2", "/clip.mp4"), false)
+  const layer = fs.readFileSync(path.join(__dirname, "..", "WallpaperLayer.qml"), "utf8")
+  assert.match(layer, /WlrLayershell\.layer: Wallpaper\.aboveVideo\(root\.assigned, modelData\.name, root\.stock\) \? WlrLayer\.Bottom : WlrLayer\.Background/)
+})
+
+test("a background change re-asserts the suspension OWE lifts when it hands back a still", () => {
+  // OWE turns Omarchy's background back on whenever the background becomes a
+  // still; while this layer draws, Omarchy's must stay off underneath it.
+  const layer = fs.readFileSync(path.join(__dirname, "..", "WallpaperLayer.qml"), "utf8")
+  assert.match(layer, /onStreamFinished: \{[\s\S]{0,200}if \(root\.suspendedByUs\) Quickshell\.execDetached\(Wallpaper\.suspendCommand\(true\)\)/)
 })

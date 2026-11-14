@@ -46,12 +46,16 @@ Item {
   WallpaperStore { id: store }
 
   // Omarchy's current background, for screens without an assignment. Nothing
-  // announces a theme change, so re-read it while the layer is showing.
+  // announces a theme change, so StockBackgroundWatch watches for one.
   Process {
     id: stockReader
     command: Wallpaper.stockCommand(root.home)
     stdout: StdioCollector {
-      onStreamFinished: root.stock = String(text || "").trim()
+      onStreamFinished: {
+        root.stock = String(text || "").trim()
+        // OWE turns Omarchy's background back on when it hands back a still.
+        if (root.suspendedByUs) Quickshell.execDetached(Wallpaper.suspendCommand(true))
+      }
     }
   }
 
@@ -77,11 +81,9 @@ Item {
     }
   }
 
-  Timer {
-    interval: 15000
-    repeat: true
-    running: root.active
-    onTriggered: stockReader.running = true
+  StockBackgroundWatch {
+    home: root.home
+    onBackgroundChanged: if (root.active) stockReader.running = true
   }
 
   Process {
@@ -99,17 +101,18 @@ Item {
       readonly property string source: Wallpaper.screenSource(root.assigned, modelData.name, root.stock)
 
       screen: modelData
-      visible: root.active
+      visible: Wallpaper.screenVisible(root.assigned, modelData.name, root.stock)
       color: "black"
       anchors { top: true; bottom: true; left: true; right: true }
       WlrLayershell.namespace: "hyprmoncfg-wallpaper"
-      WlrLayershell.layer: WlrLayer.Background
+      WlrLayershell.layer: Wallpaper.aboveVideo(root.assigned, modelData.name, root.stock) ? WlrLayer.Bottom : WlrLayer.Background
       WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
       exclusionMode: ExclusionMode.Ignore
 
       Image {
         anchors.fill: parent
-        // A video stock background cannot be drawn here; show black instead.
+        // A video stock background is OWE's to draw; screenVisible keeps
+        // this window off those screens so its video shows through.
         source: Wallpaper.isSupportedImage(window.source) ? "file://" + window.source : ""
         sourceSize.width: Math.ceil(window.width * window.modelData.devicePixelRatio)
         sourceSize.height: Math.ceil(window.height * window.modelData.devicePixelRatio)

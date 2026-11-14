@@ -187,6 +187,12 @@ picture on its card; click a card or use the list below it. To set up another
 saved profile, open it in **Profiles** and choose **Wallpapers…** from its menu,
 or press `w`.
 
+The hyprmoncfg TUI has the same tab (`4`) and edits the same pictures; this
+plugin draws them either way. Renaming or deleting a profile from the panel, the
+TUI or the CLI keeps its pictures with it, on a hyprmoncfg that includes
+wallpaper support. When Omarchy's background is a video, displays without a
+picture keep showing it.
+
 ## Languages
 
 The panel follows the language picked under Setup > Language, live and without a restart, in all 50 languages Omarchy ships, with their plural forms. Arabic, Hebrew, Persian and Urdu mirror the panel, except the layout canvas, which stays a picture of your desk. On an Omarchy without language support the panel stays in English.

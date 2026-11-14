@@ -80,6 +80,27 @@ function screenSource(assigned, connector, stock) {
   return path ? path : String(stock || "")
 }
 
+// Omarchy hands video backgrounds to OWE, which draws them on its own layer.
+// This copies the shell's Util.isVideoPath, which plugins cannot import.
+function isVideoPath(path) {
+  return /\.(mp4|m4v|mov|webm|mkv|avi)$/i.test(String(path || ""))
+}
+
+// Whether the layer covers a screen. With a video stock background the layer
+// cannot draw it, so unassigned screens stay uncovered and OWE's video shows.
+function screenVisible(assigned, connector, stock) {
+  if (!shouldSuspend(assigned)) return false
+  if ((assigned || {})[String(connector || "")]) return true
+  return !isVideoPath(stock)
+}
+
+// OWE's video sits on the Background layer as well, where the surface mapped
+// last is on top. An assigned screen over a video therefore uses the Bottom
+// layer, which is above Background and still below windows.
+function aboveVideo(assigned, connector, stock) {
+  return !!(assigned || {})[String(connector || "")] && isVideoPath(stock)
+}
+
 function shouldSuspend(assigned) {
   return !!assigned && Object.keys(assigned).length > 0
 }
@@ -186,6 +207,9 @@ if (typeof module !== "undefined") {
     assignments: assignments,
     shouldSuspend: shouldSuspend,
     screenSource: screenSource,
+    screenVisible: screenVisible,
+    aboveVideo: aboveVideo,
+    isVideoPath: isVideoPath,
     normalize: normalize,
     wallpaperFor: wallpaperFor,
     setWallpaper: setWallpaper,
