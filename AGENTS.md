@@ -37,7 +37,7 @@ Documentation changes need link/content and whitespace checks, not tests of pros
 ## Presentation consistency
 
 - No inline keyboard hints in action labels. Keep shortcuts in footer/help;
-  only the numbered 1, 2, 3 navigation tabs are exceptions.
+  only the numbered 1, 2, 3, 4 navigation tabs are exceptions.
 - Follow the shared design's Accepted display presentation contract. Use shared
   formatters: connector identity, model, compact resolution@Hz, Scale and
   Position, bare workspace IDs. Never add display numbering or logical-size text.

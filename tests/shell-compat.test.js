@@ -19,6 +19,8 @@ const localTypes = new Set(files.flatMap(name => [name.slice(0, -4),
 // Loaded only through a guard that survives its failure: see Strings.js.
 const guarded = new Set(["StringsSource.qml"])
 const bundledCommands = new Set(["omarchy-terminal-font-size"])
+// Shaped like commands, but Hyprland layer names the plugin looks for.
+const layerNamespaces = new Set(["omarchy-background"])
 
 // Everything else a plugin file may instantiate. A new Qt or Quickshell type
 // goes here; a type that isn't one is a shell name the baseline lacks.
@@ -26,7 +28,7 @@ const otherTypes = new Set(`Canvas Column Component Connections Flickable Flow F
   HoverHandler Item ListView Loader MouseArea NumberAnimation ParallelAnimation PauseAnimation Popup Process
   PanelWindow QtObject Rectangle Region Repeater Row ScriptAction SequentialAnimation Shortcut Socket SplitParser
   StdioCollector Text TextInput TextMetrics Timer Variants Window Gradient IpcHandler Scope PropertyAnimation
-  Behavior ColorAnimation TextEdit TapHandler Image ScrollBar`.split(/\s+/))
+  Behavior ColorAnimation TextEdit TapHandler Image ScrollBar FileView FolderListModel`.split(/\s+/))
 
 // Item, Rectangle, Text and positioner properties a shell type inherits from Qt.
 const qtMembers = new Set(`activeFocus activeFocusOnTab anchors antialiasing baselineOffset border bottomPadding
@@ -112,7 +114,7 @@ test("omarchy commands exist in the oldest supported shell or ship here", () => 
   for (const file of [...files, ...scripts]) {
     const text = fs.readFileSync(path.join(root, file), "utf8")
     for (const match of text.matchAll(/\b(omarchy-[a-z][a-z-]*[a-z])\b/g)) {
-      if (!baseline.commands.includes(match[1]) && !bundledCommands.has(match[1])) unknown.push(file + ": " + match[1])
+      if (!baseline.commands.includes(match[1]) && !bundledCommands.has(match[1]) && !layerNamespaces.has(match[1])) unknown.push(file + ": " + match[1])
     }
   }
   assert.deepEqual([...new Set(unknown)].filter(name => !/hyprmoncfg/.test(name)), [], "not in Omarchy " + baseline.version)

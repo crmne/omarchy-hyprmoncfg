@@ -353,6 +353,59 @@ atomic backend support, never separate client save/delete calls. Delete needs
 confirmation or undo and must not switch the live arrangement as a hidden side
 effect. Retain equivalent TUI operations and documented shortcuts.
 
+### Wallpapers
+
+The fourth tab lists each display the current profile drives, with a thumbnail,
+**Choose…** (Omarchy's file chooser, still images only) and **Clear**. Pictures
+are stored per profile and per display match key (make, model, serial) in the
+plugin-owned `~/.config/hyprmoncfg/wallpapers.json`, never in profile JSON,
+which the daemon owns. Moving a cable keeps each picture on its display.
+
+Omarchy's background draws one picture on every screen. While the active
+profile assigns any wallpaper, the persistent service suspends it and draws
+each screen itself: the assigned picture, or Omarchy's own background where
+none is set. A video background is OWE's to draw, so the layer stays off the
+screens without a picture and the video shows through. OWE's surface shares the
+Background layer, where the surface mapped last is on top, so over a video an
+assigned screen's window moves to the Bottom layer, still below windows. OWE
+turns Omarchy's background back on when it hands back a still, so every stock
+re-read re-asserts the suspension. Omarchy announces no
+background change, so `StockBackgroundWatch.qml` watches
+`~/.local/state/omarchy/current`, where a theme switch or a background pick
+replaces the `background` symlink, and the layer re-reads it at once. Double-clicking the desktop opens Omarchy's background selector
+(left) or theme switcher (right); single clicks do nothing. When the active profile has none, or there is no current profile, the
+layer goes away and Omarchy's background returns, as it does when the plugin is
+disabled. A confirmed profile delete drops that profile's pictures.
+
+The TUI's Wallpapers tab (`4`, or `w` on Profiles) edits the same file through
+hyprmoncfg's `internal/wallpaper` package, and hyprmoncfg's profile store moves
+or drops a profile's entry inside every rename and delete, whichever client
+asked. The panel's store therefore re-reads the file before each write, and its
+own rename and delete handling only acts when an older hyprmoncfg left the entry
+in place.
+
+Capability gaps: only this plugin draws wallpapers; a TUI-only install saves
+them without showing them. The TUI shows file names, not thumbnails. Renames
+outside the panel keep their pictures only with a hyprmoncfg release that
+includes wallpaper support.
+
+```mermaid
+flowchart LR
+  Panel[Panel.qml] --> Page[WallpapersPage.qml] --> Row[WallpaperRow.qml]
+  Page -- stageContent --> Canvas[DisplayCanvas.qml wallpapers]
+  ProfilesTab[Profiles tab menu, w] -- openWallpapersFor --> Page
+  Panel --> Picker[WallpaperPicker.qml] --> FS[[omarchy file select]]
+  Panel --> Store[WallpaperStore.qml]
+  Guard[PreviewGuard.qml service] --> Layer[WallpaperLayer.qml]
+  Layer --> Watch[StockBackgroundWatch.qml] --> OmState[(~/.local/state/omarchy/current)]
+  Layer --> Store
+  Store --> JSON[(wallpapers.json)]
+  Page & Layer --> WM[WallpaperModel.js]
+  Guard -- status events --> Daemon[(hyprmoncfgd socket)]
+  Layer -- omarchy-shell IPC setSuspended --> OmBg[Omarchy background]
+  TUI[[hyprmoncfg TUI, profile rename/delete]] --> JSON
+```
+
 ### Footer and confirmation
 
 Keep the footer outside scrolling content. Show one concise state: Unsaved setup,
