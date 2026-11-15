@@ -48,6 +48,45 @@ Item {
     function workspaces(payload: string): string { return root.openWorkspacePage(payload) }
   }
 
+  // Per-screen panels register here so the one shell-wide IPC target can pick
+  // the panel on the focused display.
+  property var panels: []
+  function registerPanel(panel) {
+    if (panel && root.panels.indexOf(panel) < 0) root.panels = root.panels.concat([panel])
+  }
+  function unregisterPanel(panel) {
+    root.panels = root.panels.filter(function(candidate) { return candidate !== panel })
+  }
+  function panelOnFocusedDisplay() {
+    var focused = Hyprland.focusedMonitor
+    var name = focused ? focused.name : ""
+    var live = root.panels.filter(function(panel) { return !!panel })
+    for (var i = 0; i < live.length; i++) {
+      if (name !== "" && live[i].screenName === name) return live[i]
+    }
+    return live.length > 0 ? live[0] : null
+  }
+  function openPanel() {
+    var opened = root.panels.find(function(panel) { return panel && panel.opened === true })
+    var target = opened || root.panelOnFocusedDisplay()
+    if (target) target.openFromHotkey()
+  }
+  function closePanels() {
+    root.panels.forEach(function(panel) { if (panel && panel.opened === true) panel.close() })
+  }
+  function togglePanel() {
+    if (root.panels.some(function(panel) { return panel && panel.opened === true })) root.closePanels()
+    else root.openPanel()
+  }
+  IpcHandler {
+    target: "crmne.hyprmoncfg"
+    function open(): void { root.openPanel() }
+    function close(): void { root.closePanels() }
+    function show(): void { root.openPanel() }
+    function hide(): void { root.closePanels() }
+    function toggle(): void { root.togglePanel() }
+  }
+
   property bool panelExpanded: false
   property bool panelWorkspaceOnly: false
   function setPanelWorkspaceOnly(value) {

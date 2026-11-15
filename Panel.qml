@@ -293,6 +293,10 @@ Panel {
     }
   }
   onPreviewCoordinatorChanged: root.restorePanelExpanded()
+  Connections {
+    target: root
+    function onPreviewCoordinatorChanged() { root.syncPanelRegistration() }
+  }
   function restorePanelExpanded() {
     if (root.previewCoordinator && root.previewCoordinator.panelWorkspaceOnly === true) {
       root.workspaceOnly = true
@@ -621,6 +625,23 @@ Panel {
   function toggle() {
     if (root.opened) root.close()
     else root.openFromHotkey()
+  }
+
+  // Every per-screen bar loads its own panel, so the shell-wide service owns
+  // the IPC target and routes it to the panel on the focused display.
+  readonly property string screenName: panel.screen ? panel.screen.name : ""
+  property var registeredCoordinator: null
+  function syncPanelRegistration() {
+    var coordinator = root.previewCoordinator
+    if (coordinator === root.registeredCoordinator) return
+    if (root.registeredCoordinator && typeof root.registeredCoordinator.unregisterPanel === "function")
+      root.registeredCoordinator.unregisterPanel(root)
+    root.registeredCoordinator = coordinator
+    if (coordinator && typeof coordinator.registerPanel === "function") coordinator.registerPanel(root)
+  }
+  Component.onDestruction: {
+    if (root.registeredCoordinator && typeof root.registeredCoordinator.unregisterPanel === "function")
+      root.registeredCoordinator.unregisterPanel(root)
   }
 
   function switchPanel(direction) {
@@ -1998,6 +2019,7 @@ Panel {
     root.checkTextSizeCommand()
     root.readTerminalSize()
     root.restorePanelExpanded()
+    root.syncPanelRegistration()
   }
   onActivePageChanged: {
     if (root.workspaceOnly && root.activePage !== "workspaces") { root.activePage = "workspaces"; return }

@@ -51,6 +51,33 @@ navigation. Existing brightness, text-size, scale and display controls remain
 available. The editor opens on the focused display and retains its normal
 close, repeated-open and preview behavior.
 
+## Bind a key
+
+The panel answers `omarchy-shell` directly, so a keybinding can open it without
+clicking the bar icon (and with the icon hidden). `toggle`, `open`, `close`,
+`show` and `hide` are available:
+
+```bash
+omarchy-shell crmne.hyprmoncfg toggle
+```
+
+For example, in `~/.config/hypr/bindings.lua`:
+
+```lua
+o.bind("SUPER + ALT + M", "Display layouts", "omarchy-shell crmne.hyprmoncfg toggle")
+```
+
+You can also use it in place of Omarchy's default Display widget. Disable the
+default widget, then take over its `SUPER + CTRL + D` binding:
+
+```bash
+omarchy plugin disable omarchy.monitor
+```
+
+```lua
+o.rebind("SUPER + CTRL + D", "Display", "omarchy-shell crmne.hyprmoncfg toggle")
+```
+
 ## Add a workspace picker
 
 The Workspaces canvas previews [hyprmoncfg Workspaces](https://github.com/crmne/omarchy-hyprmoncfg-workspaces),

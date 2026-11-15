@@ -2353,6 +2353,14 @@ test("lid-closed match reasons have labels", () => {
   assert.equal(rows[1].value, "+50   1 display built-in, turned off by the closed lid")
 })
 
+test("IPC is registered once by the shell service and routed to the focused display's panel", () => {
+  const guard = fs.readFileSync(path.join(__dirname, "..", "PreviewGuard.qml"), "utf8")
+  const panel = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  assert.match(guard, /IpcHandler\s*\{\s*target: "crmne\.hyprmoncfg"/)
+  assert.match(guard, /Hyprland\.focusedMonitor/)
+  assert.doesNotMatch(panel, /IpcHandler/)
+})
+
 test("expanded mode survives the bar rebuild a preview triggers", () => {
   const guard = previewGuard()
   guard.root.setPanelExpanded(true)
