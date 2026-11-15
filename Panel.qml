@@ -2786,9 +2786,13 @@ Panel {
 
               EditorPane {
                 width: parent.width
-                // Fit the arrangement's aspect within the compact clamps.
-                height: Model.compactStageHeight(root.layoutBounds, width, root.sizingUnit, root.layoutOffRow,
-                  root.displayMode.available)
+                // Fit the arrangement's aspect within the compact clamps. Size
+                // from the viewport's full width, not this pane's: the pane
+                // narrows when the body's scrollbar appears, which would
+                // shorten the stage, hide the scrollbar, widen the pane and
+                // grow the stage again in an endless layout loop.
+                height: Model.compactStageHeight(root.layoutBounds, compactBody.width, root.sizingUnit,
+                  root.layoutOffRow, root.displayMode.available)
                 title: ""
                 meta: ""
                 active: true
