@@ -259,6 +259,8 @@
   "option.strategyOff": "Off",
   "option.strategySequential": "Sequential",
   "option.vrrFullscreen": "Fullscreen",
+  "option.vrrGames": "Fullscreen (games)",
+  "option.vrrGlobal": "Follow global",
   "option.vrrOff": "Off",
   "option.vrrOn": "On",
   "picker.benefit": "A workspace picker that follows your monitor layout.",

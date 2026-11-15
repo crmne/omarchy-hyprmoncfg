@@ -517,11 +517,14 @@ Panel {
   readonly property var selectedRefreshOptions: Model.refreshOptions(root.selectedDisplayModes,
     root.selectedOutput ? Model.modeResolution(Model.outputMode(root.selectedOutput)) : "")
   readonly property var colorKeyboardFields: Model.colorInspectorFields(root.colorAdvancedOpen)
-  readonly property var vrrOptions: [
+  // In Hyprland's numeric order, as the TUI lists them.
+  readonly property var vrrOptions: Model.supportedVRROptions([
+    { value: "-1", label: Strings.t("option.vrrGlobal", "Follow global") },
     { value: "0", label: Strings.t("option.vrrOff", "Off") },
     { value: "1", label: Strings.t("option.vrrOn", "On") },
-    { value: "2", label: Strings.t("option.vrrFullscreen", "Fullscreen") }
-  ]
+    { value: "2", label: Strings.t("option.vrrFullscreen", "Fullscreen") },
+    { value: "3", label: Strings.t("option.vrrGames", "Fullscreen (games)") }
+  ], root.editorDocument.vrr_modes)
   readonly property var bitdepthOptions: [
     { value: "8", label: "8-bit" },
     { value: "10", label: "10-bit" }

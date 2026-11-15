@@ -1851,6 +1851,15 @@ function placementOptions() {
 
 // Keep an unreported or unknown current value visible in a closed set instead
 // of silently showing nothing selected.
+// The VRR modes this daemon can save, from the editor document's vrr_modes.
+// A daemon without the field accepts Off, On and Fullscreen only.
+function supportedVRROptions(options, advertised) {
+  var modes = advertised instanceof Array && advertised.length > 0 ? advertised.map(String) : ["0", "1", "2"]
+  return (options instanceof Array ? options : []).filter(function(option) {
+    return modes.indexOf(String((option || {}).value)) >= 0
+  })
+}
+
 function optionsWithCurrent(options, value) {
   var items = options instanceof Array ? options.slice() : []
   var current = String(value === undefined || value === null ? "" : value)
@@ -2134,6 +2143,7 @@ if (typeof module !== "undefined") {
     colorInspectorFields: colorInspectorFields,
     colorAdvancedSummary: colorAdvancedSummary,
     placementOptions: placementOptions,
+    supportedVRROptions: supportedVRROptions,
     optionsWithCurrent: optionsWithCurrent,
     parseCoordinate: parseCoordinate,
     parseInteger: parseInteger,

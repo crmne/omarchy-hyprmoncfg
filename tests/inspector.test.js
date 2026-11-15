@@ -50,6 +50,15 @@ test("rotation and flip are one transform edited as two independent parts", () =
     assert.equal(Model.transformWith(unknown, 1, true), unknown, "an unknown transform is never rewritten")
 })
 
+test("VRR offers only the modes the daemon advertises", () => {
+  const options = ["-1", "0", "1", "2", "3"].map(value => ({ value, label: value }))
+  assert.deepEqual(Model.supportedVRROptions(options, [-1, 0, 1, 2, 3]).map(o => o.value), ["-1", "0", "1", "2", "3"])
+  assert.deepEqual(Model.supportedVRROptions(options, undefined).map(o => o.value), ["0", "1", "2"],
+    "an older daemon rejects Follow global and Fullscreen (games)")
+  assert.deepEqual(Model.supportedVRROptions(options, []).map(o => o.value), ["0", "1", "2"])
+  assert.match(qml, /vrrOptions: Model\.supportedVRROptions\(\[[\s\S]*?\], root\.editorDocument\.vrr_modes\)/)
+})
+
 test("closed sets keep an unreported current value visible", () => {
   const options = [{ value: "0", label: "Off" }, { value: "1", label: "On" }]
   assert.deepEqual(Model.optionsWithCurrent(options, "1").map(o => o.value), ["0", "1"])
