@@ -1182,8 +1182,8 @@ test("the workspace form hides irrelevant group size and adapts keyboard navigat
   assert.match(qml, /id: workspaceGroupSizeField\s+visible: root\.workspaceGroupSizeApplicable/)
   assert.match(qml, /width: root\.workspaceGroupSizeApplicable\s+\? \(parent\.width - parent\.spacing\) \/ 2 : parent\.width/)
   // Hiding Group Size also removes its keyboard stop; assignment rows move up.
-  assert.match(qml, /readonly property int workspacePersistenceKeyboardIndex: root\.workspacesOff \? -1\s+: root\.workspaceGroupSizeApplicable \? 3 : 2/)
-  assert.match(qml, /readonly property int workspaceListKeyboardStart: root\.workspacesOff \? 1\s+: root\.workspacePersistenceKeyboardIndex \+ 1/)
+  assert.match(qml, /readonly property int workspacePersistenceKeyboardIndex: root\.workspacesOff \|\| root\.workspacePerDisplayDelegated \? -1\s+: root\.workspaceGroupSizeApplicable \? 3 : root\.workspacePerDisplay \? 1 : 2/)
+  assert.match(qml, /readonly property int workspaceListKeyboardStart: root\.workspacesOff \|\| root\.workspacePerDisplayDelegated \? 1\s+: root\.workspacePersistenceKeyboardIndex \+ 1/)
   assert.match(qml, /root\.workspaceKeyboardIndex === root\.workspaceListKeyboardStart \+ index/)
   assert.doesNotMatch(qml, /root\.workspaceKeyboardIndex === 4 \+ index/)
 })
@@ -2236,6 +2236,7 @@ test("workspace keyboard cycles Off first and Off leaves only Strategy", () => {
     workspacePlanKeyboardCount: () => 1, pickerOfferVisible: true,
     workspacePersistenceKeyboardIndex: -1, workspaceListKeyboardStart: 1, workspaceValueMaximum: 100,
     editorDocument: { workspace_persistence_supported: true },
+    workspaceStrategyOptions: Model.workspaceStrategyOptions(),
     changeWorkspaceStrategy: value => choices.push(value), editWorkspaces: value => edits.push(value),
     setWorkspaceCount: value => edits.push({ count: value }), bounded: (v, lo, hi) => Math.min(hi, Math.max(lo, v)) }
   const adjust = panelFunction("adjustWorkspaceKeyboard", root)
@@ -2246,6 +2247,10 @@ test("workspace keyboard cycles Off first and Off leaves only Strategy", () => {
   root.draftProfile.workspaces.strategy = "interleave"
   adjust(1)
   assert.equal(choices.pop(), "off")
+  // A daemon that saves Per display puts it after Interleaved.
+  root.workspaceStrategyOptions = Model.workspaceStrategyOptions(["per_display"])
+  adjust(1)
+  assert.equal(choices.pop(), "per_display")
 
   // While Off, rows after Strategy are inert even if a cursor lands on them.
   root.draftProfile.workspaces.enabled = false
@@ -2260,16 +2265,35 @@ test("workspace keyboard cycles Off first and Off leaves only Strategy", () => {
   assert.equal(count(), 1)
 })
 
+test("Per display is offered only by a daemon that can save it", () => {
+  assert.deepEqual(Model.workspaceStrategyOptions(["manual", "sequential", "interleave"]).map(option => option.value),
+    ["off", "manual", "sequential", "interleave"])
+  assert.deepEqual(Model.workspaceStrategyOptions(["manual", "sequential", "interleave", "per_display"]).map(option => option.label),
+    ["Off", "Manual", "Sequential", "Interleaved", "Per display"])
+  // A saved profile still reads by name even before the daemon is known.
+  assert.equal(Model.profileWorkspaceSummary({ workspaces: { enabled: true, strategy: "per_display", max_workspaces: 6 } }), "Per display")
+  assert.equal(Model.workspacePerDisplayDelegate({ workspace_per_display_delegate: "omarchy" }), "omarchy")
+  assert.equal(Model.workspacePerDisplayDelegate({}), "")
+})
+
+test("Omarchy's per-display workspaces leave only Strategy editable", () => {
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  assert.match(qml, /workspacePersistenceKeyboardIndex: root\.workspacesOff \|\| root\.workspacePerDisplayDelegated \? -1/)
+  assert.match(qml, /if \(root\.workspacesOff \|\| root\.workspacePerDisplayDelegated\) return root\.workspaceListKeyboardStart/)
+  assert.match(qml, /label: "Persistence"\s+value: "Set by Omarchy"/)
+  assert.match(qml, /model: root\.workspacesOff \|\| root\.workspacePerDisplayDelegated/)
+})
+
 test("Off replaces the Enabled toggle, hides plan controls, and explains the empty plan", () => {
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
   const planner = qml.slice(qml.indexOf('title: "Workspace Planner"'), qml.indexOf('title: "Monitor Layout"', qml.indexOf('title: "Workspace Plan"')))
   assert.doesNotMatch(qml, /workspaceEnabledToggle/)
   assert.doesNotMatch(planner, /label: "Enabled"/)
   assert.doesNotMatch(qml, /"preview only"/)
-  assert.match(planner, /options: Model\.workspaceStrategyOptions\(\)\s+value: root\.workspaceStrategyChoice/)
+  assert.match(planner, /options: root\.workspaceStrategyOptions\s+value: root\.workspaceStrategyChoice/)
   assert.match(planner, /label: "Workspaces"\s+value: "—"/)
   assert.match(planner, /label: "Persistence"\s+value: "—"/)
-  assert.match(planner, /Row \{\s+visible: !root\.workspacesOff/)
+  assert.match(planner, /Row \{\s+visible: !root\.workspacesOff && !root\.workspacePerDisplay/)
   assert.match(planner, /id: workspacePersistenceDropdown\s+visible: !root\.workspacesOff/)
   assert.match(planner, /id: manualAssignmentList\s+visible: !root\.workspacesOff/)
   assert.match(planner, /model: root\.workspacesOff \? \[\] : root\.workspaceRows/)

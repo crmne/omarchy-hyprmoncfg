@@ -249,6 +249,7 @@
   "option.strategyInterleaved": "交互",
   "option.strategyManual": "手動",
   "option.strategyOff": "オフ",
+  "option.strategyPerDisplay": "ディスプレイごと",
   "option.strategySequential": "順次",
   "option.vrrFullscreen": "全画面",
   "option.vrrOff": "オフ",
@@ -400,6 +401,8 @@
   "workspace.noRules": "ワークスペースルールは設定されていません",
   "workspace.offMessage": "オフ: hyprmoncfg はワークスペースルールを書き込みません。",
   "workspace.orderHeader": "モニターの順序",
+  "workspace.perDisplayCount": "ディスプレイごとに 10",
+  "workspace.perDisplayOmarchy": "Omarchy は各ディスプレイに専用のワークスペース 1-10 を割り当て、ノート PC の画面から順にブロックを選びます。プランには、ウィンドウルールで使う番号が表示されます。",
   "workspace.persistence": "保持",
   "workspace.persistenceAll": "割り当て済みすべて",
   "workspace.persistenceCustom": "カスタム (ルールごと)",
@@ -410,6 +413,7 @@
   "workspace.requiresNewerDaemon": "新しいデーモンが必要",
   "workspace.row": "ワークスペース %1",
   "workspace.rowLabel": "ワークスペース",
+  "workspace.setByOmarchy": "Omarchy が設定",
   "workspace.strategy": "方式",
   "workspace.strategySummary": {
     "other": "%2 · ワークスペース %1 個"

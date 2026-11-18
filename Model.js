@@ -1123,7 +1123,7 @@ function onOff(value) {
 // A stored strategy by its name in the Strategy control. One this panel does
 // not know, from a newer daemon, is shown as stored.
 function workspaceStrategyLabel(strategy) {
-  var options = workspaceStrategyOptions()
+  var options = workspaceStrategyOptions(["per_display"])
   for (var i = 0; i < options.length; i++) {
     if (options[i].value === strategy) return options[i].label
   }
@@ -1134,6 +1134,8 @@ function profileWorkspaceSummary(profile) {
   var settings = (profile || {}).workspaces || {}
   if (!settings.enabled) return Strings.t("workspace.disabled", "Disabled")
   var strategy = workspaceStrategyLabel(String(settings.strategy || "manual"))
+  // Per display fixes ten workspaces on each display; the stored count is inert.
+  if (String(settings.strategy || "") === "per_display") return strategy
   var maximum = Number(settings.max_workspaces || 0)
   return maximum > 0
     ? Strings.tn("workspace.strategySummary", maximum, "%2 · %1 workspace", "%2 · %1 workspaces", strategy)
@@ -1411,13 +1413,24 @@ function cycleManualWorkspaceRule(rules, profile, rowIndex, delta) {
 
 // Off is a presentation of `enabled: false`, not a stored strategy: the saved
 // strategy and plan stay intact so choosing a strategy again restores them.
-function workspaceStrategyOptions() {
-  return [
+// Per display is offered only when the daemon lists it in
+// `workspace_strategies`; an older daemon would reject it.
+function workspaceStrategyOptions(strategies) {
+  var options = [
     { value: "off", label: Strings.t("option.strategyOff", "Off") },
     { value: "manual", label: Strings.t("option.strategyManual", "Manual") },
     { value: "sequential", label: Strings.t("option.strategySequential", "Sequential") },
     { value: "interleave", label: Strings.t("option.strategyInterleaved", "Interleaved") }
   ]
+  if (strategies instanceof Array && strategies.indexOf("per_display") >= 0)
+    options.push({ value: "per_display", label: Strings.t("option.strategyPerDisplay", "Per display") })
+  return options
+}
+
+// Who runs per-display workspaces for this document: "omarchy" when Omarchy's
+// own per-monitor workspaces do, or "" when hyprmoncfg does.
+function workspacePerDisplayDelegate(document) {
+  return String((document || {}).workspace_per_display_delegate || "")
 }
 
 function workspaceOffMessage() {
@@ -2190,6 +2203,7 @@ if (typeof module !== "undefined") {
     resizeManualWorkspaceRules: resizeManualWorkspaceRules,
     cycleManualWorkspaceRule: cycleManualWorkspaceRule,
     workspaceStrategyOptions: workspaceStrategyOptions,
+    workspacePerDisplayDelegate: workspacePerDisplayDelegate,
     workspaceOffMessage: workspaceOffMessage,
     workspaceStrategyChoice: workspaceStrategyChoice,
     workspaceStrategyChanges: workspaceStrategyChanges,

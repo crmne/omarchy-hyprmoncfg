@@ -249,6 +249,7 @@
   "option.strategyInterleaved": "교차",
   "option.strategyManual": "수동",
   "option.strategyOff": "끔",
+  "option.strategyPerDisplay": "디스플레이별",
   "option.strategySequential": "순차",
   "option.vrrFullscreen": "전체 화면",
   "option.vrrOff": "끔",
@@ -400,6 +401,8 @@
   "workspace.noRules": "구성된 워크스페이스 규칙 없음",
   "workspace.offMessage": "끔: hyprmoncfg가 워크스페이스 규칙을 작성하지 않습니다.",
   "workspace.orderHeader": "모니터 순서",
+  "workspace.perDisplayCount": "디스플레이별 10개",
+  "workspace.perDisplayOmarchy": "Omarchy는 각 디스플레이에 고유한 워크스페이스 1-10을 주고, 노트북 화면부터 블록을 고릅니다. 계획에 창 규칙에 쓸 번호가 표시됩니다.",
   "workspace.persistence": "유지",
   "workspace.persistenceAll": "할당된 전체",
   "workspace.persistenceCustom": "사용자 지정 (규칙별)",
@@ -410,6 +413,7 @@
   "workspace.requiresNewerDaemon": "최신 데몬 필요",
   "workspace.row": "워크스페이스 %1",
   "workspace.rowLabel": "워크스페이스",
+  "workspace.setByOmarchy": "Omarchy가 설정",
   "workspace.strategy": "전략",
   "workspace.strategySummary": {
     "other": "%2 · 워크스페이스 %1개"

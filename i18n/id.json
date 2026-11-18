@@ -249,6 +249,7 @@
   "option.strategyInterleaved": "Selang-seling",
   "option.strategyManual": "Manual",
   "option.strategyOff": "Mati",
+  "option.strategyPerDisplay": "Per layar",
   "option.strategySequential": "Berurutan",
   "option.vrrFullscreen": "Layar penuh",
   "option.vrrOff": "Mati",
@@ -400,6 +401,8 @@
   "workspace.noRules": "Tidak ada aturan ruang kerja yang dikonfigurasi",
   "workspace.offMessage": "Mati: hyprmoncfg tidak menulis aturan ruang kerja.",
   "workspace.orderHeader": "URUTAN LAYAR",
+  "workspace.perDisplayCount": "10 per layar",
+  "workspace.perDisplayOmarchy": "Omarchy memberi setiap layar ruang kerja 1-10 miliknya sendiri dan memilih bloknya, dimulai dari layar laptop. Rencana menampilkan nomor yang dipakai di aturan jendela.",
   "workspace.persistence": "PERSISTENSI",
   "workspace.persistenceAll": "Semua yang ditetapkan",
   "workspace.persistenceCustom": "Kustom (per aturan)",
@@ -410,6 +413,7 @@
   "workspace.requiresNewerDaemon": "Perlu daemon lebih baru",
   "workspace.row": "Ruang kerja %1",
   "workspace.rowLabel": "Ruang kerja",
+  "workspace.setByOmarchy": "Diatur oleh Omarchy",
   "workspace.strategy": "STRATEGI",
   "workspace.strategySummary": {
     "other": "%2 · %1 ruang kerja"

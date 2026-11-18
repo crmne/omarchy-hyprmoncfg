@@ -478,10 +478,18 @@ Panel {
   readonly property string workspaceStrategyChoice: Model.workspaceStrategyChoice((root.draftProfile || {}).workspaces)
   readonly property bool workspacesOff: root.workspaceStrategyChoice === "off"
   readonly property bool workspaceGroupSizeApplicable: !root.workspacesOff && root.workspaceStrategy === "sequential"
+  // Per display fixes ten workspaces on each display. Where Omarchy runs its
+  // own per-monitor workspaces, it also picks the blocks and what persists.
+  readonly property bool workspacePerDisplay: !root.workspacesOff && root.workspaceStrategy === "per_display"
+  readonly property bool workspacePerDisplayDelegated: root.workspacePerDisplay
+    && Model.workspacePerDisplayDelegate(root.editorDocument) !== ""
+  readonly property var workspaceStrategyOptions: Model.workspaceStrategyOptions(
+    (root.editorDocument || {}).workspace_strategies)
   // Off leaves only Strategy editable, so the inert rows are not keyboard stops.
-  readonly property int workspacePersistenceKeyboardIndex: root.workspacesOff ? -1
-    : root.workspaceGroupSizeApplicable ? 3 : 2
-  readonly property int workspaceListKeyboardStart: root.workspacesOff ? 1
+  // Per display has no count to edit, and under Omarchy nothing but Strategy.
+  readonly property int workspacePersistenceKeyboardIndex: root.workspacesOff || root.workspacePerDisplayDelegated ? -1
+    : root.workspaceGroupSizeApplicable ? 3 : root.workspacePerDisplay ? 1 : 2
+  readonly property int workspaceListKeyboardStart: root.workspacesOff || root.workspacePerDisplayDelegated ? 1
     : root.workspacePersistenceKeyboardIndex + 1
   readonly property string selectedWorkspaceDisplayKey: {
     var index = root.workspaceKeyboardIndex - root.workspaceListKeyboardStart
@@ -1324,7 +1332,7 @@ Panel {
 
   function workspacePlanKeyboardCount() {
     var settings = ((root.draftProfile || {}).workspaces || {})
-    if (root.workspacesOff) return root.workspaceListKeyboardStart
+    if (root.workspacesOff || root.workspacePerDisplayDelegated) return root.workspaceListKeyboardStart
     if (root.workspaceStrategy === "manual")
       return root.workspaceListKeyboardStart + root.manualWorkspaceRows.length
     var order = settings.monitor_order || []
@@ -1360,9 +1368,13 @@ Panel {
     var settings = Model.clone((root.draftProfile || {}).workspaces || {}) || {}
     var index = root.workspaceKeyboardIndex
     if (index === 0) root.changeWorkspaceStrategy(
-      Model.cycleOptionValue(Model.workspaceStrategyOptions(),
+      Model.cycleOptionValue(root.workspaceStrategyOptions,
         Model.workspaceStrategyChoice(settings), delta))
-    else if (root.workspacesOff) return
+    else if (root.workspacesOff || root.workspacePerDisplayDelegated) return
+    else if (index === root.workspacePersistenceKeyboardIndex) {
+      if (root.editorDocument.workspace_persistence_supported === true && root.workspaceStrategy !== "manual")
+        root.editWorkspaces({ persist_all: !settings.persist_all })
+    }
     else if (index === 1) root.setWorkspaceCount(
       (String(settings.strategy || "") === "manual"
         ? Model.manualWorkspaceCount(settings)
@@ -1372,10 +1384,6 @@ Panel {
         group_size: Math.floor(root.bounded(Number(settings.group_size || 3) + delta,
           1, root.workspaceValueMaximum))
       })
-    }
-    else if (index === root.workspacePersistenceKeyboardIndex) {
-      if (root.editorDocument.workspace_persistence_supported === true && root.workspaceStrategy !== "manual")
-        root.editWorkspaces({ persist_all: !settings.persist_all })
     }
     else {
       if (String(settings.strategy || "") === "manual") {
@@ -4532,7 +4540,7 @@ Panel {
                   ownerOpen: root.opened && root.expanded
                   width: parent.width
                   label: Strings.t("workspace.strategy", "STRATEGY")
-                  options: Model.workspaceStrategyOptions()
+                  options: root.workspaceStrategyOptions
                   value: root.workspaceStrategyChoice
                   enabled: root.editorReady && !root.editPending
                   hasCursor: root.expanded && root.activePage === "workspaces"
@@ -4560,8 +4568,16 @@ Panel {
                   value: "—"
                 }
 
+                InfoRow {
+                  id: workspaceCountPerDisplayRow
+                  visible: root.workspacePerDisplay
+                  width: parent.width
+                  label: Strings.t("workspace.rowLabel", "Workspaces")
+                  value: Strings.t("workspace.perDisplayCount", "10 per display")
+                }
+
                 Row {
-                  visible: !root.workspacesOff
+                  visible: !root.workspacesOff && !root.workspacePerDisplay
                   width: parent.width
                   spacing: Style.space(10)
 
@@ -4612,9 +4628,17 @@ Panel {
 
                 }
 
+                InfoRow {
+                  id: workspacePersistenceDelegatedRow
+                  visible: root.workspacePerDisplayDelegated
+                  width: parent.width
+                  label: Strings.t("workspace.persistenceHeader", "Persistence")
+                  value: Strings.t("workspace.setByOmarchy", "Set by Omarchy")
+                }
+
                 PanelDropdown {
                   id: workspacePersistenceDropdown
-                  visible: !root.workspacesOff
+                  visible: !root.workspacesOff && !root.workspacePerDisplayDelegated
                   popupParent: keyCatcher
                   ownerOpen: root.opened && root.expanded
                   width: parent.width
@@ -4639,15 +4663,29 @@ Panel {
                 PanelSeparator { visible: !root.workspacesOff; foreground: root.foreground }
 
                 PanelSectionHeader {
-                  visible: !root.workspacesOff
+                  visible: !root.workspacesOff && !root.workspacePerDisplayDelegated
                   text: String(((root.draftProfile || {}).workspaces || {}).strategy || "") === "manual"
                     ? Strings.t("workspace.assignHeader", "WORKSPACE → DISPLAY") : Strings.t("workspace.orderHeader", "MONITOR ORDER")
                   foreground: root.foreground
                   fontFamily: root.fontFamily
                 }
 
+                // Omarchy numbers its displays itself, laptop screen first, and
+                // keeps each one's block wherever it is plugged in.
+                Text {
+                  visible: root.workspacePerDisplayDelegated
+                  width: parent.width
+                  textFormat: Text.PlainText
+                  wrapMode: Text.WordWrap
+                  text: Strings.t("workspace.perDisplayOmarchy",
+                    "Omarchy gives each display workspaces 1-10 of its own and picks its block, laptop screen first. The plan shows the numbers to use in window rules.")
+                  color: root.dim
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                }
+
                 Repeater {
-                  model: root.workspacesOff
+                  model: root.workspacesOff || root.workspacePerDisplayDelegated
                     || String(((root.draftProfile || {}).workspaces || {}).strategy || "") === "manual"
                     ? [] : (((root.draftProfile || {}).workspaces || {}).monitor_order || [])
 

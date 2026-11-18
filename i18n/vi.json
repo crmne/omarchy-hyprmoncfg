@@ -249,6 +249,7 @@
   "option.strategyInterleaved": "Xen kẽ",
   "option.strategyManual": "Thủ công",
   "option.strategyOff": "Tắt",
+  "option.strategyPerDisplay": "Theo màn hình",
   "option.strategySequential": "Tuần tự",
   "option.vrrFullscreen": "Toàn màn hình",
   "option.vrrOff": "Tắt",
@@ -400,6 +401,8 @@
   "workspace.noRules": "Chưa cấu hình quy tắc workspace",
   "workspace.offMessage": "Tắt: hyprmoncfg không ghi quy tắc workspace nào.",
   "workspace.orderHeader": "THỨ TỰ MÀN HÌNH",
+  "workspace.perDisplayCount": "10 mỗi màn hình",
+  "workspace.perDisplayOmarchy": "Omarchy cấp cho mỗi màn hình các workspace 1-10 riêng và chọn khối của nó, màn hình laptop trước. Kế hoạch hiển thị các số dùng trong quy tắc cửa sổ.",
   "workspace.persistence": "DUY TRÌ",
   "workspace.persistenceAll": "Tất cả đã gán",
   "workspace.persistenceCustom": "Tùy chỉnh (theo quy tắc)",
@@ -410,6 +413,7 @@
   "workspace.requiresNewerDaemon": "Cần daemon mới hơn",
   "workspace.row": "Workspace %1",
   "workspace.rowLabel": "Workspace",
+  "workspace.setByOmarchy": "Do Omarchy đặt",
   "workspace.strategy": "CHIẾN LƯỢC",
   "workspace.strategySummary": {
     "other": "%2 · %1 workspace"

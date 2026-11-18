@@ -303,9 +303,15 @@ Group size appears only for Sequential; large values retain direct entry. Manual
 mode exposes per-workspace assignment. Persistence offers First per display and
 All assigned when `workspace_persistence_supported` is true; otherwise it shows
 Requires newer daemon. Manual mode retains per-rule flags. Strategy offers Off,
-Manual, Sequential, and Interleaved; Off is the stored `enabled: false`, keeps the
+Manual, Sequential, and Interleaved, plus Per display when the daemon lists
+`per_display` in `workspace_strategies`; Off is the stored `enabled: false`, keeps the
 saved strategy and plan, writes no workspace rules, and suits user-managed rules
 or tools such as hyprsplit. While Off, the other plan values are inert.
+Per display gives each display workspaces 1-10 of its own and shows the count as
+10 per display, with no Group size. When the editor document names a
+`workspace_per_display_delegate`, Omarchy runs those workspaces: Persistence reads
+Set by Omarchy, the monitor order is replaced by a note that Omarchy picks each
+display's block, and only Strategy remains a keyboard stop.
 
 The optional hyprmoncfg Workspaces picker is offered inside the top of the
 Workspaces canvas, with its real grouped-number preview in physical left-to-right,

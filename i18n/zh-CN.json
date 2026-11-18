@@ -249,6 +249,7 @@
   "option.strategyInterleaved": "交错",
   "option.strategyManual": "手动",
   "option.strategyOff": "关闭",
+  "option.strategyPerDisplay": "按显示器",
   "option.strategySequential": "顺序",
   "option.vrrFullscreen": "全屏",
   "option.vrrOff": "关闭",
@@ -400,6 +401,8 @@
   "workspace.noRules": "未配置工作区规则",
   "workspace.offMessage": "关闭：hyprmoncfg 不写入工作区规则。",
   "workspace.orderHeader": "显示器顺序",
+  "workspace.perDisplayCount": "每台显示器 10 个",
+  "workspace.perDisplayOmarchy": "Omarchy 为每台显示器分配各自的工作区 1-10，并为其选择编号段，笔记本屏幕优先。方案会显示窗口规则中要使用的编号。",
   "workspace.persistence": "持久性",
   "workspace.persistenceAll": "全部已分配",
   "workspace.persistenceCustom": "自定义（按规则）",
@@ -410,6 +413,7 @@
   "workspace.requiresNewerDaemon": "需要更新版本的守护进程",
   "workspace.row": "工作区 %1",
   "workspace.rowLabel": "工作区",
+  "workspace.setByOmarchy": "由 Omarchy 设置",
   "workspace.strategy": "策略",
   "workspace.strategySummary": {
     "other": "%2 · %1 个工作区"

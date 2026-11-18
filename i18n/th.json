@@ -249,6 +249,7 @@
   "option.strategyInterleaved": "สลับกัน",
   "option.strategyManual": "กำหนดเอง",
   "option.strategyOff": "ปิด",
+  "option.strategyPerDisplay": "ต่อจอภาพ",
   "option.strategySequential": "ตามลำดับ",
   "option.vrrFullscreen": "เต็มหน้าจอ",
   "option.vrrOff": "ปิด",
@@ -400,6 +401,8 @@
   "workspace.noRules": "ไม่ได้กำหนดกฎเวิร์กสเปซ",
   "workspace.offMessage": "ปิด: hyprmoncfg ไม่เขียนกฎเวิร์กสเปซ",
   "workspace.orderHeader": "ลำดับจอภาพ",
+  "workspace.perDisplayCount": "10 ต่อจอภาพ",
+  "workspace.perDisplayOmarchy": "Omarchy ให้แต่ละจอภาพมีเวิร์กสเปซ 1-10 ของตัวเองและเลือกช่วงหมายเลขให้ โดยเริ่มจากหน้าจอแล็ปท็อป แผนจะแสดงหมายเลขที่ใช้ในกฎหน้าต่าง",
   "workspace.persistence": "การคงอยู่",
   "workspace.persistenceAll": "ทั้งหมดที่กำหนด",
   "workspace.persistenceCustom": "กำหนดเอง (ตามกฎ)",
@@ -410,6 +413,7 @@
   "workspace.requiresNewerDaemon": "ต้องใช้เดมอนรุ่นใหม่กว่า",
   "workspace.row": "เวิร์กสเปซ %1",
   "workspace.rowLabel": "เวิร์กสเปซ",
+  "workspace.setByOmarchy": "Omarchy กำหนด",
   "workspace.strategy": "กลยุทธ์",
   "workspace.strategySummary": {
     "other": "%2 · เวิร์กสเปซ %1 แห่ง"

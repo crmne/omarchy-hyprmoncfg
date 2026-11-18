@@ -249,6 +249,7 @@
   "option.strategyInterleaved": "Berselang",
   "option.strategyManual": "Manual",
   "option.strategyOff": "Mati",
+  "option.strategyPerDisplay": "Setiap paparan",
   "option.strategySequential": "Berurutan",
   "option.vrrFullscreen": "Skrin penuh",
   "option.vrrOff": "Mati",
@@ -400,6 +401,8 @@
   "workspace.noRules": "Tiada peraturan ruang kerja dikonfigurasi",
   "workspace.offMessage": "Mati: hyprmoncfg tidak menulis peraturan ruang kerja.",
   "workspace.orderHeader": "SUSUNAN MONITOR",
+  "workspace.perDisplayCount": "10 setiap paparan",
+  "workspace.perDisplayOmarchy": "Omarchy memberi setiap paparan ruang kerja 1-10 tersendiri dan memilih bloknya, bermula dengan skrin komputer riba. Pelan menunjukkan nombor untuk digunakan dalam peraturan tetingkap.",
   "workspace.persistence": "KEKEKALAN",
   "workspace.persistenceAll": "Semua ditetapkan",
   "workspace.persistenceCustom": "Tersuai (setiap peraturan)",
@@ -410,6 +413,7 @@
   "workspace.requiresNewerDaemon": "Perlukan daemon lebih baharu",
   "workspace.row": "Ruang kerja %1",
   "workspace.rowLabel": "Ruang kerja",
+  "workspace.setByOmarchy": "Ditetapkan oleh Omarchy",
   "workspace.strategy": "STRATEGI",
   "workspace.strategySummary": {
     "other": "%2 · %1 ruang kerja"
