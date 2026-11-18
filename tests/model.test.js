@@ -2377,6 +2377,15 @@ test("lid-closed match reasons have labels", () => {
   assert.equal(rows[1].value, "+50   1 display built-in, turned off by the closed lid")
 })
 
+test("another unit of a saved model has a match reason label", () => {
+  const rows = Model.profileMatchReasonRows({ match_score: 160, match_reasons: [
+    { kind: "connected", count: 1, points: 100 },
+    { kind: "connected_same_model", count: 1, points: 60 },
+  ] })
+  assert.equal(rows[1].value, "+60   1 display connected, same model, different unit")
+  assert.equal(rows[1].positive, true)
+})
+
 test("expanded mode survives the bar rebuild a preview triggers", () => {
   const guard = previewGuard()
   guard.root.setPanelExpanded(true)

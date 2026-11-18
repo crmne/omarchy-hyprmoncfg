@@ -208,6 +208,10 @@
     "one": "%1 display connected, kept off",
     "other": "%1 displays connected, kept off"
   },
+  "match.reason.connectedSameModel": {
+    "one": "%1 display connected, same model, different unit",
+    "other": "%1 displays connected, same model, different unit"
+  },
   "match.reason.connectedUnknown": {
     "one": "%1 display connected, not in profile",
     "other": "%1 displays connected, not in profile"

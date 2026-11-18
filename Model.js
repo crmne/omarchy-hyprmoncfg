@@ -1176,6 +1176,7 @@ function matchReasonLabel(kind, count) {
     case "connected_kept_off": return Strings.tn("match.reason.connectedKeptOff", count, "%1 display connected, kept off", "%1 displays connected, kept off")
     case "not_connected": return Strings.tn("match.reason.notConnected", count, "%1 display not connected", "%1 displays not connected")
     case "not_connected_kept_off": return Strings.tn("match.reason.notConnectedKeptOff", count, "%1 display not connected, kept off", "%1 displays not connected, kept off")
+    case "connected_same_model": return Strings.tn("match.reason.connectedSameModel", count, "%1 display connected, same model, different unit", "%1 displays connected, same model, different unit")
     case "connected_unknown": return Strings.tn("match.reason.connectedUnknown", count, "%1 display connected, not in profile", "%1 displays connected, not in profile")
     case "lid_closed_kept_off": return Strings.tn("match.reason.lidClosedKeptOff", count, "%1 display built-in, kept off with the lid closed", "%1 displays built-in, kept off with the lid closed")
     case "lid_closed_on": return Strings.tn("match.reason.lidClosedOn", count, "%1 display built-in, turned off by the closed lid", "%1 displays built-in, turned off by the closed lid")
