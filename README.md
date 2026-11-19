@@ -37,6 +37,15 @@ icon while keeping the editor, IPC routing and persistent preview guard loaded.
 The default is `true`. Keep the entry in the bar configuration; removing it
 also removes the route to the editor.
 
+To open and close the panel with a key, add a binding to
+`~/.config/hypr/bindings.lua`:
+
+```lua
+o.bind("SUPER + ALT + M", "Display layouts", { panel = "crmne.hyprmoncfg" })
+```
+
+From a script, `omarchy-shell shell toggle crmne.hyprmoncfg` does the same.
+
 A customized Omarchy Display menu can open the editor using:
 
 ```bash
