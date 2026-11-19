@@ -722,7 +722,7 @@ test("expanded profile and workspace panes use daemon-owned documents", () => {
   assert.equal(Model.profileWorkspaceSummary(editor.profiles[0]), "Sequential · 8 workspaces")
   assert.deepEqual(Model.workspacePlanRows([
     { output_key: "desk", output_name: "Desk display", workspaces: ["1", "2"] }
-  ]), [{ key: "desk", name: "Desk display", workspaces: "1, 2" }])
+  ]), [{ key: "desk", name: "Desk display", workspaces: "1, 2", ids: "1, 2", slots: false }])
 
   const detailed = {
     name: "Desk",
@@ -733,7 +733,7 @@ test("expanded profile and workspace panes use daemon-owned documents", () => {
   }
   assert.deepEqual(Model.workspacePlanRows([
     { output_key: "desk", output_name: "DP-1", workspaces: ["1", "2"] }
-  ], detailed), [{ key: "desk", name: "Microstep MPG321UR-QD", workspaces: "1, 2" }])
+  ], detailed), [{ key: "desk", name: "Microstep MPG321UR-QD", workspaces: "1, 2", ids: "1, 2", slots: false }])
   assert.equal(Model.outputDisplayLabel(detailed, "laptop"), "Samsung ATNA")
   assert.equal(Model.profileMatchLabel({ active: true, match_score: 150 }), "Active · score 150")
   assert.deepEqual(Model.profileMatchReasonRows({
@@ -1182,8 +1182,8 @@ test("the workspace form hides irrelevant group size and adapts keyboard navigat
   assert.match(qml, /id: workspaceGroupSizeField\s+visible: root\.workspaceGroupSizeApplicable/)
   assert.match(qml, /width: root\.workspaceGroupSizeApplicable\s+\? \(parent\.width - parent\.spacing\) \/ 2 : parent\.width/)
   // Hiding Group Size also removes its keyboard stop; assignment rows move up.
-  assert.match(qml, /readonly property int workspacePersistenceKeyboardIndex: root\.workspacesOff \|\| root\.workspacePerDisplayDelegated \? -1\s+: root\.workspaceGroupSizeApplicable \? 3 : root\.workspacePerDisplay \? 1 : 2/)
-  assert.match(qml, /readonly property int workspaceListKeyboardStart: root\.workspacesOff \|\| root\.workspacePerDisplayDelegated \? 1\s+: root\.workspacePersistenceKeyboardIndex \+ 1/)
+  assert.match(qml, /readonly property int workspacePersistenceKeyboardIndex: root\.workspacesOff \|\| root\.workspacePerDisplayDelegated \? -1\s+: root\.workspaceGroupSizeApplicable \? 3 : 2/)
+  assert.match(qml, /readonly property int workspaceListKeyboardStart: root\.workspacesOff \? 1\s+: root\.workspacePerDisplayDelegated \? 2 : root\.workspacePersistenceKeyboardIndex \+ 1/)
   assert.match(qml, /root\.workspaceKeyboardIndex === root\.workspaceListKeyboardStart \+ index/)
   assert.doesNotMatch(qml, /root\.workspaceKeyboardIndex === 4 \+ index/)
 })
@@ -1353,7 +1353,7 @@ test("every panel canvas uses the same adaptive card with contextual emphasis", 
   // Workspaces are bare-ID chips, or one pill with the shared text when they do not fit.
   assert.match(canvasQml, /readonly property var workspaceIds: workspaceText === "" \? \[\] : workspaceText\.split\(", "\)/)
   assert.match(canvasQml, /visible: root\.detailed && card\.workspaceIds\.length > 0/)
-  assert.match(canvasQml, /model: card\.chipsFit \? card\.workspaceIds : \[card\.workspaceText\]/)
+  assert.match(canvasQml, /model: card\.chipsFit \? card\.workspaceIds : \[card\.workspaceLabelText\]/)
   assert.match(canvasQml, /visible: !card\.compact && root\.detailed/)
   assert.doesNotMatch(canvasQml, /showWorkspaces/)
 })
@@ -2271,14 +2271,17 @@ test("Per display is offered only by a daemon that can save it", () => {
   assert.deepEqual(Model.workspaceStrategyOptions(["manual", "sequential", "interleave", "per_display"]).map(option => option.label),
     ["Off", "Manual", "Sequential", "Interleaved", "Per display"])
   // A saved profile still reads by name even before the daemon is known.
-  assert.equal(Model.profileWorkspaceSummary({ workspaces: { enabled: true, strategy: "per_display", max_workspaces: 6 } }), "Per display")
+  // Per display counts its workspaces per display; max_workspaces is inert.
+  assert.equal(Model.profileWorkspaceSummary({ workspaces: { enabled: true, strategy: "per_display", max_workspaces: 6 } }), "Per display · 10 workspaces")
+  assert.equal(Model.profileWorkspaceSummary({ workspaces: { enabled: true, strategy: "per_display", slots_per_display: 4 } }), "Per display · 4 workspaces")
   assert.equal(Model.workspacePerDisplayDelegate({ workspace_per_display_delegate: "omarchy" }), "omarchy")
   assert.equal(Model.workspacePerDisplayDelegate({}), "")
 })
 
-test("Omarchy's per-display workspaces leave only Strategy editable", () => {
+test("Omarchy's per-display workspaces leave only Strategy and the count editable", () => {
   const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
   assert.match(qml, /workspacePersistenceKeyboardIndex: root\.workspacesOff \|\| root\.workspacePerDisplayDelegated \? -1/)
+  assert.match(qml, /workspaceListKeyboardStart: root\.workspacesOff \? 1\s+: root\.workspacePerDisplayDelegated \? 2/)
   assert.match(qml, /if \(root\.workspacesOff \|\| root\.workspacePerDisplayDelegated\) return root\.workspaceListKeyboardStart/)
   assert.match(qml, /label: "Persistence"\s+value: "Set by Omarchy"/)
   assert.match(qml, /model: root\.workspacesOff \|\| root\.workspacePerDisplayDelegated/)
@@ -2489,4 +2492,83 @@ test("the panel offers Rename and Calibrate only to a daemon that supports them"
   assert.match(panel, /root\.renameSupported \? \[\{ id: "rename"/)
   assert.match(panel, /root\.rotation\.calibration_supported === true/)
   assert.match(panel, /send\("rename_profile", \{ name: name, new_name: next \}/)
+})
+
+test("Per display counts workspaces per display, 1 to 10, absent meaning 10", () => {
+  assert.equal(Model.workspaceSlotsPerDisplay({}), 10)
+  assert.equal(Model.workspaceSlotsPerDisplay({ slots_per_display: 0 }), 10)
+  assert.equal(Model.workspaceSlotsPerDisplay({ slots_per_display: 4 }), 4)
+  assert.equal(Model.workspaceSlotsPerDisplay({ slots_per_display: 11 }), 10)
+  assert.equal(Model.workspaceSlotsPerDisplay(undefined), 10)
+
+  const edits = []
+  const root = { managedChecked: true, editPending: false, previewTransaction: "",
+    draftProfile: { workspaces: { enabled: true, strategy: "per_display", max_workspaces: 9 } },
+    workspaceKeyboardIndex: 1, workspacesOff: false, workspacePerDisplay: true,
+    workspacePerDisplayDelegated: true, workspaceGroupSizeApplicable: false,
+    workspacePlanKeyboardCount: () => 2, pickerOfferVisible: false,
+    workspacePersistenceKeyboardIndex: -1, workspaceListKeyboardStart: 2, workspaceSlotsMaximum: 10,
+    editorDocument: { workspace_persistence_supported: true },
+    bounded: (v, lo, hi) => Math.min(hi, Math.max(lo, v)),
+    editWorkspaces: value => edits.push(JSON.parse(JSON.stringify(value))) }
+  root.setWorkspaceSlots = panelFunction("setWorkspaceSlots", root)
+  const adjust = panelFunction("adjustWorkspaceKeyboard", root)
+  // Editable under Omarchy too, and clamped to the ten-wide block.
+  adjust(1)
+  assert.deepEqual(edits.pop(), { slots_per_display: 10 })
+  adjust(-1)
+  assert.deepEqual(edits.pop(), { slots_per_display: 9 })
+  root.draftProfile.workspaces.slots_per_display = 1
+  adjust(-1)
+  assert.deepEqual(edits.pop(), { slots_per_display: 1 })
+  root.workspacePerDisplayDelegated = false
+  root.draftProfile.workspaces.slots_per_display = 5
+  adjust(1)
+  assert.deepEqual(edits.pop(), { slots_per_display: 6 })
+  // It never edits max_workspaces, which Per display ignores.
+  assert.equal(edits.length, 0)
+
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  assert.match(qml, /id: workspaceSlotsField[\s\S]*?from: 1\s+to: root\.workspaceSlotsMaximum\s+value: Model\.workspaceSlotsPerDisplay/)
+  assert.match(qml, /"workspace\.perDisplayCount", "%1 per display",\s+workspaceSlotsField\.value/)
+})
+
+test("Per display plans read by slot, keeping global IDs for rules and switching", () => {
+  const profile = { outputs: [{ key: "a", name: "eDP-1" }, { key: "b", name: "DP-1" }],
+    workspaces: { enabled: true, strategy: "per_display", slots_per_display: 3 } }
+  const plan = [
+    { output_key: "a", workspaces: ["1", "2", "3"] },
+    { output_key: "b", workspaces: ["11", "12", "13"] },
+    { output_key: "c", workspaces: ["30"] }
+  ]
+  const rows = Model.workspacePlanRows(plan, profile)
+  assert.deepEqual(rows.map(row => row.workspaces), ["1, 2, 3", "1, 2, 3 (11-13)", "10 (30)"])
+  assert.deepEqual(rows.map(row => row.ids), ["1, 2, 3", "11, 12, 13", "30"])
+  assert.ok(rows.every(row => row.slots === true))
+  assert.equal(Model.workspaceSlot("20"), "10")
+  assert.equal(Model.workspaceSlot(21), "1")
+  assert.equal(Model.workspaceSlot("name"), "name")
+
+  // Other strategies, and Off, keep bare global IDs.
+  profile.workspaces.strategy = "sequential"
+  assert.equal(Model.workspacePlanRows(plan, profile)[1].workspaces, "11, 12, 13")
+  profile.workspaces = { enabled: false, strategy: "per_display" }
+  assert.equal(Model.workspacePlanRows(plan, profile)[1].workspaces, "11, 12, 13")
+
+  const qml = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  assert.match(qml, /workspaceIds: Picker\.workspaceIds\(String\(modelData\.ids \|\| ""\)\)\s+slotLabels: modelData\.slots === true/)
+  const row = fs.readFileSync(path.join(__dirname, "..", "WorkspacePlanRow.qml"), "utf8")
+  assert.match(row, /text: root\.slotLabels \? Model\.workspaceSlot\(modelData\) : String\(modelData\)/)
+  assert.match(row, /onClicked: root\.chosen\(Number\(modelData\)\)/)
+})
+
+test('the display canvas labels per-display workspaces by slot and keeps IDs elsewhere', () => {
+  assert.equal(Model.workspaceSlotLabels({ workspaces: { enabled: true, strategy: 'per_display' } }), true)
+  assert.equal(Model.workspaceSlotLabels({ workspaces: { enabled: false, strategy: 'per_display' } }), false)
+  assert.equal(Model.workspaceSlotLabels({ workspaces: { enabled: true, strategy: 'sequential' } }), false)
+  assert.equal(Model.workspaceSlotLabels(null), false)
+  assert.deepEqual(['11', '12', '20'].map(Model.workspaceSlot), ['1', '2', '10'])
+  const canvas = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'DisplayCanvas.qml'), 'utf8')
+  assert.match(canvas, /root\.slotLabels && card\.chipsFit \? Model\.workspaceSlot\(modelData\)/)
+  assert.match(canvas, /registerChip\(String\(modelData\), chip\)/)
 })

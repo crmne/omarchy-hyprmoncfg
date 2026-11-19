@@ -2,12 +2,15 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "Model.js" as Model
 
 Item {
   id: root
   property string label: ""
   property var workspaceIds: []
   property bool switchingEnabled: false
+  // Per display labels each workspace by its slot on its display (11 reads 1).
+  property bool slotLabels: false
   property color foreground: Commons.Color.foreground
   property string fontFamily: Style.font.family
   signal chosen(int workspaceId)
@@ -31,7 +34,7 @@ Item {
       model: root.workspaceIds
       Button {
         required property var modelData
-        text: String(modelData)
+        text: root.slotLabels ? Model.workspaceSlot(modelData) : String(modelData)
         foreground: Commons.Color.accent
         fontFamily: root.fontFamily
         fontSize: Style.font.body

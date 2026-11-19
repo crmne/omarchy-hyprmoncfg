@@ -1134,9 +1134,9 @@ function profileWorkspaceSummary(profile) {
   var settings = (profile || {}).workspaces || {}
   if (!settings.enabled) return Strings.t("workspace.disabled", "Disabled")
   var strategy = workspaceStrategyLabel(String(settings.strategy || "manual"))
-  // Per display fixes ten workspaces on each display; the stored count is inert.
-  if (String(settings.strategy || "") === "per_display") return strategy
-  var maximum = Number(settings.max_workspaces || 0)
+  // Per display counts the workspaces each display gets; max_workspaces is inert.
+  var maximum = String(settings.strategy || "") === "per_display"
+    ? workspaceSlotsPerDisplay(settings) : Number(settings.max_workspaces || 0)
   return maximum > 0
     ? Strings.tn("workspace.strategySummary", maximum, "%2 · %1 workspace", "%2 · %1 workspaces", strategy)
     : strategy
@@ -1434,6 +1434,23 @@ function workspacePerDisplayDelegate(document) {
   return String((document || {}).workspace_per_display_delegate || "")
 }
 
+// Per display gives every display a block of ten workspace IDs (1-10, 11-20,
+// ...) and uses its first slots_per_display of them; unset or 0 means all ten.
+var workspaceBlockSize = 10
+
+function workspaceSlotsPerDisplay(settings) {
+  var slots = Math.floor(Number((settings || {}).slots_per_display || 0))
+  return slots >= 1 && slots <= workspaceBlockSize ? slots : workspaceBlockSize
+}
+
+// The number a global workspace ID has on its own display under Per display,
+// as Omarchy's bar and Super + number show it: 11 is 1, 20 is 10.
+function workspaceSlot(id) {
+  var value = Number(id)
+  if (!isFinite(value) || value < 1 || Math.floor(value) !== value) return String(id)
+  return String((value - 1) % workspaceBlockSize + 1)
+}
+
 function workspaceOffMessage() {
   return Strings.t("workspace.offMessage", "Off: hyprmoncfg writes no workspace rules.")
 }
@@ -1457,17 +1474,37 @@ function workspaceStrategyChanges(settings, choice) {
   return changes
 }
 
+// Under Per display each display's workspaces read by slot (1, 2, 3) as in
+// Omarchy's bar, followed by the global IDs window rules use when they differ
+// ("1, 2, 3 (11-13)"). `ids` always keeps the global IDs for switching.
+function workspaceSlotLabels(profile) {
+  var settings = (profile || {}).workspaces || {}
+  return settings.enabled !== false && String(settings.strategy || "") === "per_display"
+}
+
 function workspacePlanRows(plan, profile) {
   var rows = plan instanceof Array ? plan : []
+  var slots = workspaceSlotLabels(profile)
   return rows.map(function(row) {
     var item = row || {}
-    var workspaces = item.workspaces instanceof Array ? item.workspaces.join(", ") : ""
+    var ids = item.workspaces instanceof Array ? item.workspaces.map(String) : []
+    var workspaces = slots ? workspaceSlotText(ids) : ids.join(", ")
     return {
       key: String(item.output_key || ""),
       name: profile ? outputDisplayLabel(profile, item.output_key) : String(item.output_name || displayFallback()),
-      workspaces: workspaces || "—"
+      workspaces: workspaces || "—",
+      ids: ids.join(", "),
+      slots: slots
     }
   })
+}
+
+function workspaceSlotText(ids) {
+  if (ids.length === 0) return ""
+  var labels = ids.map(workspaceSlot)
+  if (labels.join(", ") === ids.join(", ")) return labels.join(", ")
+  var first = ids[0], last = ids[ids.length - 1]
+  return labels.join(", ") + " (" + (first === last ? first : first + "-" + last) + ")"
 }
 
 function enabledOutputCount(profile) {
@@ -2209,6 +2246,9 @@ if (typeof module !== "undefined") {
     workspaceStrategyChoice: workspaceStrategyChoice,
     workspaceStrategyChanges: workspaceStrategyChanges,
     workspacePlanRows: workspacePlanRows,
+    workspaceSlotsPerDisplay: workspaceSlotsPerDisplay,
+    workspaceSlot: workspaceSlot,
+    workspaceSlotLabels: workspaceSlotLabels,
     enabledOutputCount: enabledOutputCount,
     layoutMetrics: layoutMetrics,
     workspaceText: workspaceText,

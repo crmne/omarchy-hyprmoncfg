@@ -307,11 +307,16 @@ Manual, Sequential, and Interleaved, plus Per display when the daemon lists
 `per_display` in `workspace_strategies`; Off is the stored `enabled: false`, keeps the
 saved strategy and plan, writes no workspace rules, and suits user-managed rules
 or tools such as hyprsplit. While Off, the other plan values are inert.
-Per display gives each display workspaces 1-10 of its own and shows the count as
-10 per display, with no Group size. When the editor document names a
-`workspace_per_display_delegate`, Omarchy runs those workspaces: Persistence reads
-Set by Omarchy, the monitor order is replaced by a note that Omarchy picks each
-display's block, and only Strategy remains a keyboard stop.
+Per display gives each display a block of ten workspace IDs (1-10, 11-20, ...) and
+uses the first `slots_per_display` of them. The Workspaces stepper edits that count,
+1-10, beside "N per display"; an absent or 0 value shows as 10, `max_workspaces` is
+inert, and there is no Group size. The plan labels each display's workspaces by slot
+(1, 2, 3), as Omarchy's bar does, followed by the global IDs window rules use in
+parentheses when they differ ("1, 2, 3 (11-13)"); switching still targets the global
+ID. When the editor document names a `workspace_per_display_delegate`, Omarchy runs
+those workspaces: Persistence reads Set by Omarchy, the monitor order is replaced by
+a note that Omarchy picks each display's block, and only Strategy and the count
+remain keyboard stops.
 
 The optional hyprmoncfg Workspaces picker is offered inside the top of the
 Workspaces canvas, with its real grouped-number preview in physical left-to-right,

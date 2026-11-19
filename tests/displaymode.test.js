@@ -211,7 +211,7 @@ test("letter aliases cover the arrows' Ctrl and Alt moves and leave Shift to the
 test("no text entry can receive a letter the canvas or the catcher took", () => {
   const blocked = qml.match(/blocked: root\.execEditing[\s\S]*?\n\s+onMoveRequested/)[0]
   for (const id of ["profileNameInput", "positionXField", "positionYField", "workspaceCountField",
-    "workspaceGroupSizeField", "sdrBrightnessField", "sdrSaturationField", "sdrMinLuminanceField",
+    "workspaceGroupSizeField", "workspaceSlotsField", "sdrBrightnessField", "sdrSaturationField", "sdrMinLuminanceField",
     "sdrMaxLuminanceField", "minLuminanceField", "maxLuminanceField", "maxAvgLuminanceField",
     "iccProfileInput", "scaleField.customInput", "rotateMenu.visible"])
     assert.ok(blocked.includes(id), id)

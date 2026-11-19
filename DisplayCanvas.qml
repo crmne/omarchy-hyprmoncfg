@@ -20,6 +20,9 @@ BorderSurface {
   property var profile: ({ outputs: [] })
   property var editorDisplays: []
   property var workspacePlan: []
+  // Under Per display the chips read by slot, as Omarchy's bar does: the
+  // second display's 11 shows as 1. They still stand for the global IDs.
+  readonly property bool slotLabels: Model.workspaceSlotLabels(root.profile)
   property string selectedKey: ""
   property bool interactive: true
   property bool selectable: interactive
@@ -210,6 +213,7 @@ BorderSurface {
         readonly property bool selected: String(modelData.key || "") === root.selectedKey
         readonly property string workspaceText: Model.workspaceText(root.workspacePlan, modelData.key)
         readonly property var workspaceIds: workspaceText === "" ? [] : workspaceText.split(", ")
+        readonly property string workspaceLabelText: root.slotLabels ? card.workspaceIds.map(Model.workspaceSlot).join(", ") : card.workspaceText
         // Many workspaces: one elided pill with the shared text instead of chips.
         readonly property bool chipsFit: workspaceIds.length * Style.space(22) <= width * 0.6
         readonly property var summary: Model.displaySummary(modelData,
@@ -329,7 +333,7 @@ BorderSurface {
           spacing: Style.space(3)
 
           Repeater {
-            model: card.chipsFit ? card.workspaceIds : [card.workspaceText]
+            model: card.chipsFit ? card.workspaceIds : [card.workspaceLabelText]
             Rectangle {
               id: chip
               required property var modelData
@@ -350,7 +354,7 @@ BorderSurface {
                 width: Math.min(implicitWidth, card.width * 0.6 - Style.space(8))
                 elide: Text.ElideRight
                 textFormat: Text.PlainText
-                text: String(modelData)
+                text: root.slotLabels && card.chipsFit ? Model.workspaceSlot(modelData) : String(modelData)
                 color: parent.strong ? Commons.Color.background : root.accent
                 font.family: root.fontFamily
                 font.pixelSize: parent.strong ? Style.font.bodySmall : Style.font.caption

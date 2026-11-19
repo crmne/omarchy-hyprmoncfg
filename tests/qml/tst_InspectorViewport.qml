@@ -17,6 +17,33 @@ Rectangle {
   }
 
   Component {
+    id: anchoredComponent
+
+    Item {
+      x: 20.4
+      width: 300
+      height: 120
+      property alias viewport: inner
+
+      InspectorViewport {
+        id: inner
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: parent.height
+        formHeight: 40
+        property alias firstField: bordered
+
+        Rectangle {
+          id: bordered
+          width: parent.width
+          height: 40
+          border.width: 1
+        }
+      }
+    }
+  }
+
+  Component {
     id: formComponent
 
     InspectorViewport {
@@ -134,7 +161,22 @@ Rectangle {
       viewport.lastField.forceActiveFocus()
       tryCompare(viewport, "contentY", expected)
       verify(fullyVisible(viewport.lastField))
-      if (!data.scrolls) compare(viewport.firstField.width, viewport.width)
+      if (!data.scrolls) compare(viewport.firstField.width, viewport.width - 2 * viewport.bleed)
+    }
+
+    // The clip reaches a pixel past each side so a border flush with the
+    // edge survives fractional scaling, while an anchored viewport's fields
+    // stay exactly where the layout puts them.
+    function test_anchored_fields_keep_their_place_inside_a_wider_clip() {
+      var anchored = anchoredComponent.createObject(stage)
+      verify(anchored)
+      var viewport = anchored.viewport
+      compare(viewport.x, -viewport.bleed)
+      compare(viewport.width, anchored.width + 2 * viewport.bleed)
+      var field = viewport.firstField
+      compare(field.mapToItem(anchored, 0, 0).x, 0)
+      compare(field.width, anchored.width)
+      anchored.destroy()
     }
 
     function test_focus_outside_the_form_does_not_scroll() {

@@ -438,6 +438,8 @@ Panel {
   // NumberField is backed by a QML int. Keep only that technical boundary;
   // workspace planning itself has no product-level maximum.
   readonly property int workspaceValueMaximum: 2147483647
+  // Per display's blocks are ten wide, so each display has at most ten.
+  readonly property int workspaceSlotsMaximum: 10
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property var selectedOutput: Model.outputByKey(root.draftProfile, root.selectedOutputKey)
   readonly property string profileDefaultsLabel: root.sourceProfile !== ""
@@ -478,19 +480,20 @@ Panel {
   readonly property string workspaceStrategyChoice: Model.workspaceStrategyChoice((root.draftProfile || {}).workspaces)
   readonly property bool workspacesOff: root.workspaceStrategyChoice === "off"
   readonly property bool workspaceGroupSizeApplicable: !root.workspacesOff && root.workspaceStrategy === "sequential"
-  // Per display fixes ten workspaces on each display. Where Omarchy runs its
-  // own per-monitor workspaces, it also picks the blocks and what persists.
+  // Per display gives each display its own block of workspaces. Where Omarchy
+  // runs its own per-monitor workspaces, it also picks the blocks and what persists.
   readonly property bool workspacePerDisplay: !root.workspacesOff && root.workspaceStrategy === "per_display"
   readonly property bool workspacePerDisplayDelegated: root.workspacePerDisplay
     && Model.workspacePerDisplayDelegate(root.editorDocument) !== ""
   readonly property var workspaceStrategyOptions: Model.workspaceStrategyOptions(
     (root.editorDocument || {}).workspace_strategies)
   // Off leaves only Strategy editable, so the inert rows are not keyboard stops.
-  // Per display has no count to edit, and under Omarchy nothing but Strategy.
+  // Per display edits its count per display in place of the workspace count, and
+  // under Omarchy only Strategy and that count remain.
   readonly property int workspacePersistenceKeyboardIndex: root.workspacesOff || root.workspacePerDisplayDelegated ? -1
-    : root.workspaceGroupSizeApplicable ? 3 : root.workspacePerDisplay ? 1 : 2
-  readonly property int workspaceListKeyboardStart: root.workspacesOff || root.workspacePerDisplayDelegated ? 1
-    : root.workspacePersistenceKeyboardIndex + 1
+    : root.workspaceGroupSizeApplicable ? 3 : 2
+  readonly property int workspaceListKeyboardStart: root.workspacesOff ? 1
+    : root.workspacePerDisplayDelegated ? 2 : root.workspacePersistenceKeyboardIndex + 1
   readonly property string selectedWorkspaceDisplayKey: {
     var index = root.workspaceKeyboardIndex - root.workspaceListKeyboardStart
     if (index < 0 || root.workspacesOff) return ""
@@ -1053,6 +1056,10 @@ Panel {
     root.editWorkspaces({ max_workspaces: maximum })
   }
 
+  function setWorkspaceSlots(value) {
+    root.editWorkspaces({ slots_per_display: Math.floor(root.bounded(Number(value || 1), 1, root.workspaceSlotsMaximum)) })
+  }
+
   function moveManualWorkspace(row, delta) {
     var settings = Model.clone((root.draftProfile || {}).workspaces || {}) || {}
     root.workspaceKeyboardIndex = root.workspaceListKeyboardStart + Number(row || 0)
@@ -1370,6 +1377,8 @@ Panel {
     if (index === 0) root.changeWorkspaceStrategy(
       Model.cycleOptionValue(root.workspaceStrategyOptions,
         Model.workspaceStrategyChoice(settings), delta))
+    else if (index === 1 && root.workspacePerDisplay)
+      root.setWorkspaceSlots(Model.workspaceSlotsPerDisplay(settings) + delta)
     else if (root.workspacesOff || root.workspacePerDisplayDelegated) return
     else if (index === root.workspacePersistenceKeyboardIndex) {
       if (root.editorDocument.workspace_persistence_supported === true && root.workspaceStrategy !== "manual")
@@ -2603,6 +2612,7 @@ Panel {
         || profileNameInput.activeFocus
         || positionXField.input.activeFocus || positionYField.input.activeFocus
         || workspaceCountField.field.activeFocus || workspaceGroupSizeField.field.activeFocus
+        || workspaceSlotsField.field.activeFocus
         || sdrBrightnessField.input.activeFocus || sdrSaturationField.input.activeFocus
         || sdrMinLuminanceField.input.activeFocus || sdrMaxLuminanceField.input.activeFocus
         || minLuminanceField.input.activeFocus || maxLuminanceField.input.activeFocus
@@ -4568,12 +4578,48 @@ Panel {
                   value: "—"
                 }
 
-                InfoRow {
+                // Per display counts each display's workspaces, 1-10, whoever
+                // runs them; the blocks stay ten wide.
+                Row {
                   id: workspaceCountPerDisplayRow
                   visible: root.workspacePerDisplay
                   width: parent.width
-                  label: Strings.t("workspace.rowLabel", "Workspaces")
-                  value: Strings.t("workspace.perDisplayCount", "10 per display")
+                  spacing: Style.space(10)
+
+                  NumberStepper {
+                    id: workspaceSlotsField
+                    width: (parent.width - parent.spacing) / 2
+                    fieldWidth: width
+                    label: Strings.t("workspace.countHeader", "WORKSPACES")
+                    from: 1
+                    to: root.workspaceSlotsMaximum
+                    value: Model.workspaceSlotsPerDisplay((root.draftProfile || {}).workspaces)
+                    enabled: !root.editPending
+                    hasCursor: root.expanded && root.activePage === "workspaces"
+                      && root.workspaceKeyboardIndex === 1
+                    foreground: root.foreground
+                    fontFamily: root.fontFamily
+                    onModified: function(value) {
+                      var returnToKeyboard = workspaceSlotsField.field.activeFocus
+                      if (!root.editPending) root.setWorkspaceSlots(value)
+                      if (returnToKeyboard)
+                        Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+                    }
+                  }
+
+                  Text {
+                    anchors.bottom: parent.bottom
+                    height: workspaceSlotsField.field.height
+                    width: (parent.width - parent.spacing) / 2
+                    verticalAlignment: Text.AlignVCenter
+                    textFormat: Text.PlainText
+                    elide: Text.ElideRight
+                    text: Strings.t("workspace.perDisplayCount", "%1 per display",
+                      workspaceSlotsField.value)
+                    color: root.dim
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                  }
                 }
 
                 Row {
@@ -4678,7 +4724,7 @@ Panel {
                   textFormat: Text.PlainText
                   wrapMode: Text.WordWrap
                   text: Strings.t("workspace.perDisplayOmarchy",
-                    "Omarchy gives each display workspaces 1-10 of its own and picks its block, laptop screen first. The plan shows the numbers to use in window rules.")
+                    "Omarchy gives each display its own workspaces and picks its block, laptop screen first. The plan shows each display's numbers, then in parentheses the ones window rules use.")
                   color: root.dim
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.caption
@@ -4939,7 +4985,8 @@ Panel {
                         visible: root.workspaceOnly
                         width: parent.width
                         label: String(modelData.name || Strings.t("common.display", "Display"))
-                        workspaceIds: Picker.workspaceIds(String(modelData.workspaces || ""))
+                        workspaceIds: Picker.workspaceIds(String(modelData.ids || ""))
+                        slotLabels: modelData.slots === true
                         switchingEnabled: root.pickerBlockedReason === ""
                         foreground: root.foreground
                         fontFamily: root.fontFamily

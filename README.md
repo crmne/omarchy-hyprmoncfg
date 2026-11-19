@@ -157,7 +157,7 @@ Neutral SDR multipliers are shown as 1, including profiles that omit them. Reset
 
 **Workspaces**
 
-- A workspace planner that lays your workspaces out across the displays in a profile: manual, sequential, interleaved, or per display, which gives every display workspaces 1-10 of its own and leaves them to Omarchy where Omarchy already does that
+- A workspace planner that lays your workspaces out across the displays in a profile: manual, sequential, interleaved, or per display, which gives every display its own workspaces, up to ten, numbered 1-N on each display as Omarchy's bar shows them, and leaves them to Omarchy where Omarchy already does that
 - When a plan change moves a workspace to another display, its numbered chip glides there on the canvas, so you can see what moved. It follows Hyprland's animations setting and never delays input
 - Choose Off when another tool, such as hyprsplit, manages your workspaces: hyprmoncfg then writes no workspace rules for that profile and keeps the plan for when you choose a strategy again
 - Set how many workspaces there are, how they group, and the monitor order they follow
