@@ -212,6 +212,12 @@ Item {
       return
     }
     if (id !== "") {
+      // The daemon only lets the client that started a preview confirm it.
+      // Adopting a preview started elsewhere (the TUI, or the panel's own
+      // fallback connection) would show a dialog whose Keep and Revert are
+      // always rejected with "interactive preview belongs to another client".
+      var ours = root.requestPending || (root.transactionId !== "" && root.transactionId === id)
+      if (!ours) return
       if (root.transactionId !== id) root.actionError = ""
       root.transactionId = id
       root.profileName = String(pending.profile_name
